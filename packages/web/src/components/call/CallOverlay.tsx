@@ -1,8 +1,3 @@
-/**
- * Оверлей звонков (WebRTC).
- * Состояния: входящий → исходящий → активный
- * Использует бесплатные STUN-серверы Google — звонки P2P, бесплатно.
- */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
@@ -23,40 +18,47 @@ const ICE_SERVERS: RTCIceServer[] = [
 ];
 
 export default function CallOverlay() {
-  const incoming = useCallStore((s) => s.incoming);
-  const active   = useCallStore((s) => s.active);
-  const outgoing = useCallStore((s) => s.outgoing);
+  const incoming  = useCallStore((s) => s.incoming);
+  const active    = useCallStore((s) => s.active);
+  const outgoing  = useCallStore((s) => s.outgoing);
   const clearCall = useCallStore((s) => s.clearCall);
   const setActive = useCallStore((s) => s.setActive);
 
-  const pcRef          = useRef<RTCPeerConnection | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const localVideoRef  = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const pcRef           = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef  = useRef<MediaStream | null>(null);
+  const localVideoRef   = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef  = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef  = useRef<HTMLAudioElement>(null);
 
-  const [muted,       setMuted]       = useState(false);
-  const [camOff,      setCamOff]      = useState(false);
-  const [callTimer,   setCallTimer]   = useState(0);
+  // ICE candidate queue — кандидаты могут прийти до setRemoteDescription
+  const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
+  const remoteDescReady   = useRef(false);
+
+  const [muted,     setMuted]     = useState(false);
+  const [camOff,    setCamOff]    = useState(false);
+  const [callTimer, setCallTimer] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ─── Tear down WebRTC ────────────────────────────────────────────────────────
   const tearDown = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     pcRef.current?.close();
     pcRef.current = null;
+    iceCandidateQueue.current = [];
+    remoteDescReady.current = false;
     setCallTimer(0);
     setMuted(false);
     setCamOff(false);
   }, []);
 
-  // ─── Start WebRTC peer connection ────────────────────────────────────────────
   const startPeer = useCallback(async (callId: string, callType: 'audio' | 'video', isInitiator: boolean) => {
+    iceCandidateQueue.current = [];
+    remoteDescReady.current = false;
+
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
 
-    // Получаем локальный поток
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: callType === 'video',
@@ -65,84 +67,95 @@ export default function CallOverlay() {
     if (stream) {
       localStreamRef.current = stream;
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     }
 
-    // Удалённый поток
     pc.ontrack = (e) => {
-      if (remoteVideoRef.current && e.streams[0]) {
+      if (!e.streams[0]) return;
+      if (callType === 'video' && remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = e.streams[0];
+      } else if (remoteAudioRef.current) {
+        // Аудиозвонок — используем скрытый <audio> элемент
+        remoteAudioRef.current.srcObject = e.streams[0];
       }
     };
 
-    // ICE кандидаты
     pc.onicecandidate = (e) => {
       if (e.candidate) sendCallSignal(callId, e.candidate.toJSON());
     };
 
-    // Инициатор создаёт offer
     if (isInitiator) {
-      const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: callType === 'video' });
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: callType === 'video',
+      });
       await pc.setLocalDescription(offer);
       sendCallSignal(callId, offer);
     }
 
-    // Таймер разговора
     timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
   }, []);
 
-  // ─── Handle incoming signal (SDP / ICE) ─────────────────────────────────────
+  // Обработка SDP/ICE сигналов
   useEffect(() => {
     const handler = async (e: Event) => {
-      const { callId, signal } = (e as CustomEvent).detail as { callId: string; signal: RTCSessionDescriptionInit | RTCIceCandidateInit };
+      const { callId, signal } = (e as CustomEvent).detail as {
+        callId: string;
+        signal: RTCSessionDescriptionInit | RTCIceCandidateInit;
+      };
       const pc = pcRef.current;
       if (!pc) return;
 
-      const activeCall = useCallStore.getState().active;
-      if (activeCall?.callId !== callId) return;
+      if (useCallStore.getState().active?.callId !== callId) return;
 
       if ('type' in signal && (signal.type === 'offer' || signal.type === 'answer')) {
-        const sdp = signal as RTCSessionDescriptionInit;
-        await pc.setRemoteDescription(sdp);
-        if (sdp.type === 'offer') {
+        await pc.setRemoteDescription(signal as RTCSessionDescriptionInit);
+        remoteDescReady.current = true;
+
+        // Добавляем все накопленные ICE кандидаты
+        for (const candidate of iceCandidateQueue.current) {
+          try { await pc.addIceCandidate(candidate); } catch { /* ignore */ }
+        }
+        iceCandidateQueue.current = [];
+
+        if (signal.type === 'offer') {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           sendCallSignal(callId, answer);
         }
       } else {
-        try { await pc.addIceCandidate(signal as RTCIceCandidateInit); } catch {}
+        if (remoteDescReady.current) {
+          try { await pc.addIceCandidate(signal as RTCIceCandidateInit); } catch { /* ignore */ }
+        } else {
+          // Ставим в очередь — remote description ещё не готов
+          iceCandidateQueue.current.push(signal as RTCIceCandidateInit);
+        }
       }
     };
+
     window.addEventListener('call:signal', handler);
     return () => window.removeEventListener('call:signal', handler);
   }, []);
 
-  // ─── Call ended event ────────────────────────────────────────────────────────
   useEffect(() => {
     const handler = () => { tearDown(); clearCall(); };
     window.addEventListener('call:ended', handler);
     return () => window.removeEventListener('call:ended', handler);
   }, [tearDown, clearCall]);
 
-  // ─── Start peer when call becomes active ────────────────────────────────────
   useEffect(() => {
-    if (active) {
-      startPeer(active.callId, active.callType, active.isInitiator);
-    }
+    if (active) startPeer(active.callId, active.callType, active.isInitiator);
   }, [active?.callId]);
 
-  // ─── Actions ─────────────────────────────────────────────────────────────────
   const handleAccept = useCallback(async () => {
     if (!incoming) return;
     acceptCall(incoming.callId);
     setActive({
-      callId: incoming.callId,
-      peerId: incoming.callerId,
-      chatId: incoming.chatId,
-      callType: incoming.callType,
-      startedAt: new Date(),
+      callId:      incoming.callId,
+      peerId:      incoming.callerId,
+      chatId:      incoming.chatId,
+      callType:    incoming.callType,
+      startedAt:   new Date(),
       isInitiator: false,
     });
   }, [incoming, setActive]);
@@ -161,21 +174,16 @@ export default function CallOverlay() {
   }, [active, outgoing, tearDown, clearCall]);
 
   const toggleMute = () => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
-    stream.getAudioTracks().forEach((t) => { t.enabled = !t.enabled; });
+    localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = !t.enabled; });
     setMuted((m) => !m);
   };
 
   const toggleCam = () => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
-    stream.getVideoTracks().forEach((t) => { t.enabled = !t.enabled; });
+    localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = !t.enabled; });
     setCamOff((c) => !c);
   };
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
   const isVideo = active?.callType === 'video' || incoming?.callType === 'video' || outgoing?.callType === 'video';
 
   return (
@@ -188,14 +196,17 @@ export default function CallOverlay() {
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           className="fixed inset-0 z-[300] flex items-center justify-center"
         >
-          {/* Backdrop */}
+          {/* Скрытый audio элемент для аудиозвонков */}
+          <audio ref={remoteAudioRef} autoPlay />
+
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
           <div className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-2xl ${
-            isVideo && active ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg' : 'w-80 bg-dark-card border border-dark-border'
+            isVideo && active
+              ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg'
+              : 'w-80 bg-dark-card border border-dark-border'
           }`}>
 
-            {/* ── Видео фон ── */}
             {isVideo && active && (
               <>
                 <video ref={remoteVideoRef} autoPlay playsInline
@@ -205,10 +216,12 @@ export default function CallOverlay() {
               </>
             )}
 
-            {/* ── Содержимое ── */}
-            <div className={`relative z-10 flex flex-col items-center p-8 gap-4 ${isVideo && active ? 'mt-auto w-full bg-gradient-to-t from-black/80 to-transparent pt-16 pb-8' : 'w-full'}`}>
+            <div className={`relative z-10 flex flex-col items-center p-8 gap-4 ${
+              isVideo && active
+                ? 'mt-auto w-full bg-gradient-to-t from-black/80 to-transparent pt-16 pb-8'
+                : 'w-full'
+            }`}>
 
-              {/* Аватар + имя (не активный видеозвонок) */}
               {!(isVideo && active) && (
                 <>
                   <div className="relative">
@@ -232,15 +245,11 @@ export default function CallOverlay() {
                 </>
               )}
 
-              {/* Таймер активного видеозвонка */}
               {isVideo && active && (
                 <p className="text-sm text-white/70 self-center mb-2">{fmt(callTimer)}</p>
               )}
 
-              {/* ── Кнопки ── */}
               <div className="flex items-center gap-4 mt-2">
-
-                {/* Входящий: отклонить + принять */}
                 {incoming && (
                   <>
                     <button onClick={handleReject}
@@ -254,7 +263,6 @@ export default function CallOverlay() {
                   </>
                 )}
 
-                {/* Исходящий: отмена */}
                 {outgoing && (
                   <button onClick={handleEnd}
                     className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all">
@@ -262,7 +270,6 @@ export default function CallOverlay() {
                   </button>
                 )}
 
-                {/* Активный звонок: микрофон, камера (если видео), завершить */}
                 {active && (
                   <>
                     <button onClick={toggleMute}

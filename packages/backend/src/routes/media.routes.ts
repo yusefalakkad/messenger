@@ -28,7 +28,8 @@ function createUpload(type: 'image' | 'video' | 'voice' | 'circle') {
     storage: multer.memoryStorage(),
     limits: { fileSize: limits[type] },
     fileFilter: (_req, file, cb) => {
-      if (allowed[type].includes(file.mimetype)) cb(null, true);
+      const mime = file.mimetype.split(';')[0].trim();
+      if (allowed[type].includes(mime)) cb(null, true);
       else cb(new Error(`Invalid file type for ${type}`));
     },
   });
