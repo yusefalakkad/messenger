@@ -51,7 +51,8 @@ router.post('/upload/:type',
 
       const { userId } = req as AuthRequest;
       const type = req.params.type as 'image' | 'video' | 'voice' | 'circle';
-      const ext = path.extname(req.file.originalname).slice(1) || req.file.mimetype.split('/')[1];
+      const baseMime = req.file.mimetype.split(';')[0].trim();
+      const ext = path.extname(req.file.originalname).slice(1) || baseMime.split('/')[1];
       const objectName = generateObjectName(userId, type, ext);
 
       const url = await uploadFile(objectName, req.file.buffer, req.file.mimetype, req.file.size);

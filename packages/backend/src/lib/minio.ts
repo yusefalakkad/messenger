@@ -15,23 +15,20 @@ export async function initializeMinio(): Promise<void> {
   const exists = await minioClient.bucketExists(bucketName);
   if (!exists) {
     await minioClient.makeBucket(bucketName, 'us-east-1');
-    // Set public read policy for media files
-    const policy = JSON.stringify({
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Effect: 'Allow',
-          Principal: { AWS: ['*'] },
-          Action: ['s3:GetObject'],
-          Resource: [`arn:aws:s3:::${bucketName}/*`],
-        },
-      ],
-    });
-    await minioClient.setBucketPolicy(bucketName, policy);
     logger.info(`MinIO bucket '${bucketName}' created`);
-  } else {
-    logger.info(`MinIO bucket '${bucketName}' ready`);
   }
+  // Всегда устанавливаем политику публичного чтения
+  const policy = JSON.stringify({
+    Version: '2012-10-17',
+    Statement: [{
+      Effect: 'Allow',
+      Principal: { AWS: ['*'] },
+      Action: ['s3:GetObject'],
+      Resource: [`arn:aws:s3:::${bucketName}/*`],
+    }],
+  });
+  await minioClient.setBucketPolicy(bucketName, policy);
+  logger.info(`MinIO bucket '${bucketName}' ready`);
 }
 
 export async function uploadFile(

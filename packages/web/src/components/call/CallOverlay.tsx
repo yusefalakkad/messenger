@@ -24,11 +24,14 @@ export default function CallOverlay() {
   const clearCall = useCallStore((s) => s.clearCall);
   const setActive = useCallStore((s) => s.setActive);
 
-  const pcRef           = useRef<RTCPeerConnection | null>(null);
-  const localStreamRef  = useRef<MediaStream | null>(null);
-  const localVideoRef   = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef  = useRef<HTMLVideoElement>(null);
-  const remoteAudioRef  = useRef<HTMLAudioElement>(null);
+  const pcRef          = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef  = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+
+  // Remote stream через state — надёжнее чем прямое назначение в ontrack
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   // ICE candidate queue — кандидаты могут прийти до setRemoteDescription
   const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
@@ -39,6 +42,17 @@ export default function CallOverlay() {
   const [callTimer, setCallTimer] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Назначаем remote stream на элементы после рендера
+  useEffect(() => {
+    if (!remoteStream) return;
+    if (active?.callType === 'video' && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, active?.callType]);
+
   const tearDown = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -47,6 +61,7 @@ export default function CallOverlay() {
     pcRef.current = null;
     iceCandidateQueue.current = [];
     remoteDescReady.current = false;
+    setRemoteStream(null);
     setCallTimer(0);
     setMuted(false);
     setCamOff(false);
@@ -70,14 +85,9 @@ export default function CallOverlay() {
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     }
 
+    // Используем setState — React сам назначит stream на элементы после рендера
     pc.ontrack = (e) => {
-      if (!e.streams[0]) return;
-      if (callType === 'video' && remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = e.streams[0];
-      } else if (remoteAudioRef.current) {
-        // Аудиозвонок — используем скрытый <audio> элемент
-        remoteAudioRef.current.srcObject = e.streams[0];
-      }
+      if (e.streams[0]) setRemoteStream(e.streams[0]);
     };
 
     pc.onicecandidate = (e) => {
@@ -96,7 +106,6 @@ export default function CallOverlay() {
     timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
   }, []);
 
-  // Обработка SDP/ICE сигналов
   useEffect(() => {
     const handler = async (e: Event) => {
       const { callId, signal } = (e as CustomEvent).detail as {
@@ -105,16 +114,14 @@ export default function CallOverlay() {
       };
       const pc = pcRef.current;
       if (!pc) return;
-
       if (useCallStore.getState().active?.callId !== callId) return;
 
       if ('type' in signal && (signal.type === 'offer' || signal.type === 'answer')) {
         await pc.setRemoteDescription(signal as RTCSessionDescriptionInit);
         remoteDescReady.current = true;
 
-        // Добавляем все накопленные ICE кандидаты
-        for (const candidate of iceCandidateQueue.current) {
-          try { await pc.addIceCandidate(candidate); } catch { /* ignore */ }
+        for (const c of iceCandidateQueue.current) {
+          try { await pc.addIceCandidate(c); } catch { /* ignore */ }
         }
         iceCandidateQueue.current = [];
 
@@ -127,12 +134,10 @@ export default function CallOverlay() {
         if (remoteDescReady.current) {
           try { await pc.addIceCandidate(signal as RTCIceCandidateInit); } catch { /* ignore */ }
         } else {
-          // Ставим в очередь — remote description ещё не готов
           iceCandidateQueue.current.push(signal as RTCIceCandidateInit);
         }
       }
     };
-
     window.addEventListener('call:signal', handler);
     return () => window.removeEventListener('call:signal', handler);
   }, []);
@@ -196,8 +201,8 @@ export default function CallOverlay() {
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           className="fixed inset-0 z-[300] flex items-center justify-center"
         >
-          {/* Скрытый audio элемент для аудиозвонков */}
-          <audio ref={remoteAudioRef} autoPlay />
+          {/* Скрытый audio для аудиозвонков (video элемент обрабатывает видеозвонки) */}
+          <audio ref={remoteAudioRef} autoPlay playsInline />
 
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
@@ -221,15 +226,10 @@ export default function CallOverlay() {
                 ? 'mt-auto w-full bg-gradient-to-t from-black/80 to-transparent pt-16 pb-8'
                 : 'w-full'
             }`}>
-
               {!(isVideo && active) && (
                 <>
                   <div className="relative">
-                    <Avatar
-                      src={incoming?.callerAvatar}
-                      name={incoming?.callerName ?? 'Звонок'}
-                      size="xl"
-                    />
+                    <Avatar src={incoming?.callerAvatar} name={incoming?.callerName ?? 'Звонок'} size="xl" />
                     {(outgoing || active) && (
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
                     )}
@@ -262,14 +262,12 @@ export default function CallOverlay() {
                     </button>
                   </>
                 )}
-
                 {outgoing && (
                   <button onClick={handleEnd}
                     className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all">
                     <PhoneOff size={22} className="text-white" />
                   </button>
                 )}
-
                 {active && (
                   <>
                     <button onClick={toggleMute}
@@ -278,7 +276,6 @@ export default function CallOverlay() {
                       }`}>
                       {muted ? <MicOff size={18} /> : <Mic size={18} />}
                     </button>
-
                     {isVideo && (
                       <button onClick={toggleCam}
                         className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
@@ -287,13 +284,11 @@ export default function CallOverlay() {
                         {camOff ? <VideoOff size={18} /> : <Video size={18} />}
                       </button>
                     )}
-
                     {!isVideo && (
                       <button className="w-12 h-12 rounded-full bg-dark-hover flex items-center justify-center text-white/60">
                         <Volume2 size={18} />
                       </button>
                     )}
-
                     <button onClick={handleEnd}
                       className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all">
                       <PhoneOff size={20} className="text-white" />

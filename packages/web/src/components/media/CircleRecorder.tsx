@@ -69,7 +69,13 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
   const startRecording = useCallback(() => {
     if (!streamRef.current || recording) return;
     chunksRef.current = [];
-    const mr = new MediaRecorder(streamRef.current, { mimeType: 'video/webm;codecs=vp8,opus' });
+    const mimeType = [
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp9,opus',
+      'video/webm',
+      'video/mp4',
+    ].find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+    const mr = new MediaRecorder(streamRef.current, mimeType ? { mimeType } : undefined);
     mr.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
     recorderRef.current = mr;
     mr.start(100);
@@ -90,7 +96,7 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
 
     const thumb = captureThumb();
     rec.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'video/webm' });
       onRecorded(blob, time, thumb);
     };
     rec.stop();

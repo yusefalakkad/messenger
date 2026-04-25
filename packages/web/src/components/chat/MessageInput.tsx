@@ -163,7 +163,11 @@ export default function MessageInput({ chatId }: Props) {
       analyser.smoothingTimeConstant = 0.6;
       source.connect(analyser);
 
-      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const audioMime = [
+        'audio/webm;codecs=opus', 'audio/webm',
+        'audio/ogg;codecs=opus',  'audio/mp4',
+      ].find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+      const mr = new MediaRecorder(stream, audioMime ? { mimeType: audioMime } : undefined);
       mr.ondataavailable = (e) => { if (e.data.size > 0) ptt.current.chunks.push(e.data); };
 
       const d = ptt.current;
@@ -220,7 +224,7 @@ export default function MessageInput({ chatId }: Props) {
     const duration  = d.time;
 
     d.recorder.onstop = async () => {
-      const blob = new Blob(d.chunks, { type: 'audio/webm' });
+      const blob = new Blob(d.chunks, { type: d.recorder?.mimeType || 'audio/webm' });
       d.stream?.getTracks().forEach((t) => t.stop());
       d.stream = null;
       try { d.audioCtx?.close(); } catch {}

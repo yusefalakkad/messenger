@@ -9,7 +9,9 @@ ARGS="-n \
   --realm=messenger \
   --log-file=stdout \
   --no-multicast-peers \
-  --no-cli"
+  --no-cli \
+  --min-port=50000 \
+  --max-port=50200"
 
 if [ -n "$SERVER_IP" ]; then
     ARGS="$ARGS --external-ip=$SERVER_IP"

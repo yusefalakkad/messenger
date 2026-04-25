@@ -59,6 +59,6 @@ export const config = {
     maxFileSize: 50 * 1024 * 1024,   // 50 MB
     allowedImageTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     allowedVideoTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
-    allowedVoiceTypes: ['audio/ogg', 'audio/mpeg', 'audio/webm', 'audio/wav'],
+    allowedVoiceTypes: ['audio/ogg', 'audio/mpeg', 'audio/webm', 'audio/wav', 'audio/mp4'],
   },
 } as const;
