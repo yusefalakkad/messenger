@@ -22,6 +22,7 @@ RUN npm run build --workspace=packages/web
 
 # ─── Stage 2: Backend runtime ────────────────────────────────────────────────
 FROM node:20-alpine AS backend
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
