@@ -275,6 +275,7 @@ export default function MessageInput({ chatId }: Props) {
 
   const onRecBtnDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    if (pttState !== 'idle') return; // не начинаем новый таймер во время записи
     const d = ptt.current;
     d.startY = e.clientY;
     d.startX = e.clientX;
@@ -287,7 +288,7 @@ export default function MessageInput({ chatId }: Props) {
         startVoicePTT();
       }
     }, 180);
-  }, [recMode, startVoicePTT]);
+  }, [recMode, startVoicePTT, pttState]);
 
   const onRecBtnMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     if (pttState !== 'recording') return;
@@ -622,42 +623,35 @@ export default function MessageInput({ chatId }: Props) {
             </button>
           )}
 
-          {/* Нет текста, idle → кнопка PTT (голос или кружок) */}
-          {!hasText && pttState === 'idle' && (
+          {/* Нет текста → единая кнопка PTT (idle + recording — один DOM-элемент, чтобы pointer capture не терялся) */}
+          {!hasText && pttState !== 'locked' && (
             <button
               onPointerDown={onRecBtnDown}
               onPointerMove={onRecBtnMove}
               onPointerUp={onRecBtnUp}
               onPointerCancel={onRecBtnUp}
               disabled={uploading}
-              title={recMode === 'voice' ? 'Зажми для записи, тап — переключить на кружок' : 'Зажми для записи, тап — переключить на голос'}
+              title={pttState === 'idle'
+                ? (recMode === 'voice' ? 'Зажми для записи, тап — переключить на кружок' : 'Зажми для записи, тап — переключить на голос')
+                : 'Отпусти для отправки / тап — остановить'}
               className={clsx(
                 'w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all select-none touch-none',
-                recMode === 'voice'
+                pttState === 'recording'
+                  ? 'bg-red-500 text-white shadow-lg shadow-red-500/40 animate-pulse'
+                  : recMode === 'voice'
                   ? 'bg-dark-card hover:bg-dark-hover text-white/60 hover:text-white'
                   : 'bg-dark-card hover:bg-dark-hover text-primary-400 hover:text-primary-300',
                 uploading && 'opacity-40 cursor-not-allowed',
               )}
             >
-              {recMode === 'voice' ? <Mic size={18} /> : <CircleDot size={18} />}
-            </button>
-          )}
-
-          {/* Идёт запись (не зафиксировано) → красная кнопка (пульсирует, пока держишь) */}
-          {pttState === 'recording' && (
-            <button
-              onPointerDown={onRecBtnDown}
-              onPointerMove={onRecBtnMove}
-              onPointerUp={onRecBtnUp}
-              onPointerCancel={onRecBtnUp}
-              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-red-500 text-white shadow-lg shadow-red-500/40 animate-pulse select-none touch-none"
-            >
-              <Mic size={18} />
+              {pttState === 'recording'
+                ? <Mic size={18} />
+                : recMode === 'voice' ? <Mic size={18} /> : <CircleDot size={18} />}
             </button>
           )}
 
           {/* Зафиксировано → синяя кнопка отправки */}
-          {pttState === 'locked' && (
+          {!hasText && pttState === 'locked' && (
             <button onClick={() => stopVoicePTT(true)}
               className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-600/30 transition-all">
               <Send size={18} />
