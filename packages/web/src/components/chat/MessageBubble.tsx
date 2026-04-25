@@ -404,12 +404,6 @@ function CircleMessage({
           </div>
         )}
 
-        {/* Длительность */}
-        {!playing && media.duration && (
-          <div className="absolute bottom-4 right-4 bg-black/60 rounded-full px-2 py-0.5 text-xs text-white font-medium">
-            {formatDuration(media.duration)}
-          </div>
-        )}
       </div>
 
       {/* Время под кружком */}

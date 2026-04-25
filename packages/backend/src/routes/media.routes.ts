@@ -29,6 +29,8 @@ function createUpload(type: 'image' | 'video' | 'voice' | 'circle') {
     limits: { fileSize: limits[type] },
     fileFilter: (_req, file, cb) => {
       const mime = file.mimetype.split(';')[0].trim();
+      // Кружки и видео — принимаем любой video/* тип
+      if (type === 'circle' && mime.startsWith('video/')) { cb(null, true); return; }
       if (allowed[type].includes(mime)) cb(null, true);
       else cb(new Error(`Invalid file type for ${type}`));
     },
