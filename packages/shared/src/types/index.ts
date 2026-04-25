@@ -203,6 +203,7 @@ export interface ApiResponse<T = void> {
     limit?: number;
     total?: number;
     hasMore?: boolean;
+    cursor?: string;
   };
 }
 

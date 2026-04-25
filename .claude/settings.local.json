@@ -14,7 +14,9 @@
       "Bash(npm run *)",
       "Bash(find /Users/usefalakkad/Desktop/Месенджер/packages/web/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"useCall\\\\|initiateCall\\\\|RTCPeer\" {} \\\\;)",
       "Bash(find . -type f -name \"*.ts\" -path \"*/packages/backend/*\" ! -path \"*/node_modules/*\" -exec wc -l {} +)",
-      "Bash(chmod +x /Users/usefalakkad/Desktop/Месенджер/deploy.sh /Users/usefalakkad/Desktop/Месенджер/entrypoint.sh /Users/usefalakkad/Desktop/Месенджер/coturn/entrypoint.sh)"
+      "Bash(chmod +x /Users/usefalakkad/Desktop/Месенджер/deploy.sh /Users/usefalakkad/Desktop/Месенджер/entrypoint.sh /Users/usefalakkad/Desktop/Месенджер/coturn/entrypoint.sh)",
+      "Bash(sed -n '10,25p' /Users/usefalakkad/Desktop/Месенджер/packages/backend/src/routes/user.routes.ts)",
+      "Bash(sed -n '45,60p' /Users/usefalakkad/Desktop/Месенджер/packages/backend/src/services/auth.service.ts)"
     ]
   }
 }

@@ -15,7 +15,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: config.upload.maxImageSize },
   fileFilter: (_req, file, cb) => {
-    if (config.upload.allowedImageTypes.includes(file.mimetype)) {
+    if ((config.upload.allowedImageTypes as string[]).includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type for avatar'));

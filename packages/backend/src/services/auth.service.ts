@@ -7,7 +7,7 @@ import { AppError } from '../utils/response';
 import type { AuthTokens } from '@messenger/shared';
 
 // Argon2id — recommended by OWASP (stronger than bcrypt)
-const ARGON2_OPTIONS: argon2.Options = {
+const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
   type: argon2.argon2id,
   memoryCost: 65536, // 64 MB
   timeCost: 3,
