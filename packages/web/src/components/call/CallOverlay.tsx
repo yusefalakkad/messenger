@@ -47,8 +47,7 @@ export default function CallOverlay() {
     if (!remoteStream) return;
     if (active?.callType === 'video' && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
-    }
-    if (remoteAudioRef.current) {
+    } else if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, active?.callType]);

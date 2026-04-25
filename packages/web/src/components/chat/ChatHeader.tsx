@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Phone, Video, Search, MoreVertical, ShieldCheck } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
 import ProfilePanel from './ProfilePanel';
@@ -7,6 +7,8 @@ import { isChatE2E } from '@/lib/e2e';
 import { initiateCall } from '@/lib/socket';
 import { useCallStore } from '@/stores/call.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useChatStore } from '@/stores/chat.store';
+import { api } from '@/lib/api';
 import type { Chat, ChatMember } from '@messenger/shared';
 
 interface Props {
@@ -16,8 +18,12 @@ interface Props {
 
 export default function ChatHeader({ chat, otherMember }: Props) {
   const [showProfile, setShowProfile] = useState(false);
+  const [showMenu,    setShowMenu]    = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const myUserId  = useAuthStore((s) => s.user?.id);
   const setOutgoing = useCallStore((s) => s.setOutgoing);
+  const clearMessages = useChatStore((s) => s.clearMessages);
 
   const name     = chat.type === 'group' ? chat.name : otherMember?.user.displayName;
   const avatar   = chat.type === 'group' ? chat.avatar : otherMember?.user.avatar;
@@ -27,7 +33,6 @@ export default function ChatHeader({ chat, otherMember }: Props) {
     ? `${chat.members.length} участников`
     : isOnline ? 'в сети' : 'не в сети';
 
-  // Только для прямых чатов — звонки
   const peerId = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== myUserId)?.userId
     : undefined;
@@ -39,10 +44,28 @@ export default function ChatHeader({ chat, otherMember }: Props) {
     setOutgoing({ callId, chatId: chat.id, peerId, callType });
   }, [peerId, chat.id, setOutgoing]);
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
+
+  const handleClearChat = async () => {
+    try {
+      await api.delete(`/chats/${chat.id}/messages`);
+      clearMessages(chat.id);
+    } catch {}
+    setConfirmClear(false);
+    setShowMenu(false);
+  };
+
   return (
     <>
       <header className="flex items-center gap-3 px-4 py-3 border-b border-dark-border bg-dark-surface flex-shrink-0">
-        {/* Кликабельная зона — аватар + имя */}
         <button
           className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
           onClick={() => setShowProfile(true)}
@@ -64,36 +87,69 @@ export default function ChatHeader({ chat, otherMember }: Props) {
           </div>
         </button>
 
-        {/* Кнопки справа */}
         <div className="flex items-center gap-1 flex-shrink-0">
           {peerId && (
-            <button
-              onClick={() => startCall('audio')}
+            <button onClick={() => startCall('audio')}
               className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white"
-              title="Аудиозвонок"
-            >
+              title="Аудиозвонок">
               <Phone size={18} />
             </button>
           )}
           {peerId && (
-            <button
-              onClick={() => startCall('video')}
+            <button onClick={() => startCall('video')}
               className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white"
-              title="Видеозвонок"
-            >
+              title="Видеозвонок">
               <Video size={18} />
             </button>
           )}
           <button className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white">
             <Search size={18} />
           </button>
-          <button className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white">
-            <MoreVertical size={18} />
-          </button>
+
+          {/* More menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu((v) => !v)}
+              className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white">
+              <MoreVertical size={18} />
+            </button>
+
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-dark-card border border-dark-border rounded-2xl shadow-2xl overflow-hidden z-50">
+                <button
+                  onClick={() => { setShowMenu(false); setConfirmClear(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors text-sm text-red-400">
+                  <Trash2 size={16} />
+                  Очистить чат
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* Панель профиля — вне <header>, позиционируется по ChatWindow (relative) */}
+      {/* Confirm clear dialog */}
+      {confirmClear && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-dark-card border border-dark-border rounded-2xl p-6 w-80 shadow-2xl">
+            <h3 className="font-semibold text-base mb-2">Очистить чат?</h3>
+            <p className="text-sm text-white/50 mb-5">Все сообщения будут удалены безвозвратно.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="flex-1 py-2.5 rounded-xl bg-dark-hover text-sm font-medium hover:bg-dark-border transition-colors">
+                Отмена
+              </button>
+              <button
+                onClick={handleClearChat}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-sm font-medium text-white transition-colors">
+                Очистить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <AnimatePresence>
         {showProfile && (
           <ProfilePanel

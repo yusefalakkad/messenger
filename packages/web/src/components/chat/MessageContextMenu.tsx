@@ -94,15 +94,13 @@ export default function MessageContextMenu({
           </button>
         )}
 
-        {isOwn && (
-          <button
-            onClick={() => { onDelete(); onClose(); }}
-            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm text-red-400"
-          >
-            <Trash2 size={16} />
-            <span>Удалить</span>
-          </button>
-        )}
+        <button
+          onClick={() => { onDelete(); onClose(); }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm text-red-400"
+        >
+          <Trash2 size={16} />
+          <span>Удалить</span>
+        </button>
       </div>
     </motion.div>
   );

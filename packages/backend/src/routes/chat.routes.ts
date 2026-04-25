@@ -207,6 +207,28 @@ router.get('/:chatId/messages',
   },
 );
 
+// DELETE /chats/:chatId/messages — clear all messages in chat
+router.delete('/:chatId/messages',
+  requireAuth,
+  validate([param('chatId').notEmpty()]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+
+      const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
+      if (!member) throw new AppError(403, 'FORBIDDEN', 'You are not a member of this chat');
+
+      await prisma.message.updateMany({
+        where: { chatId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+
+      sendSuccess(res, { cleared: true });
+    } catch (err) { next(err); }
+  },
+);
+
 // GET /chats/:chatId/media — все фото/видео/кружки для галереи в профиле
 router.get('/:chatId/media',
   requireAuth,
