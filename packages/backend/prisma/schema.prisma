@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  displayName  String
+  phone        String?   @unique
+  email        String?   @unique
+  passwordHash String
+  avatar       String?
+  bio          String?
+  status       UserStatus @default(offline)
+  lastSeenAt   DateTime?
+  // E2E encryption: client sends public key on registration
+  publicKey    String    // X25519 public key (base64)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  sessions         Session[]
+  chatMemberships  ChatMember[]
+  sentMessages     Message[]    @relation("MessageSender")
+  messageReads     MessageRead[]
+  reactions        Reaction[]
+  contacts         Contact[]    @relation("ContactOwner")
+  contactOf        Contact[]    @relation("ContactTarget")
+
+  @@index([username])
+  @@index([phone])
+  @@index([email])
+}
+
+enum UserStatus {
+  online
+  offline
+  away
+}
+
+// ─── Session ──────────────────────────────────────────────────────────────────
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId     String
+  deviceName   String?
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([refreshToken])
+}
+
+// ─── Contact ──────────────────────────────────────────────────────────────────
+
+model Contact {
+  id         String   @id @default(cuid())
+  ownerId    String
+  owner      User     @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  targetId   String
+  target     User     @relation("ContactTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  nickname   String?
+  blocked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([ownerId, targetId])
+  @@index([ownerId])
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+model Chat {
+  id        String   @id @default(cuid())
+  type      ChatType @default(direct)
+  name      String?
+  avatar    String?
+  // For group chats: description
+  description String?
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   ChatMember[]
+  messages  Message[]
+
+  @@index([createdAt])
+}
+
+enum ChatType {
+  direct
+  group
+}
+
+// ─── ChatMember ───────────────────────────────────────────────────────────────
+
+model ChatMember {
+  id       String         @id @default(cuid())
+  chatId   String
+  chat     Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     ChatMemberRole @default(member)
+  // E2E: group session key encrypted with this member's public key
+  encryptedSessionKey String?
+  mutedUntil DateTime?
+  joinedAt   DateTime @default(now())
+  leftAt     DateTime?
+
+  @@unique([chatId, userId])
+  @@index([userId])
+  @@index([chatId])
+}
+
+enum ChatMemberRole {
+  owner
+  admin
+  member
+}
+
+// ─── Message ──────────────────────────────────────────────────────────────────
+
+model Message {
+  id         String      @id @default(cuid())
+  chatId     String
+  chat       Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User        @relation("MessageSender", fields: [senderId], references: [id])
+  type       MessageType @default(text)
+
+  // Text (may be E2E encrypted — stored as base64 ciphertext)
+  content    String?
+  encrypted  Boolean     @default(false)
+  // If encrypted: nonce stored separately
+  nonce      String?
+
+  // Reply
+  replyToId  String?
+  replyTo    Message?    @relation("MessageReply", fields: [replyToId], references: [id])
+  replies    Message[]   @relation("MessageReply")
+
+  // Forward
+  forwardedFromId String?
+
+  // Media
+  media      Media?
+
+  editedAt   DateTime?
+  deletedAt  DateTime?
+  createdAt  DateTime    @default(now())
+
+  reads      MessageRead[]
+  reactions  Reaction[]
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
+}
+
+enum MessageType {
+  text
+  image
+  video
+  voice
+  circle
+  file
+  system
+}
+
+// ─── Reaction ─────────────────────────────────────────────────────────────────
+
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+// ─── MessageRead ──────────────────────────────────────────────────────────────
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+}
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+
+model Media {
+  id           String    @id @default(cuid())
+  messageId    String    @unique
+  message      Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url          String
+  thumbnailUrl String?
+  mimeType     String
+  size         Int       // bytes
+  width        Int?
+  height       Int?
+  duration     Float?    // seconds
+  // Voice waveform stored as JSON array
+  waveform     Json?
+  uploadedAt   DateTime  @default(now())
+
+  @@index([messageId])
+}

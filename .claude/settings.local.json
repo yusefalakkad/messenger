@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Read(//Users/usefalakkad/.volta/**)",
+      "Read(//Users/usefalakkad/Library/Caches/**)",
+      "Read(//Users/usefalakkad/**)",
+      "Bash(export PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\")",
+      "Bash(/opt/homebrew/bin/npx prisma:*)",
+      "Bash(/opt/homebrew/bin/npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(npx prisma *)",
+      "Bash(npm run *)",
+      "Bash(find /Users/usefalakkad/Desktop/Месенджер/packages/web/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"useCall\\\\|initiateCall\\\\|RTCPeer\" {} \\\\;)",
+      "Bash(find . -type f -name \"*.ts\" -path \"*/packages/backend/*\" ! -path \"*/node_modules/*\" -exec wc -l {} +)",
+      "Bash(chmod +x /Users/usefalakkad/Desktop/Месенджер/deploy.sh /Users/usefalakkad/Desktop/Месенджер/entrypoint.sh /Users/usefalakkad/Desktop/Месенджер/coturn/entrypoint.sh)"
+    ]
+  }
+}

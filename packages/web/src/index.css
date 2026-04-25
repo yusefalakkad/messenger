@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    @apply bg-dark-bg text-white;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-dark-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-dark-hover; }
+}
+
+@layer components {
+  /* Message bubbles */
+  .bubble-out {
+    @apply bg-primary-600 text-white rounded-msg rounded-br-msg-sm;
+  }
+  .bubble-in {
+    @apply bg-dark-card text-white rounded-msg rounded-bl-msg-sm;
+  }
+
+  /* Glass effect for overlays */
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    @apply bg-dark-surface/80;
+  }
+
+  /* Input base */
+  .input-base {
+    @apply bg-dark-input border border-dark-border rounded-xl px-4 py-3
+           text-white placeholder-white/30 outline-none transition-colors
+           focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30;
+  }
+
+  /* Button base */
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-500 active:bg-primary-700
+           text-white font-medium rounded-xl px-6 py-3 transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Typing indicator dots */
+  .typing-dot {
+    @apply w-2 h-2 rounded-full bg-white/60;
+    animation: pulseDot 1.4s ease-in-out infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+}
