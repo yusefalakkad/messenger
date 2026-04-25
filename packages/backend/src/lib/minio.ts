@@ -47,8 +47,8 @@ export async function uploadFile(
     size,
     { 'Content-Type': mimeType },
   );
-  const protocol = config.minio.useSSL ? 'https' : 'http';
-  return `${protocol}://${config.minio.endpoint}:${config.minio.port}/${config.minio.bucket}/${objectName}`;
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  return `${clientUrl}/media/${objectName}`;
 }
 
 export async function deleteFile(objectName: string): Promise<void> {
