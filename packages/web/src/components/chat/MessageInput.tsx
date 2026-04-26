@@ -32,6 +32,7 @@ export default function MessageInput({ chatId }: Props) {
   const [showCircle,   setShowCircle]   = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const [uploading,    setUploading]    = useState(false);
+  const [uploadError,  setUploadError]  = useState<string | null>(null);
 
   const replyingTo      = useChatStore((s) => s.replyingTo);
   const editingMessage  = useChatStore((s) => s.editingMessage);
@@ -247,7 +248,11 @@ export default function MessageInput({ chatId }: Props) {
               duration: Math.max(1, duration), waveform: finalBars,
             },
           });
-        } catch (err) { console.error('Voice upload failed', err); }
+        } catch (err) {
+          console.error('Voice upload failed', err);
+          setUploadError('Не удалось отправить голосовое');
+          setTimeout(() => setUploadError(null), 3000);
+        }
         finally { setUploading(false); }
       }
     };
@@ -354,7 +359,11 @@ export default function MessageInput({ chatId }: Props) {
         chatId, type: 'circle',
         mediaData: { url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size, duration: Math.round(duration) },
       });
-    } catch (err) { console.error('Circle upload failed', err); }
+    } catch (err) {
+      console.error('Circle upload failed', err);
+      setUploadError('Не удалось отправить кружок');
+      setTimeout(() => setUploadError(null), 3000);
+    }
     finally { setUploading(false); }
   }, [chatId]);
 
@@ -467,6 +476,17 @@ export default function MessageInput({ chatId }: Props) {
               className="flex items-center gap-2 bg-primary-600/10 border border-primary-600/20 rounded-xl px-4 py-2.5 mb-3">
               <div className="w-3.5 h-3.5 border-2 border-primary-400/50 border-t-primary-400 rounded-full animate-spin flex-shrink-0" />
               <span className="text-sm text-primary-400">Загрузка медиа...</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Ошибка загрузки */}
+        <AnimatePresence>
+          {uploadError && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 mb-3">
+              <span className="text-sm text-red-400">{uploadError}</span>
             </motion.div>
           )}
         </AnimatePresence>

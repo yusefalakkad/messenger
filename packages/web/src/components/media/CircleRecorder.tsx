@@ -16,12 +16,13 @@ const RADIUS = 108;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export default function CircleRecorder({ onRecorded, onCancel }: Props) {
-  const videoRef    = useRef<HTMLVideoElement>(null);
-  const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const streamRef   = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef   = useRef<BlobPart[]>([]);
-  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoRef         = useRef<HTMLVideoElement>(null);
+  const canvasRef        = useRef<HTMLCanvasElement>(null);
+  const streamRef        = useRef<MediaStream | null>(null);
+  const recorderRef      = useRef<MediaRecorder | null>(null);
+  const chunksRef        = useRef<BlobPart[]>([]);
+  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopRecordingRef = useRef<() => void>(() => {});
 
   const [ready, setReady]       = useState(false);
   const [recording, setRecording] = useState(false);
@@ -83,7 +84,7 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
 
     timerRef.current = setInterval(() => {
       setTime((t) => {
-        if (t + 1 >= MAX_DURATION) { stopRecording(); return MAX_DURATION; }
+        if (t + 1 >= MAX_DURATION) { stopRecordingRef.current(); return MAX_DURATION; }
         return t + 1;
       });
     }, 1000);
@@ -102,6 +103,8 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
     rec.stop();
     setRecording(false);
   }, [time, captureThumb, onRecorded]);
+
+  useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 

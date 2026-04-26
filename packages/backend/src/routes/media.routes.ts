@@ -70,7 +70,7 @@ router.post('/upload/:type',
       sendSuccess(res, {
         url,
         objectName,
-        mimeType: req.file.mimetype,
+        mimeType: req.file.mimetype.split(';')[0].trim(),
         size: req.file.size,
         ...metadata,
       }, 201);
