@@ -229,6 +229,90 @@ router.delete('/:chatId/messages',
   },
 );
 
+// POST /chats/:chatId/members — add a user to group (admin/owner only)
+router.post('/:chatId/members',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('userId').notEmpty(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const { userId: targetUserId } = req.body as { userId: string };
+
+      // Check caller is admin/owner
+      const callerMember = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
+      if (!callerMember || !['owner', 'admin'].includes(callerMember.role)) {
+        throw new AppError(403, 'FORBIDDEN', 'Only admins and owners can add members');
+      }
+
+      // Check chat is a group
+      const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+      if (!chat || chat.type !== 'group') throw new AppError(400, 'NOT_GROUP', 'This is not a group chat');
+
+      // Check target user exists
+      const targetUser = await prisma.user.findUnique({ where: { id: targetUserId, deletedAt: null }, select: { id: true } });
+      if (!targetUser) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+
+      // Check not already a member
+      const existing = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId: targetUserId } } });
+      if (existing && !existing.leftAt) throw new AppError(409, 'ALREADY_MEMBER', 'User is already a member');
+
+      // Create or restore membership
+      const newMember = await prisma.chatMember.upsert({
+        where: { chatId_userId: { chatId, userId: targetUserId } },
+        update: { leftAt: null, role: 'member' },
+        create: { chatId, userId: targetUserId, role: 'member' },
+        include: { user: { select: { id: true, username: true, displayName: true, avatar: true, status: true, publicKey: true } } },
+      });
+
+      const io = req.app.get('io') as SocketServer;
+      if (io) {
+        io.to(`chat:${chatId}`).emit('chat:memberAdded', { chatId, member: newMember });
+        io.to(`user:${targetUserId}`).emit('chat:memberAdded', { chatId, member: newMember });
+        // Add the new user's sockets to the chat room
+        io.in(`user:${targetUserId}`).socketsJoin(`chat:${chatId}`);
+      }
+
+      sendSuccess(res, newMember, 201);
+    } catch (err) { next(err); }
+  },
+);
+
+// DELETE /chats/:chatId/members/:userId — remove member (admin/owner only)
+router.delete('/:chatId/members/:memberId',
+  requireAuth,
+  validate([param('chatId').notEmpty(), param('memberId').notEmpty()]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId, memberId } = req.params;
+
+      // Check caller is admin/owner (or is removing themselves)
+      const callerMember = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
+      if (!callerMember) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+      if (userId !== memberId && !['owner', 'admin'].includes(callerMember.role)) {
+        throw new AppError(403, 'FORBIDDEN', 'Only admins and owners can remove members');
+      }
+
+      await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId: memberId } },
+        data: { leftAt: new Date() },
+      });
+
+      const io = req.app.get('io') as SocketServer;
+      if (io) {
+        io.to(`chat:${chatId}`).emit('chat:memberRemoved', { chatId, userId: memberId });
+        io.in(`user:${memberId}`).socketsLeave(`chat:${chatId}`);
+      }
+
+      sendSuccess(res, { removed: true });
+    } catch (err) { next(err); }
+  },
+);
+
 // GET /chats/:chatId/media — все фото/видео/кружки для галереи в профиле
 router.get('/:chatId/media',
   requireAuth,

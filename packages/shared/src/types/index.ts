@@ -150,6 +150,10 @@ export interface WSClientEvents {
   'call:reject':   { callId: string };
   'call:end':      { callId: string };
   'call:signal':   { callId: string; signal: RTCSessionDescriptionInit | RTCIceCandidateInit };
+  // Group calls
+  'call:group-start': { callId: string; chatId: string; callType: CallType };
+  'call:group-join':  { callId: string; chatId: string };
+  'call:group-leave': { callId: string };
 }
 
 export interface WSServerEvents {
@@ -167,6 +171,10 @@ export interface WSServerEvents {
   'call:accepted':  { callId: string; peerId: string };
   'call:ended':     { callId: string; reason: 'rejected' | 'ended' | 'missed' };
   'call:signal':    { callId: string; signal: RTCSessionDescriptionInit | RTCIceCandidateInit };
+  // Group calls
+  'call:group-incoming': { callId: string; chatId: string; callType: CallType; initiatorId: string; initiatorName: string; initiatorAvatar?: string };
+  'call:peer-joined':    { callId: string; peerId: string; peerName: string; peerAvatar?: string };
+  'call:peer-left':      { callId: string; peerId: string };
 }
 
 export interface SendMessagePayload {

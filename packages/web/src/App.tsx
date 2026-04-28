@@ -5,6 +5,7 @@ import { useAppInit } from '@/hooks/useAppInit';
 import AuthPage from '@/pages/AuthPage';
 import ChatPage from '@/pages/ChatPage';
 import CallOverlay from '@/components/call/CallOverlay';
+import GroupCallOverlay from '@/components/call/GroupCallOverlay';
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -52,6 +53,7 @@ export default function App() {
       </Routes>
       {/* Глобальный оверлей звонков поверх всего */}
       {isAuthenticated && <CallOverlay />}
+      {isAuthenticated && <GroupCallOverlay />}
     </BrowserRouter>
   );
 }

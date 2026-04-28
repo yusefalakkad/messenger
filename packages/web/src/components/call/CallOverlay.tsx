@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, ChevronDown } from 'lucide-react';
 import { useCallStore } from '@/stores/call.store';
+import { useChatStore } from '@/stores/chat.store';
 import { acceptCall, rejectCall, endCall, sendCallSignal } from '@/lib/socket';
 import Avatar from '@/components/ui/Avatar';
 
@@ -24,16 +25,20 @@ export default function CallOverlay() {
   const clearCall = useCallStore((s) => s.clearCall);
   const setActive = useCallStore((s) => s.setActive);
 
+  // Task 6: get peer info from chat store
+  const chat = useChatStore((s) => s.chats.find((c) => c.id === active?.chatId));
+  const peerMember = chat?.members.find((m) => m.userId === active?.peerId);
+  const peerAvatar = peerMember?.user.avatar;
+  const peerName   = peerMember?.user.displayName;
+
   const pcRef          = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const localVideoRef  = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
-  // Remote stream через state — надёжнее чем прямое назначение в ontrack
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
-  // ICE candidate queue — кандидаты могут прийти до setRemoteDescription
   const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
   const remoteDescReady   = useRef(false);
 
@@ -42,7 +47,9 @@ export default function CallOverlay() {
   const [callTimer, setCallTimer] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Назначаем remote stream на элементы после рендера
+  // Task 1: minimized state
+  const [minimized, setMinimized] = useState(false);
+
   useEffect(() => {
     if (!remoteStream) return;
     if (active?.callType === 'video' && remoteVideoRef.current) {
@@ -64,6 +71,12 @@ export default function CallOverlay() {
     setCallTimer(0);
     setMuted(false);
     setCamOff(false);
+    setMinimized(false);
+  }, []);
+
+  const startTimer = useCallback(() => {
+    if (timerRef.current) return;
+    timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
   }, []);
 
   const startPeer = useCallback(async (callId: string, callType: 'audio' | 'video', isInitiator: boolean) => {
@@ -73,18 +86,7 @@ export default function CallOverlay() {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: callType === 'video',
-    }).catch(() => null);
-
-    if (stream) {
-      localStreamRef.current = stream;
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-    }
-
-    // Используем setState — React сам назначит stream на элементы после рендера
+    // Task 2: ALL event handlers BEFORE async getUserMedia
     pc.ontrack = (e) => {
       if (e.streams[0]) setRemoteStream(e.streams[0]);
     };
@@ -92,6 +94,45 @@ export default function CallOverlay() {
     pc.onicecandidate = (e) => {
       if (e.candidate) sendCallSignal(callId, e.candidate.toJSON());
     };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      if (state === 'connected') {
+        startTimer();
+      } else if (state === 'failed') {
+        // Only 'failed' ends the call, not 'disconnected'
+        endCall(callId);
+        tearDown();
+        clearCall();
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
+      if (state === 'failed' && isInitiator) {
+        pc.restartIce();
+        pc.createOffer({ iceRestart: true })
+          .then((offer) => pc.setLocalDescription(offer))
+          .then(() => {
+            if (pc.localDescription) sendCallSignal(callId, pc.localDescription);
+          })
+          .catch(() => {/* ignore */});
+      }
+    };
+
+    // Task 3: Better video constraints
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: callType === 'video'
+        ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
+        : false,
+    }).catch(() => null);
+
+    if (stream) {
+      localStreamRef.current = stream;
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+    }
 
     if (isInitiator) {
       const offer = await pc.createOffer({
@@ -102,8 +143,11 @@ export default function CallOverlay() {
       sendCallSignal(callId, offer);
     }
 
-    timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
-  }, []);
+    // Task 2: 3s fallback timer start in case onconnectionstatechange fires early
+    setTimeout(() => {
+      if (!timerRef.current) startTimer();
+    }, 3000);
+  }, [clearCall, startTimer, tearDown]);
 
   useEffect(() => {
     const handler = async (e: Event) => {
@@ -149,7 +193,7 @@ export default function CallOverlay() {
 
   useEffect(() => {
     if (active) startPeer(active.callId, active.callType, active.isInitiator);
-  }, [active?.callId]);
+  }, [active?.callId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccept = useCallback(async () => {
     if (!incoming) return;
@@ -190,6 +234,44 @@ export default function CallOverlay() {
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const isVideo = active?.callType === 'video' || incoming?.callType === 'video' || outgoing?.callType === 'video';
 
+  // Task 6: show avatar when audio-only, or video call with no remote stream / cam off
+  const showRemoteAvatar = active && (!isVideo || !remoteStream || camOff);
+  const displayAvatar = peerAvatar;
+  const displayName   = peerName ?? incoming?.callerName ?? 'Звонок';
+
+  // Task 1: Minimized pill
+  if (minimized && active) {
+    return (
+      <div className="fixed bottom-6 right-6 z-[300] flex items-center gap-3 bg-dark-card border border-dark-border rounded-full px-4 py-2.5 shadow-2xl">
+        <Avatar src={displayAvatar} name={displayName} size="sm" />
+        <span className="text-sm font-semibold tabular-nums">{fmt(callTimer)}</span>
+        <button
+          onClick={toggleMute}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            muted ? 'bg-red-500/20 text-red-400' : 'bg-dark-hover text-white/60 hover:text-white'
+          }`}
+          title={muted ? 'Включить микрофон' : 'Выключить микрофон'}
+        >
+          {muted ? <MicOff size={14} /> : <Mic size={14} />}
+        </button>
+        <button
+          onClick={handleEnd}
+          className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all"
+          title="Завершить звонок"
+        >
+          <PhoneOff size={14} className="text-white" />
+        </button>
+        <button
+          onClick={() => setMinimized(false)}
+          className="w-8 h-8 rounded-full bg-dark-hover flex items-center justify-center text-white/60 hover:text-white transition-all"
+          title="Развернуть"
+        >
+          <ChevronDown size={14} className="rotate-180" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <AnimatePresence>
       {(incoming || active || outgoing) && (
@@ -200,7 +282,7 @@ export default function CallOverlay() {
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           className="fixed inset-0 z-[300] flex items-center justify-center"
         >
-          {/* Скрытый audio для аудиозвонков (video элемент обрабатывает видеозвонки) */}
+          {/* Hidden audio for audio calls */}
           <audio ref={remoteAudioRef} autoPlay playsInline />
 
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
@@ -211,10 +293,28 @@ export default function CallOverlay() {
               : 'w-80 bg-dark-card border border-dark-border'
           }`}>
 
+            {/* Task 1: minimize button for active calls */}
+            {active && (
+              <button
+                onClick={() => setMinimized(true)}
+                className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-all"
+                title="Свернуть"
+              >
+                <ChevronDown size={16} />
+              </button>
+            )}
+
             {isVideo && active && (
               <>
-                <video ref={remoteVideoRef} autoPlay playsInline
-                  className="absolute inset-0 w-full h-full object-cover" />
+                {/* Task 6: show peer avatar when no remote stream */}
+                {showRemoteAvatar ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-dark-bg">
+                    <Avatar src={displayAvatar} name={displayName} size="xl" />
+                  </div>
+                ) : (
+                  <video ref={remoteVideoRef} autoPlay playsInline
+                    className="absolute inset-0 w-full h-full object-cover" />
+                )}
                 <video ref={localVideoRef} autoPlay playsInline muted
                   className={`absolute bottom-20 right-4 w-28 h-40 rounded-2xl object-cover border-2 border-white/20 z-10 ${camOff ? 'hidden' : ''}`} />
               </>
@@ -228,13 +328,18 @@ export default function CallOverlay() {
               {!(isVideo && active) && (
                 <>
                   <div className="relative">
-                    <Avatar src={incoming?.callerAvatar} name={incoming?.callerName ?? 'Звонок'} size="xl" />
+                    {/* Task 6: show avatar for audio calls and incoming calls */}
+                    <Avatar
+                      src={active ? displayAvatar : incoming?.callerAvatar}
+                      name={displayName}
+                      size="xl"
+                    />
                     {(outgoing || active) && (
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
                     )}
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-semibold">{incoming?.callerName ?? 'Звонок'}</p>
+                    <p className="text-lg font-semibold">{displayName}</p>
                     <p className="text-sm text-white/50">
                       {incoming && 'Входящий звонок...'}
                       {outgoing && 'Звоним...'}

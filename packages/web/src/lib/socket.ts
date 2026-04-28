@@ -136,6 +136,57 @@ export function initSocket(): Socket {
     window.dispatchEvent(new CustomEvent('call:signal', { detail: data }));
   });
 
+  // ── Group call events ─────────────────────────────────────────────────────
+
+  socket.on('call:group-incoming', (data: WSServerEvents['call:group-incoming']) => {
+    useCallStore.getState().setGroupCall({
+      callId:       data.callId,
+      chatId:       data.chatId,
+      callType:     data.callType,
+      participants: [{
+        userId: data.initiatorId,
+        name:   data.initiatorName,
+        avatar: data.initiatorAvatar,
+      }],
+    });
+    window.dispatchEvent(new CustomEvent('call:group-incoming', { detail: data }));
+  });
+
+  socket.on('call:peer-joined', (data: WSServerEvents['call:peer-joined']) => {
+    useCallStore.getState().addParticipant({
+      userId: data.peerId,
+      name:   data.peerName,
+      avatar: data.peerAvatar,
+    });
+    window.dispatchEvent(new CustomEvent('call:peer-joined', { detail: data }));
+  });
+
+  socket.on('call:peer-left', (data: WSServerEvents['call:peer-left']) => {
+    useCallStore.getState().removeParticipant(data.peerId);
+    window.dispatchEvent(new CustomEvent('call:peer-left', { detail: data }));
+  });
+
+  // ── Chat member events (Task 4) ───────────────────────────────────────────
+
+  socket.on('chat:memberAdded', ({ chatId, member }: { chatId: string; member: import('@messenger/shared').ChatMember }) => {
+    useChatStore.setState((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== chatId) return c;
+        const exists = c.members.some((m) => m.userId === member.userId);
+        return exists ? c : { ...c, members: [...c.members, member] };
+      }),
+    }));
+  });
+
+  socket.on('chat:memberRemoved', ({ chatId, userId: removedUserId }: { chatId: string; userId: string }) => {
+    useChatStore.setState((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== chatId) return c;
+        return { ...c, members: c.members.filter((m) => m.userId !== removedUserId) };
+      }),
+    }));
+  });
+
   socket.on('user:status', ({ userId, status }: WSServerEvents['user:status']) => {
     useChatStore.setState((s) => ({
       chats: s.chats.map((chat) => ({
@@ -202,4 +253,16 @@ export function endCall(callId: string): void {
 
 export function sendCallSignal(callId: string, signal: RTCSessionDescriptionInit | RTCIceCandidateInit): void {
   socket?.emit('call:signal', { callId, signal });
+}
+
+export function startGroupCall(callId: string, chatId: string, callType: import('@messenger/shared').CallType): void {
+  socket?.emit('call:group-start', { callId, chatId, callType });
+}
+
+export function joinGroupCall(callId: string, chatId: string): void {
+  socket?.emit('call:group-join', { callId, chatId });
+}
+
+export function leaveGroupCall(callId: string): void {
+  socket?.emit('call:group-leave', { callId });
 }

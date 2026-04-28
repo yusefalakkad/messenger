@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2 } from 'lucide-react';
+import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, UserPlus, PhoneCall } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
 import ProfilePanel from './ProfilePanel';
+import AddMemberModal from './AddMemberModal';
 import { isChatE2E } from '@/lib/e2e';
-import { initiateCall } from '@/lib/socket';
+import { initiateCall, startGroupCall } from '@/lib/socket';
 import { useCallStore } from '@/stores/call.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
@@ -17,12 +18,14 @@ interface Props {
 }
 
 export default function ChatHeader({ chat, otherMember }: Props) {
-  const [showProfile, setShowProfile] = useState(false);
-  const [showMenu,    setShowMenu]    = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
+  const [showProfile,   setShowProfile]   = useState(false);
+  const [showMenu,      setShowMenu]      = useState(false);
+  const [confirmClear,  setConfirmClear]  = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const myUserId  = useAuthStore((s) => s.user?.id);
-  const setOutgoing = useCallStore((s) => s.setOutgoing);
+  const myUserId    = useAuthStore((s) => s.user?.id);
+  const setOutgoing  = useCallStore((s) => s.setOutgoing);
+  const setGroupCall = useCallStore((s) => s.setGroupCall);
   const clearMessages = useChatStore((s) => s.clearMessages);
 
   const name     = chat.type === 'group' ? chat.name : otherMember?.user.displayName;
@@ -43,6 +46,20 @@ export default function ChatHeader({ chat, otherMember }: Props) {
     initiateCall(callId, peerId, chat.id, callType);
     setOutgoing({ callId, chatId: chat.id, peerId, callType });
   }, [peerId, chat.id, setOutgoing]);
+
+  const startGroupCallFn = useCallback((callType: 'audio' | 'video') => {
+    if (chat.type !== 'group') return;
+    const callId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    startGroupCall(callId, chat.id, callType);
+    setGroupCall({
+      callId,
+      chatId: chat.id,
+      callType,
+      participants: chat.members
+        .filter((m) => m.userId === myUserId)
+        .map((m) => ({ userId: m.userId, name: m.user.displayName, avatar: m.user.avatar })),
+    });
+  }, [chat, myUserId, setGroupCall]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -102,6 +119,13 @@ export default function ChatHeader({ chat, otherMember }: Props) {
               <Video size={18} />
             </button>
           )}
+          {chat.type === 'group' && (
+            <button onClick={() => startGroupCallFn('audio')}
+              className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white"
+              title="Групповой звонок">
+              <PhoneCall size={18} />
+            </button>
+          )}
           <button className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white">
             <Search size={18} />
           </button>
@@ -116,6 +140,14 @@ export default function ChatHeader({ chat, otherMember }: Props) {
 
             {showMenu && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-dark-card border border-dark-border rounded-2xl shadow-2xl overflow-hidden z-50">
+                {chat.type === 'group' && (
+                  <button
+                    onClick={() => { setShowMenu(false); setShowAddMember(true); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors text-sm text-white/80">
+                    <UserPlus size={16} />
+                    Добавить участника
+                  </button>
+                )}
                 <button
                   onClick={() => { setShowMenu(false); setConfirmClear(true); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors text-sm text-red-400">
@@ -156,6 +188,16 @@ export default function ChatHeader({ chat, otherMember }: Props) {
             chat={chat}
             otherMember={otherMember}
             onClose={() => setShowProfile(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddMember && (
+          <AddMemberModal
+            chatId={chat.id}
+            existingMemberIds={chat.members.map((m) => m.userId)}
+            onClose={() => setShowAddMember(false)}
           />
         )}
       </AnimatePresence>

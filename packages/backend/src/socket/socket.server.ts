@@ -184,6 +184,52 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       socket.to(`call:${callId}`).emit('call:signal', { callId, signal });
     });
 
+    // ─── Group Calls ──────────────────────────────────────────────────────────────
+
+    socket.on('call:group-start', async ({ callId, chatId, callType }: WSClientEvents['call:group-start']) => {
+      const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
+      if (!member) return;
+
+      socket.join(`call:${callId}`);
+
+      const caller = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, avatar: true } });
+
+      const members = await prisma.chatMember.findMany({
+        where: { chatId, leftAt: null, userId: { not: userId } },
+        select: { userId: true },
+      });
+
+      members.forEach(({ userId: memberId }) => {
+        io.to(`user:${memberId}`).emit('call:group-incoming', {
+          callId,
+          chatId,
+          callType,
+          initiatorId:     userId,
+          initiatorName:   caller?.displayName ?? socket.username,
+          initiatorAvatar: caller?.avatar ?? undefined,
+        });
+      });
+    });
+
+    socket.on('call:group-join', async ({ callId, chatId: _chatId }: WSClientEvents['call:group-join']) => {
+      const joiner = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, avatar: true } });
+
+      // Notify existing call room participants BEFORE joining
+      socket.to(`call:${callId}`).emit('call:peer-joined', {
+        callId,
+        peerId:     userId,
+        peerName:   joiner?.displayName ?? socket.username,
+        peerAvatar: joiner?.avatar ?? undefined,
+      });
+
+      socket.join(`call:${callId}`);
+    });
+
+    socket.on('call:group-leave', ({ callId }: WSClientEvents['call:group-leave']) => {
+      socket.to(`call:${callId}`).emit('call:peer-left', { callId, peerId: userId });
+      socket.leave(`call:${callId}`);
+    });
+
     // ─── Disconnect ───────────────────────────────────────────────────────────
 
     socket.on('disconnect', async () => {
