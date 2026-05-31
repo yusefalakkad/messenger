@@ -9,6 +9,11 @@ final class ChatViewModel: ObservableObject {
     @Published var typingUsers: Set<String> = []
     @Published var draft: String = ""
 
+    /// Сообщение, на которое сейчас отвечаем.
+    @Published var replyingTo: Message?
+    /// Сообщение, которое сейчас редактируется.
+    @Published var editingMessage: Message?
+
     let chat: Chat
     private let currentUserId: String
     private let privateKey: String?
@@ -94,6 +99,16 @@ final class ChatViewModel: ObservableObject {
         draft = ""
         stopTypingImmediate()
 
+        // ── Режим редактирования ──
+        if let editing = editingMessage {
+            sendEdit(messageId: editing.id, newText: text)
+            editingMessage = nil
+            return
+        }
+
+        let replyToId = replyingTo?.id
+        replyingTo = nil
+
         let payload: SendMessagePayload
         if isE2E,
            let myPriv = privateKey,
@@ -106,7 +121,8 @@ final class ChatViewModel: ObservableObject {
                 nonce: enc.nonceB64,
                 encrypted: true,
                 mediaData: nil,
-                replyToId: nil
+                replyToId: replyToId,
+                forwardedFromId: nil
             )
         } else {
             payload = SendMessagePayload(
@@ -116,9 +132,72 @@ final class ChatViewModel: ObservableObject {
                 nonce: nil,
                 encrypted: false,
                 mediaData: nil,
-                replyToId: nil
+                replyToId: replyToId,
+                forwardedFromId: nil
             )
         }
+        SocketClient.shared.send(payload)
+    }
+
+    // MARK: - Edit
+
+    /// Начать редактировать (вызывается из контекстного меню).
+    func beginEdit(_ message: Message) {
+        guard message.senderId == currentUserId else { return }
+        editingMessage = message
+        replyingTo = nil
+        // Заполняем draft уже-расшифрованным текстом
+        draft = displayContent(for: message) ?? message.content ?? ""
+    }
+
+    func cancelEdit() {
+        editingMessage = nil
+        draft = ""
+    }
+
+    private func sendEdit(messageId: String, newText: String) {
+        // Если чат E2E — шифруем новое содержимое тем же способом
+        if isE2E,
+           let myPriv = privateKey,
+           let theirPub = otherMember?.user.publicKey,
+           let enc = try? E2E.encryptText(newText, recipientPublicKeyB64: theirPub, senderPrivateKeyB64: myPriv) {
+            SocketClient.shared.editMessage(
+                messageId: messageId, chatId: chat.id,
+                content: enc.ciphertextB64, nonce: enc.nonceB64, encrypted: true
+            )
+        } else {
+            SocketClient.shared.editMessage(
+                messageId: messageId, chatId: chat.id,
+                content: newText, encrypted: false
+            )
+        }
+    }
+
+    // MARK: - Reply
+
+    func beginReply(_ message: Message) {
+        replyingTo = message
+        editingMessage = nil
+    }
+
+    func cancelReply() {
+        replyingTo = nil
+    }
+
+    // MARK: - Forward
+
+    /// Пересылает сообщение в другой чат через тот же socket.io event.
+    func forward(message: Message, to targetChatId: String) {
+        let payload = SendMessagePayload(
+            chatId: targetChatId,
+            type: message.type.rawValue,
+            content: nil,         // backend resolves from forwardedFromId
+            nonce: nil,
+            encrypted: false,
+            mediaData: nil,
+            replyToId: nil,
+            forwardedFromId: message.id
+        )
         SocketClient.shared.send(payload)
     }
 
@@ -253,6 +332,17 @@ final class ChatViewModel: ObservableObject {
                 guard let self else { return }
                 if event.isTyping { self.typingUsers.insert(event.userId) }
                 else              { self.typingUsers.remove(event.userId) }
+            }
+            .store(in: &cancellables)
+
+        SocketClient.shared.messageUpdated
+            .sink { [weak self] event in
+                guard let self,
+                      let idx = self.messages.firstIndex(where: { $0.id == event.id }) else { return }
+                // Поскольку Message — value type с let, делаем полный re-fetch текущего чата.
+                // Это просто и надёжно; для оптимизации можно ввести мутабельные filed-views.
+                _ = idx
+                Task { await self.load() }
             }
             .store(in: &cancellables)
     }

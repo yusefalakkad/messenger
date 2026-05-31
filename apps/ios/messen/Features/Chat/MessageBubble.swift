@@ -9,6 +9,9 @@ struct MessageBubble: View {
     let currentUserId: String?
     let onReact: (String) -> Void
     let onDelete: () -> Void
+    let onReply: () -> Void
+    let onEdit: () -> Void
+    let onForward: () -> Void
 
     @State private var showReactionPicker = false
 
@@ -40,6 +43,9 @@ struct MessageBubble: View {
             VStack(alignment: isOwn ? .trailing : .leading, spacing: 4) {
                 bubble
                     .contextMenu {
+                        Button(action: onReply) {
+                            Label("Ответить", systemImage: "arrowshape.turn.up.left")
+                        }
                         Button {
                             UIPasteboard.general.string = displayContent ?? message.content
                         } label: {
@@ -49,6 +55,14 @@ struct MessageBubble: View {
                             showReactionPicker = true
                         } label: {
                             Label("Реакция", systemImage: "face.smiling")
+                        }
+                        Button(action: onForward) {
+                            Label("Переслать", systemImage: "arrowshape.turn.up.right")
+                        }
+                        if isOwn, message.type == .text {
+                            Button(action: onEdit) {
+                                Label("Редактировать", systemImage: "pencil")
+                            }
                         }
                         if isOwn {
                             Button(role: .destructive, action: onDelete) {
@@ -102,9 +116,17 @@ struct MessageBubble: View {
                     .padding(.leading, 12)
             }
 
-            HStack(alignment: .bottom, spacing: 6) {
-                content
-                metadata
+            VStack(alignment: .leading, spacing: 4) {
+                if let reply = message.replyTo {
+                    replyQuote(reply)
+                }
+                if message.forwardedFromId != nil {
+                    forwardedBadge
+                }
+                HStack(alignment: .bottom, spacing: 6) {
+                    content
+                    metadata
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -163,6 +185,40 @@ struct MessageBubble: View {
                 .font(Typo.body)
                 .foregroundStyle(.white)
         }
+    }
+
+    private func replyQuote(_ reply: ReplyPreview) -> some View {
+        HStack(spacing: 8) {
+            Rectangle()
+                .fill(isOwn ? Color.white.opacity(0.6) : LinearGradient.brand)
+                .frame(width: 3)
+                .clipShape(Capsule())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(reply.sender?.displayName ?? "—")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isOwn ? Color.white.opacity(0.9) : Color.brandViolet)
+                Text(reply.content ?? "—")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(
+            (isOwn ? Color.white.opacity(0.12) : Color.brandViolet.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        )
+    }
+
+    private var forwardedBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrowshape.turn.up.right.fill")
+                .font(.system(size: 9, weight: .semibold))
+            Text("Пересланное сообщение")
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(isOwn ? Color.white.opacity(0.7) : Color.brandViolet.opacity(0.8))
     }
 
     @ViewBuilder

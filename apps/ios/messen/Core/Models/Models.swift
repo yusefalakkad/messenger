@@ -75,6 +75,14 @@ struct MediaInfo: Codable, Hashable {
     let thumbnailUrl: String?
 }
 
+/// Снапшот сообщения, на которое ответили (приходит вложенным).
+struct ReplyPreview: Codable, Hashable {
+    let id: String
+    let content: String?
+    let type: String?
+    let sender: MessageSender?
+}
+
 struct Message: Codable, Identifiable, Hashable {
     let id: String
     let chatId: String
@@ -86,6 +94,7 @@ struct Message: Codable, Identifiable, Hashable {
     let encrypted: Bool?
     let media: MediaInfo?
     let replyToId: String?
+    let replyTo: ReplyPreview?
     let forwardedFromId: String?
     let editedAt: Date?
     let deletedAt: Date?
@@ -114,6 +123,7 @@ struct SendMessagePayload: Codable {
     let encrypted: Bool?
     let mediaData: MediaPayload?
     let replyToId: String?
+    let forwardedFromId: String?
 }
 
 struct Chat: Codable, Identifiable, Hashable {

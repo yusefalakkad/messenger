@@ -98,6 +98,17 @@ final class SocketClient: ObservableObject {
         socket?.emit("message:delete", ["messageId": messageId, "chatId": chatId])
     }
 
+    func editMessage(messageId: String, chatId: String, content: String, nonce: String? = nil, encrypted: Bool = false) {
+        var payload: [String: Any] = [
+            "messageId": messageId,
+            "chatId": chatId,
+            "content": content,
+            "encrypted": encrypted,
+        ]
+        if let n = nonce { payload["nonce"] = n }
+        socket?.emit("message:edit", payload)
+    }
+
     private func emit<E: Encodable>(_ event: String, _ payload: E) {
         guard let data = try? JSONEncoder().encode(payload),
               let obj  = try? JSONSerialization.jsonObject(with: data, options: [])

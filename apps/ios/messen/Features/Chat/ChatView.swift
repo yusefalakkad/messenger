@@ -4,6 +4,7 @@ struct ChatView: View {
     @EnvironmentObject var auth: AuthStore
     @StateObject private var vm: ChatViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var forwardingMessage: Message?
 
     init(chat: Chat, currentUserId: String, privateKey: String?) {
         _vm = StateObject(wrappedValue: ChatViewModel(
@@ -21,6 +22,21 @@ struct ChatView: View {
                 header
                 if vm.isE2E { e2eBanner }
                 messagesScroll
+                if let replying = vm.replyingTo {
+                    ReplyBar(
+                        preview: vm.displayContent(for: replying) ?? replying.content ?? mediaPreview(for: replying),
+                        authorName: replying.sender?.displayName ?? "—",
+                        onCancel: { vm.cancelReply() }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if let editing = vm.editingMessage {
+                    EditBar(
+                        preview: vm.displayContent(for: editing) ?? editing.content ?? "",
+                        onCancel: { vm.cancelEdit() }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 MessageInput(
                     text: $vm.draft,
                     onSend: vm.sendDraft,
@@ -37,6 +53,27 @@ struct ChatView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .task { await vm.load() }
+        .sheet(item: $forwardingMessage) { msg in
+            ForwardSheet(message: msg) { targetChat in
+                vm.forward(message: msg, to: targetChat.id)
+            }
+            .environmentObject(auth)
+            .presentationDetents([.large])
+            .presentationBackground(.ultraThinMaterial)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func mediaPreview(for m: Message) -> String {
+        switch m.type {
+        case .voice:  return "🎤 Голосовое"
+        case .image:  return "📷 Фото"
+        case .video:  return "🎬 Видео"
+        case .circle: return "⭕ Видео-кружок"
+        case .file:   return "📎 Файл"
+        default:      return ""
+        }
     }
 
     // MARK: - Header
@@ -158,8 +195,11 @@ struct ChatView: View {
                                 isFirstInGroup: isFirstInGroup,
                                 displayContent: vm.displayContent(for: msg),
                                 currentUserId: auth.user?.id,
-                                onReact: { emoji in vm.react(messageId: msg.id, emoji: emoji) },
-                                onDelete: { vm.delete(messageId: msg.id) }
+                                onReact:   { emoji in vm.react(messageId: msg.id, emoji: emoji) },
+                                onDelete:  { vm.delete(messageId: msg.id) },
+                                onReply:   { vm.beginReply(msg) },
+                                onEdit:    { vm.beginEdit(msg) },
+                                onForward: { forwardingMessage = msg }
                             )
                             .id(msg.id)
                             .transition(.asymmetric(
