@@ -117,8 +117,13 @@ struct ChatListView: View {
                 .padding(.bottom, 24)
             }
             .navigationDestination(for: String.self) { chatId in
-                // Заглушка под будущий ChatView
-                ChatPlaceholderView(chatId: chatId)
+                if let chat = vm.chats.first(where: { $0.id == chatId }),
+                   let userId = auth.user?.id {
+                    ChatView(chat: chat, currentUserId: userId, privateKey: auth.privateKey)
+                        .environmentObject(auth)
+                } else {
+                    ChatPlaceholderView(chatId: chatId)
+                }
             }
         }
     }

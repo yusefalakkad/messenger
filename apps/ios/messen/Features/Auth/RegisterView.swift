@@ -89,13 +89,13 @@ struct RegisterView: View {
         Task {
             defer { loading = false }
             do {
-                let resp = try await AuthService.register(
+                let (resp, privateKey) = try await AuthService.register(
                     username: username.trimmingCharacters(in: .whitespaces),
                     displayName: displayName.trimmingCharacters(in: .whitespaces),
                     password: password,
                     phone: phone.isEmpty ? nil : phone
                 )
-                auth.setAuth(user: resp.user, accessToken: resp.tokens.accessToken)
+                auth.setAuth(user: resp.user, accessToken: resp.tokens.accessToken, privateKey: privateKey)
             } catch {
                 self.error = (error as? APIError)?.errorDescription ?? "Ошибка регистрации"
             }

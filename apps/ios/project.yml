@@ -6,6 +6,11 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
+packages:
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: "16.1.0"
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -23,6 +28,9 @@ targets:
       - path: messen
         excludes:
           - "**/.DS_Store"
+    dependencies:
+      - package: SocketIO
+        product: SocketIO
     info:
       path: messen/Info.plist
       properties:

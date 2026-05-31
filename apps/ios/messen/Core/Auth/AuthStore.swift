@@ -18,11 +18,13 @@ final class AuthStore: ObservableObject {
            let decoded = try? JSONDecoder().decode(User.self, from: userData) {
             self.accessToken = token
             self.user = decoded
+            // Авто-подключение WebSocket при восстановлении сессии
+            SocketClient.shared.connect()
         }
         // APIClient читает токен прямо из Keychain — синхронизация не нужна.
     }
 
-    func setAuth(user: User, accessToken: String) {
+    func setAuth(user: User, accessToken: String, privateKey: String? = nil) {
         self.user = user
         self.accessToken = accessToken
         KeychainStore.set(accessToken, for: KeychainStore.Keys.accessToken)
@@ -30,14 +32,26 @@ final class AuthStore: ObservableObject {
            let str  = String(data: json, encoding: .utf8) {
             KeychainStore.set(str, for: KeychainStore.Keys.user)
         }
+        if let pk = privateKey {
+            KeychainStore.set(pk, for: KeychainStore.Keys.privateKey)
+        }
+        SocketClient.shared.connect()
+    }
+
+    /// E2E-приватный ключ текущего юзера (если есть).
+    var privateKey: String? {
+        KeychainStore.get(KeychainStore.Keys.privateKey)
     }
 
     func logout() {
+        SocketClient.shared.disconnect()
         self.user = nil
         self.accessToken = nil
         KeychainStore.delete(KeychainStore.Keys.accessToken)
         KeychainStore.delete(KeychainStore.Keys.user)
-        // Приватный E2E-ключ можно оставить — он нужен для расшифровки старых сообщений после повторного логина.
+        E2E.clearCache()
+        // Приватный E2E-ключ оставляем — пригодится для расшифровки старых сообщений
+        // при повторном логине того же юзера на этом устройстве.
     }
 
     /// Уникальный ID устройства — генерим один раз, сохраняем в Keychain.

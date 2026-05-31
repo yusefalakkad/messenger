@@ -43,17 +43,21 @@ enum AuthService {
         )
     }
 
-    static func register(username: String, displayName: String, password: String, phone: String?) async throws -> RegisterResponse {
-        try await APIClient.shared.post(
+    /// Генерирует пару E2E-ключей, отправляет публичный на сервер.
+    /// Возвращает кортеж: (resp, privateKeyB64) — приватный надо сохранить в Keychain.
+    static func register(username: String, displayName: String, password: String, phone: String?) async throws -> (resp: RegisterResponse, privateKeyB64: String) {
+        let pair = E2E.generateKeyPair()
+        let resp: RegisterResponse = try await APIClient.shared.post(
             "auth/register",
             body: RegisterRequest(
                 username: username,
                 displayName: displayName,
                 password: password,
                 phone: phone,
-                publicKey: nil  // TODO: интегрировать swift-sodium для E2E key pair
+                publicKey: pair.publicKeyB64
             )
         )
+        return (resp, pair.privateKeyB64)
     }
 
     private static func deviceName() -> String {

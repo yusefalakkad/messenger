@@ -8,6 +8,8 @@ struct User: Codable, Identifiable, Hashable {
     let displayName: String
     let avatar: String?
     let status: String?
+    /// X25519/P-256 public key (base64 SPKI). Используется для E2E к этому юзеру.
+    let publicKey: String?
 }
 
 // MARK: - Chat
@@ -30,6 +32,64 @@ struct LastMessage: Codable, Hashable {
     let content: String?
     let type: String
     let createdAt: Date
+}
+
+// MARK: - Message
+
+enum MessageType: String, Codable {
+    case text
+    case voice
+    case image
+    case video
+    case circle
+    case file
+    case system
+}
+
+struct ReadReceipt: Codable, Hashable {
+    let userId: String
+    let readAt: Date
+}
+
+struct Reaction: Codable, Hashable {
+    let userId: String
+    let emoji: String
+}
+
+struct MessageSender: Codable, Hashable {
+    let id: String
+    let username: String?
+    let displayName: String
+    let avatar: String?
+    let publicKey: String?
+}
+
+struct Message: Codable, Identifiable, Hashable {
+    let id: String
+    let chatId: String
+    let senderId: String?
+    let sender: MessageSender?
+    let type: MessageType
+    let content: String?        // если encrypted — это ciphertext base64
+    let nonce: String?          // base64 nonce для AES-GCM
+    let encrypted: Bool?
+    let replyToId: String?
+    let forwardedFromId: String?
+    let editedAt: Date?
+    let deletedAt: Date?
+    let readBy: [ReadReceipt]?
+    let reactions: [Reaction]?
+    let createdAt: Date
+}
+
+/// DTO для отправки сообщения через socket.io событие `message:send`.
+struct SendMessagePayload: Codable {
+    let chatId: String
+    let type: String
+    let content: String?
+    let nonce: String?
+    let encrypted: Bool?
+    let replyToId: String?
 }
 
 struct Chat: Codable, Identifiable, Hashable {
