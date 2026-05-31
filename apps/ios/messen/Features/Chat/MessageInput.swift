@@ -7,6 +7,7 @@ struct MessageInput: View {
     let onTextChanged: () -> Void
     let onVoiceRecorded: (URL, TimeInterval, [CGFloat]) -> Void
     let onImageSelected: (ImagePreparer.Prepared) -> Void
+    let onCircleRequested: () -> Void
 
     @FocusState private var focused: Bool
     @StateObject private var recorder = AudioRecorder()
@@ -28,6 +29,9 @@ struct MessageInput: View {
             } else {
                 attachButton
                 inputField
+                if !hasText {
+                    circleButton
+                }
                 rightActionButton
             }
         }
@@ -116,6 +120,19 @@ struct MessageInput: View {
                 .background(LinearGradient.brand)
                 .clipShape(Circle())
                 .shadow(color: Color.brandViolet.opacity(0.5), radius: 12, x: 0, y: 5)
+        }
+        .buttonStyle(PressDownStyle())
+    }
+
+    private var circleButton: some View {
+        Button(action: onCircleRequested) {
+            Image(systemName: "circle.dashed")
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: 40, height: 40)
+                .background(Color.white.opacity(0.06))
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
         .buttonStyle(PressDownStyle())
     }

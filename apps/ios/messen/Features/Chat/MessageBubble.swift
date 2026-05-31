@@ -159,6 +159,10 @@ struct MessageBubble: View {
             }
         case .image:
             mediaImage
+        case .circle:
+            if let m = message.media {
+                CirclePlayerView(media: m, isOwn: isOwn)
+            }
         default:
             textContent
         }

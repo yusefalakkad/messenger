@@ -67,6 +67,21 @@ enum MediaService {
         )
     }
 
+    /// Загружает видео-кружок.
+    static func uploadCircle(
+        fileURL: URL,
+        duration: TimeInterval,
+        mimeType: String = "video/mp4"
+    ) async throws -> UploadedMedia {
+        try await upload(
+            path: "media/upload/circle",
+            fileURL: fileURL,
+            fileName: "circle.mp4",
+            mimeType: mimeType,
+            fields: ["duration": "\(Int(duration.rounded()))"]
+        )
+    }
+
     // MARK: - Core multipart upload
 
     private static func upload(

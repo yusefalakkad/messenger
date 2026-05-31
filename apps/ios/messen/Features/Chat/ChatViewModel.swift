@@ -235,6 +235,40 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Circle (video-кружок)
+
+    func sendCircle(fileURL: URL, duration: TimeInterval) async {
+        do {
+            let media = try await MediaService.uploadCircle(
+                fileURL: fileURL,
+                duration: duration
+            )
+            let payload = SendMessagePayload(
+                chatId: chat.id,
+                type: MessageType.circle.rawValue,
+                content: nil,
+                nonce: nil,
+                encrypted: false,
+                mediaData: MediaPayload(
+                    url: media.url,
+                    mimeType: media.mimeType,
+                    size: media.size,
+                    duration: duration,
+                    width: media.width,
+                    height: media.height,
+                    waveform: nil,
+                    thumbnailUrl: nil
+                ),
+                replyToId: nil,
+                forwardedFromId: nil
+            )
+            SocketClient.shared.send(payload)
+            try? FileManager.default.removeItem(at: fileURL)
+        } catch {
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
     // MARK: - Voice message
 
     /// Загружает голосовой файл и отправляет сообщение.

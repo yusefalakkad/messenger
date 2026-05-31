@@ -5,6 +5,7 @@ struct ChatView: View {
     @StateObject private var vm: ChatViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var forwardingMessage: Message?
+    @State private var showingCircleRecorder = false
 
     init(chat: Chat, currentUserId: String, privateKey: String?) {
         _vm = StateObject(wrappedValue: ChatViewModel(
@@ -46,7 +47,8 @@ struct ChatView: View {
                     },
                     onImageSelected: { prepared in
                         Task { await vm.sendImage(prepared: prepared) }
-                    }
+                    },
+                    onCircleRequested: { showingCircleRecorder = true }
                 )
             }
         }
@@ -60,6 +62,15 @@ struct ChatView: View {
             .environmentObject(auth)
             .presentationDetents([.large])
             .presentationBackground(.ultraThinMaterial)
+        }
+        .fullScreenCover(isPresented: $showingCircleRecorder) {
+            CircleRecorderView(
+                onRecorded: { url, dur in
+                    showingCircleRecorder = false
+                    Task { await vm.sendCircle(fileURL: url, duration: dur) }
+                },
+                onCancel: { showingCircleRecorder = false }
+            )
         }
     }
 
