@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
 import { useCallStore } from '@/stores/call.store';
 import { playNotificationSound } from '@/lib/notificationSound';
+import { SOCKET_URL } from '@/lib/config';
 import type { Message, WSServerEvents, Chat, SendMessagePayload, CallType } from '@messenger/shared';
 
 let socket: Socket | null = null;
@@ -26,7 +27,7 @@ export function initSocket(): Socket {
     socket = null;
   }
 
-  socket = io('/', {
+  socket = io(SOCKET_URL, {
     auth: { token },
     transports: ['websocket'],
     reconnection: true,
@@ -59,9 +60,10 @@ export function initSocket(): Socket {
     const myUserId = useAuthStore.getState().user?.id;
     getChatStore().addMessage(message.chatId, message);
 
-    // Звук уведомления для входящих сообщений
+    // Звук + системное уведомление для входящих сообщений
     if (message.senderId !== myUserId) {
       playNotificationSound();
+      maybeShowNotification(message);
     }
 
     // Если чат открыт — сразу отмечаем прочитанным
@@ -202,4 +204,32 @@ export function endCall(callId: string): void {
 
 export function sendCallSignal(callId: string, signal: RTCSessionDescriptionInit | RTCIceCandidateInit): void {
   socket?.emit('call:signal', { callId, signal });
+}
+
+// ── In-tab Notification API (когда таб открыт но не активен) ──────────────────
+
+function maybeShowNotification(message: Message): void {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible') return; // активная вкладка — звука хватит
+  try {
+    const title = message.sender?.displayName ?? 'Новое сообщение';
+    const body =
+      message.encrypted   ? '🔒 Зашифрованное сообщение' :
+      message.type === 'image'  ? '📷 Фото'   :
+      message.type === 'video'  ? '🎬 Видео'  :
+      message.type === 'voice'  ? '🎤 Голосовое' :
+      message.type === 'circle' ? '⭕ Видео-кружок' :
+      message.type === 'file'   ? '📎 Файл'   :
+      (message.content ?? '').slice(0, 120);
+    const n = new Notification(title, {
+      body,
+      icon: message.sender?.avatar ?? '/icon-192.png',
+      tag:  message.chatId,
+    });
+    n.onclick = () => {
+      window.focus();
+      window.location.assign(`/chat/${message.chatId}`);
+      n.close();
+    };
+  } catch { /* */ }
 }

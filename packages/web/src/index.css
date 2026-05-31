@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* iOS safe-area + клавиатура (управляется из native.ts) */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --keyboard-height: 0px;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -11,6 +20,14 @@
   html, body, #root {
     height: 100%;
     overflow: hidden;
+    /* Запрещаем pull-to-refresh оверскролл, который ломает UX в WebView */
+    overscroll-behavior: none;
+  }
+
+  /* На iOS текст не должен подскакивать при тапе/выделении */
+  body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-touch-callout: none;
   }
 
   body {
@@ -190,6 +207,22 @@
 }
 
 @layer utilities {
+  /* iOS safe-area paddings */
+  .pt-safe { padding-top: var(--sat); }
+  .pb-safe { padding-bottom: var(--sab); }
+  .pl-safe { padding-left: var(--sal); }
+  .pr-safe { padding-right: var(--sar); }
+  .px-safe { padding-left: var(--sal); padding-right: var(--sar); }
+  .py-safe { padding-top: var(--sat); padding-bottom: var(--sab); }
+  .mt-safe { margin-top: var(--sat); }
+  .mb-safe { margin-bottom: var(--sab); }
+  .h-safe-top    { height: var(--sat); }
+  .h-safe-bottom { height: var(--sab); }
+  .min-h-safe-bottom { min-height: var(--sab); }
+
+  /* Сумма safe-area + клавиатура — для нижней панели ввода в чате */
+  .pb-input { padding-bottom: calc(var(--sab) + var(--keyboard-height)); }
+
   /* Тонкая разделительная линия с градиентом */
   .divider-grad {
     height: 1px;

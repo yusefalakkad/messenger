@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import { API_URL } from './config';
+import { isNative } from './platform';
 
 export const api = axios.create({
-  baseURL: '/api',
-  withCredentials: true,
+  baseURL: API_URL,
+  // На native cookies cross-origin не отправляются, гоняем только JWT bearer.
+  withCredentials: !isNative(),
 });
 
 // Attach access token
@@ -39,7 +42,7 @@ api.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+        const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: !isNative() });
         const newToken = data.data.accessToken;
         useAuthStore.getState().setAccessToken(newToken);
         refreshQueue.forEach((cb) => cb(newToken));

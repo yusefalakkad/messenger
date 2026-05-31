@@ -61,7 +61,7 @@ export default function ChatHeader({ chat, otherMember }: Props) {
 
   return (
     <>
-      <header className="flex items-center gap-2 px-3 lg:px-4 py-3 border-b border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
+      <header className="flex items-center gap-2 px-3 lg:px-4 pb-3 pt-[calc(var(--sat)+0.75rem)] border-b border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
         <IconBtn onClick={() => navigate('/')} className="lg:hidden -ml-1" title="Назад">
           <ChevronLeft size={20} />
         </IconBtn>

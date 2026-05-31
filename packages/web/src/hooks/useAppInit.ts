@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/lib/api';
 import { initSocket, disconnectSocket } from '@/lib/socket';
+import { setupPush } from '@/lib/push';
+import { registerPushNotifications } from '@/lib/native';
+import { isNative } from '@/lib/platform';
 
 /**
  * Хук инициализации приложения.
@@ -39,6 +42,14 @@ export function useAppInit(): boolean {
         } else {
           // Токен есть — просто подключаем сокет
           initSocket();
+        }
+        // Подписка на push — в фоне, не блокирует UI.
+        // Native (iOS) — APNs через Capacitor; Web — стандартный VAPID/SW.
+        const user = useAuthStore.getState().user;
+        if (isNative() && user) {
+          registerPushNotifications(user.id).catch(() => {});
+        } else {
+          setupPush().catch(() => { /* нет разрешения / unsupported */ });
         }
       }
       if (!cancelled) setReady(true);

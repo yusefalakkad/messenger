@@ -9,3 +9,12 @@ uploads/
 minio-data/
 postgres-data/
 redis-data/
+
+# Capacitor iOS — генерится `npm run ios:init`, но сам Xcode-проект
+# (App.xcworkspace, Podfile.lock и т.д.) ХРАНИТЬ В РЕПО НУЖНО, чтобы
+# подпись/настройки переехали между машинами. А вот зависимости — нет.
+packages/web/ios/App/Pods/
+packages/web/ios/App/build/
+packages/web/ios/.gradle/
+packages/web/ios/DerivedData/
+packages/web/ios/capacitor-cordova-ios-plugins/

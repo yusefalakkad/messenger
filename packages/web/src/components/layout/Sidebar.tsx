@@ -66,7 +66,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/[0.05] bg-dark-surface/80 backdrop-blur-xl relative">
+    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/[0.05] bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
       {/* Ambient свечение в шапке сайдбара */}
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-50 pointer-events-none" />
 

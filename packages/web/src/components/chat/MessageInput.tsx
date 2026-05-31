@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { sendMessage, sendTyping } from '@/lib/socket';
 import { api } from '@/lib/api';
+import { haptic } from '@/lib/native';
 import { encryptText, isChatE2E, getRecipientPublicKey } from '@/lib/e2e';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -137,6 +138,7 @@ export default function MessageInput({ chatId }: Props) {
   const handleSend = useCallback(async () => {
     const t = text.trim();
     if (!t) return;
+    haptic.light();
     setText('');
     sendTyping(chatId, false);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -356,6 +358,7 @@ export default function MessageInput({ chatId }: Props) {
 
     d.pressTimer = setTimeout(() => {
       d.pressTimer = null; // таймер сработал — это долгое нажатие
+      haptic.medium();
       if (recMode === 'circle') {
         setShowCircle(true);
       } else {
@@ -497,7 +500,7 @@ export default function MessageInput({ chatId }: Props) {
         onChange={(e) => handleFileChange(e, 'video')} />
 
       {/* ─── Основная панель ─── */}
-      <div className="flex-shrink-0 border-t border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl px-4 py-3">
+      <div className="flex-shrink-0 border-t border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl px-4 pt-3 pb-3 pb-input">
 
         {/* Планка «Ответить» */}
         <AnimatePresence>
