@@ -64,6 +64,17 @@ struct MessageSender: Codable, Hashable {
     let publicKey: String?
 }
 
+struct MediaInfo: Codable, Hashable {
+    let url: String
+    let mimeType: String?
+    let size: Int?
+    let duration: Double?     // секунды (voice/circle/video)
+    let width: Int?
+    let height: Int?
+    let waveform: [Double]?   // голосовое
+    let thumbnailUrl: String?
+}
+
 struct Message: Codable, Identifiable, Hashable {
     let id: String
     let chatId: String
@@ -73,6 +84,7 @@ struct Message: Codable, Identifiable, Hashable {
     let content: String?        // если encrypted — это ciphertext base64
     let nonce: String?          // base64 nonce для AES-GCM
     let encrypted: Bool?
+    let media: MediaInfo?
     let replyToId: String?
     let forwardedFromId: String?
     let editedAt: Date?
@@ -82,6 +94,17 @@ struct Message: Codable, Identifiable, Hashable {
     let createdAt: Date
 }
 
+struct MediaPayload: Codable {
+    let url: String
+    let mimeType: String?
+    let size: Int?
+    let duration: Double?
+    let width: Int?
+    let height: Int?
+    let waveform: [Double]?
+    let thumbnailUrl: String?
+}
+
 /// DTO для отправки сообщения через socket.io событие `message:send`.
 struct SendMessagePayload: Codable {
     let chatId: String
@@ -89,6 +112,7 @@ struct SendMessagePayload: Codable {
     let content: String?
     let nonce: String?
     let encrypted: Bool?
+    let mediaData: MediaPayload?
     let replyToId: String?
 }
 

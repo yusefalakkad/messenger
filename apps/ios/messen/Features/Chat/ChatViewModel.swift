@@ -105,6 +105,7 @@ final class ChatViewModel: ObservableObject {
                 content: enc.ciphertextB64,
                 nonce: enc.nonceB64,
                 encrypted: true,
+                mediaData: nil,
                 replyToId: nil
             )
         } else {
@@ -114,10 +115,47 @@ final class ChatViewModel: ObservableObject {
                 content: text,
                 nonce: nil,
                 encrypted: false,
+                mediaData: nil,
                 replyToId: nil
             )
         }
         SocketClient.shared.send(payload)
+    }
+
+    // MARK: - Voice message
+
+    /// Загружает голосовой файл и отправляет сообщение.
+    func sendVoice(fileURL: URL, duration: TimeInterval, waveform: [CGFloat]) async {
+        do {
+            let media = try await MediaService.uploadVoice(
+                fileURL: fileURL,
+                duration: duration,
+                waveform: waveform
+            )
+            let payload = SendMessagePayload(
+                chatId: chat.id,
+                type: MessageType.voice.rawValue,
+                content: nil,
+                nonce: nil,
+                encrypted: false,
+                mediaData: MediaPayload(
+                    url: media.url,
+                    mimeType: media.mimeType,
+                    size: media.size,
+                    duration: duration,
+                    width: nil,
+                    height: nil,
+                    waveform: waveform.map { Double($0) },
+                    thumbnailUrl: nil
+                ),
+                replyToId: nil
+            )
+            SocketClient.shared.send(payload)
+            // Удаляем локальный временный файл
+            try? FileManager.default.removeItem(at: fileURL)
+        } catch {
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 
     // MARK: - Typing indicator

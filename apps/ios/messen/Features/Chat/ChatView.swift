@@ -24,7 +24,10 @@ struct ChatView: View {
                 MessageInput(
                     text: $vm.draft,
                     onSend: vm.sendDraft,
-                    onTextChanged: vm.onTextChange
+                    onTextChanged: vm.onTextChange,
+                    onVoiceRecorded: { url, dur, wf in
+                        Task { await vm.sendVoice(fileURL: url, duration: dur, waveform: wf) }
+                    }
                 )
             }
         }

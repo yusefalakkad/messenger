@@ -78,6 +78,20 @@ struct MessageBubble: View {
 
     @ViewBuilder
     private var content: some View {
+        switch message.type {
+        case .voice:
+            if let m = message.media {
+                VoicePlayerView(media: m, isOwn: isOwn)
+            }
+        case .image:
+            mediaImage
+        default:
+            textContent
+        }
+    }
+
+    @ViewBuilder
+    private var textContent: some View {
         if isEncryptedFailed {
             HStack(spacing: 6) {
                 Image(systemName: "lock.fill")
@@ -96,6 +110,25 @@ struct MessageBubble: View {
             Text(raw)
                 .font(Typo.body)
                 .foregroundStyle(.white)
+        }
+    }
+
+    @ViewBuilder
+    private var mediaImage: some View {
+        if let urlStr = message.media?.url, let url = URL(string: urlStr) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let img):
+                    img.resizable().scaledToFit()
+                        .frame(maxWidth: 240, maxHeight: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                default:
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 200, height: 160)
+                        .overlay(ProgressView().tint(.brandViolet))
+                }
+            }
         }
     }
 
