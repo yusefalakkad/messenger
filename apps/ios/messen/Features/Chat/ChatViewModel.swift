@@ -122,6 +122,40 @@ final class ChatViewModel: ObservableObject {
         SocketClient.shared.send(payload)
     }
 
+    // MARK: - Image message
+
+    func sendImage(prepared: ImagePreparer.Prepared) async {
+        do {
+            let media = try await MediaService.uploadImage(
+                fileURL: prepared.fileURL,
+                mimeType: prepared.mimeType,
+                fileName: prepared.fileName
+            )
+            let payload = SendMessagePayload(
+                chatId: chat.id,
+                type: MessageType.image.rawValue,
+                content: nil,
+                nonce: nil,
+                encrypted: false,
+                mediaData: MediaPayload(
+                    url: media.url,
+                    mimeType: media.mimeType,
+                    size: media.size,
+                    duration: nil,
+                    width: media.width ?? prepared.width,
+                    height: media.height ?? prepared.height,
+                    waveform: nil,
+                    thumbnailUrl: nil
+                ),
+                replyToId: nil
+            )
+            SocketClient.shared.send(payload)
+            try? FileManager.default.removeItem(at: prepared.fileURL)
+        } catch {
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
     // MARK: - Voice message
 
     /// Загружает голосовой файл и отправляет сообщение.
@@ -156,6 +190,18 @@ final class ChatViewModel: ObservableObject {
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    // MARK: - Reactions / delete
+
+    func react(messageId: String, emoji: String) {
+        SocketClient.shared.reactToMessage(messageId: messageId, chatId: chat.id, emoji: emoji)
+    }
+
+    func delete(messageId: String) {
+        SocketClient.shared.deleteMessageRemote(messageId: messageId, chatId: chat.id)
+        // Локально удаляем сразу для отзывчивости (сервер придёт по сокету)
+        messages.removeAll { $0.id == messageId }
     }
 
     // MARK: - Typing indicator

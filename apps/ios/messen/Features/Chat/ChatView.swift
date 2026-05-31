@@ -27,6 +27,9 @@ struct ChatView: View {
                     onTextChanged: vm.onTextChange,
                     onVoiceRecorded: { url, dur, wf in
                         Task { await vm.sendVoice(fileURL: url, duration: dur, waveform: wf) }
+                    },
+                    onImageSelected: { prepared in
+                        Task { await vm.sendImage(prepared: prepared) }
                     }
                 )
             }
@@ -153,7 +156,10 @@ struct ChatView: View {
                                 message: msg,
                                 isOwn: msg.senderId == auth.user?.id,
                                 isFirstInGroup: isFirstInGroup,
-                                displayContent: vm.displayContent(for: msg)
+                                displayContent: vm.displayContent(for: msg),
+                                currentUserId: auth.user?.id,
+                                onReact: { emoji in vm.react(messageId: msg.id, emoji: emoji) },
+                                onDelete: { vm.delete(messageId: msg.id) }
                             )
                             .id(msg.id)
                             .transition(.asymmetric(

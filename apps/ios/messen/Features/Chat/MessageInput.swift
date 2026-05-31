@@ -1,13 +1,16 @@
 import SwiftUI
+import PhotosUI
 
 struct MessageInput: View {
     @Binding var text: String
     let onSend: () -> Void
     let onTextChanged: () -> Void
     let onVoiceRecorded: (URL, TimeInterval, [CGFloat]) -> Void
+    let onImageSelected: (ImagePreparer.Prepared) -> Void
 
     @FocusState private var focused: Bool
     @StateObject private var recorder = AudioRecorder()
+    @State private var photoItem: PhotosPickerItem?
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -43,15 +46,29 @@ struct MessageInput: View {
     // MARK: - Static input pieces
 
     private var attachButton: some View {
-        Button {
-            // TODO: media attach picker
-        } label: {
+        PhotosPicker(
+            selection: $photoItem,
+            matching: .images,
+            photoLibrary: .shared()
+        ) {
             Image(systemName: "paperclip")
                 .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(.white.opacity(0.55))
                 .padding(8)
         }
-        .buttonStyle(PressDownStyle())
+        .onChange(of: photoItem) { _, newValue in
+            guard let newValue else { return }
+            Task {
+                do {
+                    if let prepared = try await ImagePreparer.prepare(newValue) {
+                        onImageSelected(prepared)
+                    }
+                    photoItem = nil
+                } catch {
+                    photoItem = nil
+                }
+            }
+        }
     }
 
     private var inputField: some View {

@@ -6,6 +6,11 @@ struct MessageBubble: View {
     let isFirstInGroup: Bool
     /// Уже расшифрованный текст (если был зашифрован).
     let displayContent: String?
+    let currentUserId: String?
+    let onReact: (String) -> Void
+    let onDelete: () -> Void
+
+    @State private var showReactionPicker = false
 
     private static let timeFmt: DateFormatter = {
         let f = DateFormatter()
@@ -32,11 +37,58 @@ struct MessageBubble: View {
                 }
             }
 
-            bubble
+            VStack(alignment: isOwn ? .trailing : .leading, spacing: 4) {
+                bubble
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = displayContent ?? message.content
+                        } label: {
+                            Label("Скопировать", systemImage: "doc.on.doc")
+                        }
+                        Button {
+                            showReactionPicker = true
+                        } label: {
+                            Label("Реакция", systemImage: "face.smiling")
+                        }
+                        if isOwn {
+                            Button(role: .destructive, action: onDelete) {
+                                Label("Удалить", systemImage: "trash")
+                            }
+                        }
+                    }
+                if let rs = message.reactions, !rs.isEmpty {
+                    ReactionsBar(
+                        reactions: rs,
+                        currentUserId: currentUserId,
+                        onToggle: onReact
+                    )
+                    .padding(.horizontal, 4)
+                }
+            }
 
             if !isOwn { Spacer(minLength: 40) }
         }
         .padding(.vertical, 1)
+        .sheet(isPresented: $showReactionPicker) {
+            VStack(spacing: 8) {
+                Text("Выбери реакцию")
+                    .font(Typo.bodyM)
+                    .foregroundStyle(.white.opacity(0.6))
+                ReactionPicker(
+                    onPick: { emoji in
+                        onReact(emoji)
+                        showReactionPicker = false
+                    },
+                    onMore: {
+                        // На будущее: полный emoji picker
+                        showReactionPicker = false
+                    }
+                )
+            }
+            .padding(20)
+            .presentationDetents([.height(140)])
+            .presentationBackground(.ultraThinMaterial)
+        }
     }
 
     @ViewBuilder
