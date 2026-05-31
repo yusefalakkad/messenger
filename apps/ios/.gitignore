@@ -1,0 +1,24 @@
+# Сгенерированный XcodeGen проект — не коммитим, регенерится локально
+messen.xcodeproj/
+messen.xcworkspace/
+
+# Xcode build artifacts
+DerivedData/
+build/
+.build/
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Конфиденциальные
+*.p8
+*.p12
+*.cer
+GoogleService-Info.plist

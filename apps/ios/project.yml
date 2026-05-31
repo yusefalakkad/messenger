@@ -1,0 +1,50 @@
+name: messen
+options:
+  bundleIdPrefix: online.akkdmsg
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEVELOPMENT_TEAM: "" # выставится в Xcode при первой сборке
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  messen:
+    type: application
+    platform: iOS
+    sources:
+      - path: messen
+        excludes:
+          - "**/.DS_Store"
+    info:
+      path: messen/Info.plist
+      properties:
+        CFBundleDisplayName: messen
+        UILaunchScreen:
+          UIColorName: BrandBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - audio
+          - voip
+          - remote-notification
+        NSMicrophoneUsageDescription: "Нужен микрофон для голосовых сообщений и звонков"
+        NSCameraUsageDescription: "Нужна камера для фото, видео и видео-кружков"
+        NSPhotoLibraryUsageDescription: "Доступ нужен для отправки фото и видео"
+        NSUserNotificationUsageDescription: "Чтобы вы видели входящие сообщения и звонки"
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: online.akkdmsg.messen
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
