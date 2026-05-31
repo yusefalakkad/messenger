@@ -1,11 +1,15 @@
 import SwiftUI
+import Combine
 
 struct ChatListView: View {
     @EnvironmentObject var auth: AuthStore
     @StateObject private var vm = ChatListViewModel()
 
+    @State private var path: [String] = []
+    @State private var showNewChat = false
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 AmbientBackground()
 
@@ -21,6 +25,42 @@ struct ChatListView: View {
         .preferredColorScheme(.dark)
         .task { await vm.load() }
         .refreshable { await vm.load() }
+        // Deep-link от push: переключиться на нужный чат
+        .onReceive(PushManager.shared.openChatRequested) { chatId in
+            openChat(chatId)
+        }
+        .onAppear {
+            if let pending = PushManager.shared.consumePendingChatId() {
+                openChat(pending)
+            }
+        }
+        // Свежее сообщение в любом чате — поднимаем чат вверх списка
+        .onReceive(SocketClient.shared.messageReceived) { _ in
+            Task { await vm.load() }
+        }
+        // Новый чат создан — добавим в список
+        .onReceive(SocketClient.shared.chatCreated) { chat in
+            vm.upsert(chat)
+        }
+        .sheet(isPresented: $showNewChat) {
+            NewChatView(onChatCreated: { chat in
+                vm.upsert(chat)
+                showNewChat = false
+                openChat(chat.id)
+            })
+            .environmentObject(auth)
+            .presentationDetents([.large])
+            .presentationBackground(.ultraThinMaterial)
+        }
+    }
+
+    private func openChat(_ chatId: String) {
+        // Если чата ещё нет в списке — подгрузим
+        if !vm.chats.contains(where: { $0.id == chatId }) {
+            Task { await vm.load() }
+        }
+        // Сбросим стек до корня и пушим
+        path = [chatId]
     }
 
     // MARK: - Header
@@ -48,6 +88,17 @@ struct ChatListView: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
             Spacer()
+
+            Button { showNewChat = true } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(LinearGradient.brand)
+                    .clipShape(Circle())
+                    .shadow(color: Color.brandViolet.opacity(0.5), radius: 12, x: 0, y: 5)
+            }
+            .buttonStyle(PressDownStyle())
 
             Menu {
                 Button(role: .destructive) { auth.logout() } label: {

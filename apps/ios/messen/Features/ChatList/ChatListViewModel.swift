@@ -16,6 +16,22 @@ final class ChatListViewModel: ObservableObject {
         }
     }
 
+    /// Добавляет чат, если его нет, или заменяет существующий по id (+пересортировка).
+    func upsert(_ chat: Chat) {
+        if let idx = chats.firstIndex(where: { $0.id == chat.id }) {
+            chats[idx] = chat
+        } else {
+            chats.insert(chat, at: 0)
+        }
+        sort()
+    }
+
+    private func sort() {
+        chats.sort { lhs, rhs in
+            (lhs.lastMessage?.createdAt ?? .distantPast) > (rhs.lastMessage?.createdAt ?? .distantPast)
+        }
+    }
+
     func load() async {
         loading = true
         defer { loading = false }

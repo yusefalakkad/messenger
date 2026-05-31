@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct MessenApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var auth = AuthStore()
 
     init() {

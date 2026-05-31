@@ -20,6 +20,8 @@ final class AuthStore: ObservableObject {
             self.user = decoded
             // Авто-подключение WebSocket при восстановлении сессии
             SocketClient.shared.connect()
+            // И пере-регистрация APNs-токена (на случай если устройство сменилось)
+            Task { await PushManager.shared.requestAuthorizationAndRegister() }
         }
         // APIClient читает токен прямо из Keychain — синхронизация не нужна.
     }
@@ -36,6 +38,8 @@ final class AuthStore: ObservableObject {
             KeychainStore.set(pk, for: KeychainStore.Keys.privateKey)
         }
         SocketClient.shared.connect()
+        // После логина просим разрешение на push и регистрируемся в APNs.
+        Task { await PushManager.shared.requestAuthorizationAndRegister() }
     }
 
     /// E2E-приватный ключ текущего юзера (если есть).
