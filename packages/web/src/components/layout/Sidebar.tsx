@@ -1,15 +1,18 @@
 import { useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
 import Avatar from '@/components/ui/Avatar';
+import IconBtn from '@/components/ui/IconBtn';
+import Dropdown, { DropdownItem } from '@/components/ui/Dropdown';
 import ChatListItem from '@/components/chat/ChatListItem';
 import NewChatModal from '@/components/chat/NewChatModal';
 import NewGroupModal from '@/components/chat/NewGroupModal';
+import SettingsDialog from '@/components/settings/SettingsDialog';
 
 export default function Sidebar() {
   const { chatId } = useParams();
@@ -23,6 +26,7 @@ export default function Sidebar() {
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showPlus,    setShowPlus]    = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -62,22 +66,29 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-80 flex-shrink-0 flex flex-col border-r border-dark-border bg-dark-surface">
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-dark-border">
+    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/[0.05] bg-dark-surface/80 backdrop-blur-xl relative">
+      {/* Ambient свечение в шапке сайдбара */}
+      <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-50 pointer-events-none" />
 
-        {/* Аватар с возможностью смены */}
+      {/* ── Header ── */}
+      <div className="relative flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.05]">
+
+        {/* Аватар в градиентном кольце с возможностью смены */}
         <div className="relative flex-shrink-0 group">
-          <Avatar
-            src={user?.avatar}
-            name={user?.displayName ?? '?'}
-            size="md"
-            online
-          />
+          <div className="ring-gradient">
+            <div className="rounded-full bg-dark-surface p-[2px]">
+              <Avatar
+                src={user?.avatar}
+                name={user?.displayName ?? '?'}
+                size="md"
+                online
+              />
+            </div>
+          </div>
           <button
             onClick={() => avatarInputRef.current?.click()}
             disabled={uploadingAvatar}
-            className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+            className="absolute inset-1 rounded-full bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
             title="Сменить фото"
           >
             {uploadingAvatar
@@ -95,71 +106,43 @@ export default function Sidebar() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{user?.displayName}</p>
-          <p className="text-white/40 text-xs truncate">@{user?.username}</p>
+          <p className="font-semibold text-sm truncate leading-tight">{user?.displayName}</p>
+          <p className="text-white/40 text-xs truncate mt-0.5">@{user?.username}</p>
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* Кнопка «+» с выпадающим меню */}
+        <div className="flex items-center gap-0.5">
           <div className="relative">
-            <button
-              onClick={() => setShowPlus((v) => !v)}
-              className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white"
-              title="Новый чат или группа"
-            >
+            <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title="Новый чат или группа">
               <Plus size={18} />
-            </button>
-
-            <AnimatePresence>
-              {showPlus && (
-                <>
-                  {/* Backdrop */}
-                  <div className="fixed inset-0 z-10" onClick={() => setShowPlus(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                    transition={{ duration: 0.1 }}
-                    className="absolute right-0 top-full mt-1 bg-dark-card border border-dark-border rounded-xl shadow-2xl z-20 overflow-hidden min-w-[180px]"
-                  >
-                    <button
-                      onClick={() => { setShowNewChat(true); setShowPlus(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors text-sm"
-                    >
-                      <MessageSquarePlus size={16} className="text-primary-400" />
-                      <span>Новый чат</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowNewGroup(true); setShowPlus(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors text-sm"
-                    >
-                      <Users size={16} className="text-primary-400" />
-                      <span>Новая группа</span>
-                    </button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+            </IconBtn>
+            <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
+              <DropdownItem
+                icon={<MessageSquarePlus size={16} />} label="Новый чат"
+                onClick={() => { setShowNewChat(true); setShowPlus(false); }}
+              />
+              <DropdownItem
+                icon={<Users size={16} />} label="Новая группа"
+                onClick={() => { setShowNewGroup(true); setShowPlus(false); }}
+              />
+            </Dropdown>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="p-2 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white"
-            title="Выйти"
-          >
+          <IconBtn onClick={() => setShowSettings(true)} title="Настройки">
+            <Settings size={18} />
+          </IconBtn>
+
+          <IconBtn onClick={handleLogout} title="Выйти">
             <LogOut size={18} />
-          </button>
+          </IconBtn>
         </div>
       </div>
 
       {/* ── Search ── */}
-      <div className="px-3 py-2">
+      <div className="px-3 py-2.5">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/35" />
           <input
-            className="w-full bg-dark-bg border border-dark-border rounded-xl pl-9 pr-4 py-2.5
-                       text-sm placeholder-white/30 text-white outline-none
-                       focus:border-primary-500/50 transition-colors"
+            className="input-pill w-full"
             placeholder="Поиск чатов..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -168,27 +151,38 @@ export default function Sidebar() {
       </div>
 
       {/* ── Chat list ── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="relative flex-1 overflow-y-auto px-1">
         <AnimatePresence>
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-white/30 text-sm gap-2">
-              <Users size={28} className="opacity-30" />
-              <p>Нет чатов</p>
+            <div className="flex flex-col items-center justify-center mt-12 px-6 gap-3 text-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-brand-gradient blur-xl opacity-30 rounded-2xl" />
+                <div className="relative w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
+                  <Users size={24} className="text-white/40" />
+                </div>
+              </div>
+              <p className="text-white/50 text-sm">Здесь пока тихо</p>
               <button
                 onClick={() => setShowNewChat(true)}
-                className="text-primary-400 hover:text-primary-300 text-xs"
+                className="text-xs font-medium text-gradient hover:opacity-80 transition-opacity"
               >
-                Начать переписку
+                Начать переписку →
               </button>
             </div>
           ) : (
-            filtered.map((chat) => (
-              <ChatListItem
+            filtered.map((chat, idx) => (
+              <motion.div
                 key={chat.id}
-                chat={chat}
-                active={chat.id === chatId}
-                onClick={() => navigate(`/chat/${chat.id}`)}
-              />
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <ChatListItem
+                  chat={chat}
+                  active={chat.id === chatId}
+                  onClick={() => navigate(`/chat/${chat.id}`)}
+                />
+              </motion.div>
             ))
           )}
         </AnimatePresence>
@@ -199,6 +193,8 @@ export default function Sidebar() {
         {showNewChat  && <NewChatModal  onClose={() => setShowNewChat(false)} />}
         {showNewGroup && <NewGroupModal onClose={() => setShowNewGroup(false)} />}
       </AnimatePresence>
+
+      <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
     </aside>
   );
 }

@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { initSocket } from '@/lib/socket';
 import { generateKeyPair } from '@/lib/crypto';
+import { encryptAndStore } from '@/lib/keyVault';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function RegisterForm() {
@@ -36,7 +38,9 @@ export default function RegisterForm() {
       });
 
       const { user, tokens } = data.data;
-      // Store private key locally (never leaves device)
+      // Шифруем приватный ключ паролем перед сохранением в localStorage.
+      // Плейнтекст кэшируется в sessionStorage до закрытия вкладки.
+      await encryptAndStore(user.id, privateKey, form.password);
       setAuth(user, tokens.accessToken, privateKey);
       initSocket();
     } catch (err: unknown) {
@@ -109,17 +113,26 @@ export default function RegisterForm() {
       </div>
 
       {/* E2E notice */}
-      <div className="flex items-start gap-2.5 bg-primary-600/10 border border-primary-600/20 rounded-xl px-4 py-3">
-        <ShieldCheck size={16} className="text-primary-400 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-primary-300">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="flex items-start gap-2.5 bg-primary-600/10 border border-primary-500/25 rounded-xl px-4 py-3"
+      >
+        <ShieldCheck size={16} className="text-primary-300 mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-primary-200/85 leading-relaxed">
           При регистрации автоматически создаётся ключ шифрования. Приватный ключ хранится только на вашем устройстве.
         </p>
-      </div>
+      </motion.div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+        <motion.div
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-3 text-rose-300 text-sm"
+        >
           {error}
-        </div>
+        </motion.div>
       )}
 
       <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">

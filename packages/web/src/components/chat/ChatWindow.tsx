@@ -41,9 +41,9 @@ export default function ChatWindow() {
 
       {/* E2E-баннер — показывается один раз при открытии зашифрованного чата */}
       {isE2E && (
-        <div className="flex items-center justify-center gap-1.5 py-1.5 bg-primary-600/8 border-b border-primary-600/15 flex-shrink-0">
-          <ShieldCheck size={12} className="text-primary-400/80" />
-          <span className="text-[11px] text-primary-400/70 select-none">
+        <div className="flex items-center justify-center gap-1.5 py-1.5 bg-primary-600/10 border-b border-primary-500/20 flex-shrink-0 backdrop-blur-sm">
+          <ShieldCheck size={12} className="text-primary-300" />
+          <span className="text-[11px] text-primary-200/80 select-none">
             Сообщения защищены сквозным шифрованием
           </span>
         </div>

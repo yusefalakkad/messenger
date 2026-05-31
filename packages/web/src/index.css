@@ -14,45 +14,162 @@
   }
 
   body {
-    @apply bg-dark-bg text-white;
+    @apply bg-dark-bg text-white antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    /* Глубокий фиолетово-чёрный с ambient-засветками — не пустой "чисто чёрный" */
+    background-color: #0b0a14;
+    background-image:
+      radial-gradient(1100px 700px at 10% -10%, rgba(124,77,255,0.18), transparent 60%),
+      radial-gradient(900px 700px at 110% 110%, rgba(255,77,141,0.12), transparent 60%),
+      radial-gradient(600px 400px at 80% 0%, rgba(255,138,61,0.06), transparent 60%);
+    background-attachment: fixed;
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
+  /* Скроллбар тонкий, прозрачный */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-dark-border rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-dark-hover; }
+  ::-webkit-scrollbar-thumb { @apply bg-white/5 rounded-full transition-colors; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-white/15; }
+
+  ::selection { background-color: rgba(124,77,255,0.4); color: white; }
+
+  /* Плавные переходы для интерактивных элементов по умолчанию */
+  button, a, input, textarea, [role="button"] {
+    transition-property: background-color, border-color, color, box-shadow, transform, opacity, filter;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
 }
 
 @layer components {
-  /* Message bubbles */
-  .bubble-out {
-    @apply bg-primary-600 text-white rounded-msg rounded-br-msg-sm;
-  }
-  .bubble-in {
-    @apply bg-dark-card text-white rounded-msg rounded-bl-msg-sm;
+  /* ─────────────────────────────────────────────
+     Брендовый градиентный текст (анимированный)
+  ───────────────────────────────────────────── */
+  .text-gradient {
+    background: linear-gradient(135deg, #b794ff 0%, #ff6dbb 45%, #ff8a3d 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
   }
 
-  /* Glass effect for overlays */
+  /* Стеклянная поверхность для оверлеев и панелей */
   .glass {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    @apply bg-dark-surface/80;
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    @apply bg-dark-surface/65 border border-white/[0.06];
+  }
+
+  /* Карточка со стеклом + внутреннее свечение */
+  .glass-card {
+    @apply rounded-2xl border border-white/[0.07] bg-white/[0.025];
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.05) inset,
+      0 22px 60px -30px rgba(0,0,0,0.7);
+  }
+
+  /* Брендовый чип-пилюля с градиентной обводкой */
+  .chip-brand {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-white/85;
+    background: linear-gradient(rgba(20,18,30,0.6), rgba(20,18,30,0.6)) padding-box,
+                linear-gradient(135deg, #7c4dff, #ff4d8d 60%, #ff8a3d) border-box;
+    border: 1px solid transparent;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Message bubbles */
+  .bubble-out {
+    @apply text-white rounded-msg rounded-br-msg-sm;
+    background: linear-gradient(135deg, #6a3df0 0%, #9a3dff 50%, #d946a8 100%);
+    box-shadow: 0 10px 30px -14px rgba(124,77,255,0.6);
+  }
+  .bubble-in {
+    @apply text-white rounded-msg rounded-bl-msg-sm border border-white/[0.06];
+    background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
+    box-shadow: 0 4px 18px -10px rgba(0,0,0,0.5);
   }
 
   /* Input base */
   .input-base {
-    @apply bg-dark-input border border-dark-border rounded-xl px-4 py-3
-           text-white placeholder-white/30 outline-none transition-colors
-           focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30;
+    @apply bg-dark-input border border-white/[0.07] rounded-xl px-4 py-3
+           text-white placeholder-white/30 outline-none
+           focus:border-primary-500/70 focus:ring-2 focus:ring-primary-500/25
+           focus:bg-white/[0.04];
   }
 
-  /* Button base */
+  /* Pill-shaped поисковый input */
+  .input-pill {
+    @apply bg-white/[0.04] border border-white/[0.07] rounded-full pl-9 pr-4 py-2
+           text-sm placeholder-white/35 text-white outline-none
+           focus:border-primary-500/60 focus:bg-white/[0.06]
+           focus:ring-2 focus:ring-primary-500/20;
+  }
+
+  /* Брендовая кнопка — градиент + свечение */
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-500 active:bg-primary-700
-           text-white font-medium rounded-xl px-6 py-3 transition-colors
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply text-white font-medium rounded-xl px-6 py-3
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-glow-violet active:scale-[0.97];
+    background: linear-gradient(135deg, #7c4dff 0%, #d946ef 60%, #ff8a3d 100%);
+    background-size: 200% 200%;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-position: 100% 0%;
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 44px -10px rgba(124,77,255,0.65);
+  }
+
+  /* Призрачная кнопка-иконка */
+  .btn-icon {
+    @apply p-2 rounded-xl text-white/65 hover:text-white hover:bg-white/[0.07]
+           active:bg-white/[0.1] active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed
+           inline-flex items-center justify-center;
+  }
+  .btn-icon-sm { @apply p-1.5 rounded-lg; }
+  .btn-icon-danger { @apply hover:text-rose-400 hover:bg-rose-500/10; }
+
+  /* Item в выпадающих меню */
+  .menu-item {
+    @apply w-full flex items-center gap-3 px-4 py-2.5 text-sm
+           text-white/85 hover:bg-white/[0.06] hover:pl-5
+           active:bg-white/[0.09];
+  }
+  .menu-item-danger { @apply text-rose-400 hover:bg-rose-500/10; }
+
+  /* Кольцо-градиент вокруг аватара */
+  .ring-gradient {
+    background: linear-gradient(135deg, #7c4dff, #ff4d8d 55%, #ff8a3d);
+    padding: 2px;
+    border-radius: 9999px;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.3s;
+  }
+  .ring-gradient:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 24px -2px rgba(124,77,255,0.55);
+  }
+
+  /* Анимированная градиентная обводка вокруг карточки */
+  .border-gradient {
+    position: relative;
+    border-radius: 1rem;
+  }
+  .border-gradient::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(124,77,255,0.5), rgba(255,77,141,0.4), rgba(255,138,61,0.4));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
   }
 
   /* Typing indicator dots */
@@ -62,4 +179,44 @@
   }
   .typing-dot:nth-child(2) { animation-delay: 0.2s; }
   .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  /* Лоадер-скелетон с шиммером */
+  .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+    @apply rounded-md;
+  }
+}
+
+@layer utilities {
+  /* Тонкая разделительная линия с градиентом */
+  .divider-grad {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  }
+
+  /* Световое пятно (как фон) */
+  .bg-spot-violet { background: radial-gradient(circle, rgba(124,77,255,0.3), transparent 60%); }
+  .bg-spot-pink   { background: radial-gradient(circle, rgba(255,77,141,0.25), transparent 60%); }
+  .bg-spot-orange { background: radial-gradient(circle, rgba(255,138,61,0.22), transparent 60%); }
+
+  /* Hover-lift микро-интеракция */
+  .hover-lift {
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.25s;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+  }
+
+  /* Текст с градиентным подчёркиванием на hover */
+  .link-grad {
+    background-image: linear-gradient(90deg, #b794ff, #ff6dbb, #ff8a3d);
+    background-size: 100% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.3s;
+  }
+  .link-grad:hover { background-size: 100% 2px; }
 }

@@ -46,7 +46,7 @@ export default function Avatar({ src, name, size = 'md', online, className }: Av
         <span className={clsx(
           'absolute bottom-0 right-0 rounded-full border-2 border-dark-surface',
           s.dot,
-          online ? 'bg-green-500' : 'bg-white/20',
+          online ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-white/25',
         )} />
       )}
     </div>

@@ -89,11 +89,16 @@ export default function MessageList({ chatId, messages }: Props) {
       >
         {groups.map(({ date, msgs }) => (
           <div key={date}>
-            <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-dark-border" />
-              <span className="text-xs text-white/30 px-2">{date}</span>
-              <div className="flex-1 h-px bg-dark-border" />
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              className="flex items-center gap-3 my-4"
+            >
+              <div className="flex-1 divider-grad" />
+              <span className="text-[11px] text-white/40 uppercase tracking-wider font-medium px-2">{date}</span>
+              <div className="flex-1 divider-grad" />
+            </motion.div>
 
             <AnimatePresence initial={false}>
               {msgs.map((msg, i) => {
@@ -104,9 +109,9 @@ export default function MessageList({ chatId, messages }: Props) {
                 return (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15 }}
+                    initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
                   >
                     <MessageBubble
                       message={msg}
@@ -129,17 +134,20 @@ export default function MessageList({ chatId, messages }: Props) {
       <AnimatePresence>
         {showScrollBtn && (
           <motion.button
-            initial={{ opacity: 0, scale: 0.8, y: 8 }}
+            initial={{ opacity: 0, scale: 0.8, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 8 }}
+            exit={{ opacity: 0, scale: 0.8, y: 12 }}
+            whileHover={{ scale: 1.08, y: -2 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 22 }}
             onClick={scrollToBottom}
-            className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-dark-card border border-dark-border
-                       shadow-lg flex items-center justify-center hover:bg-dark-hover transition-colors z-10"
+            className="absolute bottom-4 right-4 w-11 h-11 rounded-full glass shadow-glow-soft
+                       flex items-center justify-center z-10"
           >
-            <ChevronDown size={18} className="text-white/70" />
+            <ChevronDown size={20} className="text-white/80" />
             {unreadBelow > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full
-                               bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center px-0.5">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] rounded-full
+                               bg-brand-gradient text-white text-[10px] font-bold flex items-center justify-center px-0.5 shadow-glow-violet">
                 {unreadBelow > 99 ? '99+' : unreadBelow}
               </span>
             )}

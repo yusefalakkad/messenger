@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { useChatStore } from '@/stores/chat.store';
 
 interface Props { chatId: string; }
@@ -7,15 +8,20 @@ export default function TypingIndicator({ chatId }: Props) {
   if (!typingUsers || typingUsers.size === 0) return null;
 
   return (
-    <div className="flex items-end gap-2 mb-1">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      className="flex items-end gap-2 mb-1"
+    >
       <div className="w-8 flex-shrink-0" />
-      <div className="bubble-in px-4 py-3 rounded-msg rounded-bl-msg-sm">
+      <div className="bubble-in px-4 py-3">
         <div className="flex items-center gap-1">
           <span className="typing-dot" />
           <span className="typing-dot" />
           <span className="typing-dot" />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

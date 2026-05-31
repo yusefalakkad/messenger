@@ -19,6 +19,9 @@ import { editMessage as socketEditMsg } from '@/lib/socket';
 import CircleRecorder from '@/components/media/CircleRecorder';
 import MediaPreview, { type PendingMedia } from '@/components/media/MediaPreview';
 import EmojiPicker from '@/components/ui/EmojiPicker';
+import IconBtn from '@/components/ui/IconBtn';
+import Dropdown, { DropdownItem } from '@/components/ui/Dropdown';
+import MentionAutocomplete from './MentionAutocomplete';
 import type { MessageType } from '@messenger/shared';
 
 interface Props { chatId: string; }
@@ -33,6 +36,9 @@ export default function MessageInput({ chatId }: Props) {
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const [uploading,    setUploading]    = useState(false);
   const [uploadError,  setUploadError]  = useState<string | null>(null);
+
+  // Автокомплит @username — { query, caretStart } или null если не активен
+  const [mention, setMention] = useState<{ query: string; startIdx: number } | null>(null);
 
   const replyingTo      = useChatStore((s) => s.replyingTo);
   const editingMessage  = useChatStore((s) => s.editingMessage);
@@ -90,6 +96,22 @@ export default function MessageInput({ chatId }: Props) {
       textareaRef.current?.focus();
     }
   }, [editingMessage?.id]);
+
+  // ─── Черновики ──────────────────────────────────────────────────────────────
+  // При входе в чат — подгружаем сохранённый текст; при выходе/смене — сохраняем.
+
+  useEffect(() => {
+    if (editingMessage) return;
+    const draft = localStorage.getItem(`draft:${chatId}`);
+    setText(draft ?? '');
+  }, [chatId]);
+
+  useEffect(() => {
+    if (editingMessage) return;
+    const t = text.trim();
+    if (t) localStorage.setItem(`draft:${chatId}`, text);
+    else   localStorage.removeItem(`draft:${chatId}`);
+  }, [text, chatId, editingMessage]);
 
   // ─── Очистка при смене чата ──────────────────────────────────────────────────
 
@@ -149,8 +171,55 @@ export default function MessageInput({ chatId }: Props) {
   }, [chatId, text, editingMessage, replyingTo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Если открыт @-автокомплит, он сам перехватывает нав. клавиши.
+    if (mention && ['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      if (e.key === 'Enter' || e.key === 'Tab') e.preventDefault();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
+
+  // Парсит @partial перед кареткой; возвращает null если не в режиме @.
+  const detectMention = (value: string, caret: number): { query: string; startIdx: number } | null => {
+    let i = caret - 1;
+    while (i >= 0) {
+      const ch = value[i];
+      if (ch === '@') {
+        const prev = i === 0 ? null : value[i - 1];
+        if (prev === null || /\s/.test(prev)) {
+          return { startIdx: i, query: value.slice(i + 1, caret) };
+        }
+        return null;
+      }
+      if (/\s/.test(ch)) return null;
+      i--;
+    }
+    return null;
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setText(value);
+    handleTyping();
+    const caret = e.target.selectionStart ?? value.length;
+    setMention(detectMention(value, caret));
+  };
+
+  const insertMention = useCallback((username: string) => {
+    if (!mention) return;
+    const before = text.slice(0, mention.startIdx);
+    const after  = text.slice(mention.startIdx + 1 + mention.query.length);
+    const newText = `${before}@${username} ${after}`;
+    setText(newText);
+    setMention(null);
+    setTimeout(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const caret = mention.startIdx + 2 + username.length;
+      ta.focus();
+      ta.setSelectionRange(caret, caret);
+    }, 0);
+  }, [mention, text]);
 
   // ─── PTT: запуск голосовой записи ────────────────────────────────────────────
 
@@ -428,7 +497,7 @@ export default function MessageInput({ chatId }: Props) {
         onChange={(e) => handleFileChange(e, 'video')} />
 
       {/* ─── Основная панель ─── */}
-      <div className="flex-shrink-0 border-t border-dark-border bg-dark-surface px-4 py-3">
+      <div className="flex-shrink-0 border-t border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl px-4 py-3">
 
         {/* Планка «Ответить» */}
         <AnimatePresence>
@@ -496,53 +565,58 @@ export default function MessageInput({ chatId }: Props) {
           {/* ── Кнопка прикрепить (скрыта при записи) ── */}
           {!isRecording && (
             <div className="relative flex-shrink-0">
-              <button
-                onClick={() => setShowAttach(!showAttach)}
-                disabled={uploading}
-                className="p-2.5 rounded-xl hover:bg-dark-hover transition-colors text-white/60 hover:text-white disabled:opacity-40"
-              >
+              <IconBtn onClick={() => setShowAttach(!showAttach)} disabled={uploading} active={showAttach}>
                 <Paperclip size={20} />
-              </button>
+              </IconBtn>
 
-              <AnimatePresence>
-                {showAttach && (
-                  <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                    className="absolute bottom-12 left-0 bg-dark-card border border-dark-border rounded-xl overflow-hidden shadow-xl z-10 min-w-[160px]">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors"
-                      onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}>
-                      <ImageIcon size={18} className="text-primary-400" /><span className="text-sm">Фото</span>
-                    </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors"
-                      onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}>
-                      <Video size={18} className="text-primary-400" /><span className="text-sm">Видео</span>
-                    </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors"
-                      onClick={() => { setShowCircle(true); setShowAttach(false); }}>
-                      <CircleDot size={18} className="text-primary-400" /><span className="text-sm">Видео-кружок</span>
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <Dropdown
+                open={showAttach}
+                onClose={() => setShowAttach(false)}
+                anchor="left"
+                className="!bottom-full !top-auto !mb-2 !mt-0"
+              >
+                <DropdownItem
+                  icon={<ImageIcon size={16} />} label="Фото"
+                  onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
+                />
+                <DropdownItem
+                  icon={<Video size={16} />} label="Видео"
+                  onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}
+                />
+                <DropdownItem
+                  icon={<CircleDot size={16} />} label="Видео-кружок"
+                  onClick={() => { setShowCircle(true); setShowAttach(false); }}
+                />
+              </Dropdown>
             </div>
           )}
 
           {/* ── Центральная зона ── */}
+          <div className="relative flex-1">
+          <AnimatePresence>
+            {mention && !isRecording && (
+              <MentionAutocomplete
+                chatId={chatId}
+                query={mention.query}
+                onSelect={insertMention}
+                onClose={() => setMention(null)}
+              />
+            )}
+          </AnimatePresence>
           <div className={clsx(
-            'flex-1 rounded-2xl transition-all overflow-hidden',
-            isRecording
-              ? 'bg-dark-bg border border-dark-border'
-              : 'bg-dark-bg border border-dark-border',
+            'rounded-3xl overflow-hidden',
+            'bg-white/[0.04] border border-white/[0.07] backdrop-blur-sm',
+            !isRecording && 'focus-within:border-primary-500/60 focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:bg-white/[0.06]',
           )}>
             {/* Обычный ввод текста */}
             {!isRecording && (
-              <div className="px-3 py-2.5 flex items-end gap-1.5 relative">
+              <div className="px-3 py-2 flex items-end gap-1 relative">
                 {/* Эмодзи кнопка */}
                 <div className="relative flex-shrink-0">
                   <button
                     onClick={() => setShowEmoji((v) => !v)}
                     disabled={uploading}
-                    className="p-1.5 rounded-lg hover:bg-dark-hover transition-colors text-white/40 hover:text-white/70"
+                    className="btn-icon btn-icon-sm text-white/40 hover:text-white/80"
                   >
                     <Smile size={18} />
                   </button>
@@ -561,13 +635,17 @@ export default function MessageInput({ chatId }: Props) {
 
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed max-h-[120px]"
+                  className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed max-h-[120px] py-1.5"
                   placeholder="Сообщение..."
                   rows={1}
                   value={text}
                   disabled={uploading}
-                  onChange={(e) => { setText(e.target.value); handleTyping(); }}
+                  onChange={handleTextChange}
                   onKeyDown={handleKeyDown}
+                  onSelect={(e) => {
+                    const ta = e.currentTarget;
+                    setMention(detectMention(ta.value, ta.selectionStart ?? 0));
+                  }}
                 />
               </div>
             )}
@@ -633,14 +711,22 @@ export default function MessageInput({ chatId }: Props) {
               </div>
             )}
           </div>
+          </div>
 
           {/* ── Правая кнопка ── */}
-          {/* Текст → синяя кнопка отправки */}
+          {/* Текст → градиентная кнопка отправки */}
           {hasText && !isRecording && (
-            <button onClick={handleSend}
-              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-600 hover:bg-primary-500 text-white transition-all">
+            <motion.button
+              onClick={handleSend}
+              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.05 }}
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-brand-gradient text-white shadow-glow-violet"
+            >
               <Send size={18} />
-            </button>
+            </motion.button>
           )}
 
           {/* Нет текста → единая кнопка PTT (idle + recording — один DOM-элемент, чтобы pointer capture не терялся) */}
@@ -655,12 +741,12 @@ export default function MessageInput({ chatId }: Props) {
                 ? (recMode === 'voice' ? 'Зажми для записи, тап — переключить на кружок' : 'Зажми для записи, тап — переключить на голос')
                 : 'Отпусти для отправки / тап — остановить'}
               className={clsx(
-                'w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all select-none touch-none',
+                'w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 select-none touch-none',
                 pttState === 'recording'
-                  ? 'bg-red-500 text-white shadow-lg shadow-red-500/40 animate-pulse'
+                  ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse-glow'
                   : recMode === 'voice'
-                  ? 'bg-dark-card hover:bg-dark-hover text-white/60 hover:text-white'
-                  : 'bg-dark-card hover:bg-dark-hover text-primary-400 hover:text-primary-300',
+                  ? 'bg-white/[0.06] hover:bg-white/[0.1] text-white/65 hover:text-white border border-white/[0.06]'
+                  : 'bg-white/[0.06] hover:bg-white/[0.1] text-primary-300 hover:text-primary-200 border border-white/[0.06]',
                 uploading && 'opacity-40 cursor-not-allowed',
               )}
             >
@@ -670,12 +756,16 @@ export default function MessageInput({ chatId }: Props) {
             </button>
           )}
 
-          {/* Зафиксировано → синяя кнопка отправки */}
+          {/* Зафиксировано → градиентная кнопка отправки */}
           {!hasText && pttState === 'locked' && (
-            <button onClick={() => stopVoicePTT(true)}
-              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-600/30 transition-all">
+            <motion.button
+              onClick={() => stopVoicePTT(true)}
+              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.05 }}
+              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-brand-gradient text-white shadow-glow-violet"
+            >
               <Send size={18} />
-            </button>
+            </motion.button>
           )}
         </div>
 

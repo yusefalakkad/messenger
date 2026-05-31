@@ -48,59 +48,72 @@ export default function NewChatModal({ onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95, y: 8 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 8 }}
+        initial={{ scale: 0.92, y: 16, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.92, y: 16, opacity: 0 }}
+        transition={{ duration: 0.25, ease: [0.34, 1.3, 0.64, 1] }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-dark-surface border border-dark-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+        className="glass-card w-full max-w-sm overflow-hidden relative"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
-          <h2 className="font-semibold">Новый чат</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-dark-hover transition-colors text-white/60">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-3">
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-            <input
-              autoFocus
-              className="w-full bg-dark-bg border border-dark-border rounded-xl pl-9 pr-4 py-2.5
-                         text-sm placeholder-white/30 text-white outline-none focus:border-primary-500/50"
-              placeholder="Поиск пользователей..."
-              value={query}
-              onChange={(e) => search(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="max-h-64 overflow-y-auto pb-2">
-          {loading && (
-            <div className="flex justify-center py-6">
-              <Loader2 size={20} className="animate-spin text-white/40" />
-            </div>
-          )}
-          {!loading && results.map((u) => (
-            <button
-              key={u.id}
-              onClick={() => startChat(u.id)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-dark-hover transition-colors"
+        <div className="absolute -top-20 -right-20 w-56 h-56 bg-spot-violet blur-3xl pointer-events-none" />
+        <div className="relative">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
+            <h2 className="font-semibold">Новый чат</h2>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              whileHover={{ rotate: 90 }}
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-white/[0.07] text-white/60"
             >
-              <Avatar src={u.avatar} name={u.displayName} size="md" />
-              <div className="text-left">
-                <p className="text-sm font-medium">{u.displayName}</p>
-                <p className="text-xs text-white/40">@{u.username}</p>
+              <X size={18} />
+            </motion.button>
+          </div>
+
+          <div className="p-3">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+              <input
+                autoFocus
+                className="input-pill w-full !pl-9"
+                placeholder="Поиск пользователей..."
+                value={query}
+                onChange={(e) => search(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="max-h-64 overflow-y-auto pb-2">
+            {loading && (
+              <div className="flex justify-center py-6">
+                <Loader2 size={20} className="animate-spin text-primary-300" />
               </div>
-            </button>
-          ))}
-          {!loading && query.length > 0 && results.length === 0 && (
-            <p className="text-center text-white/30 text-sm py-6">Пользователи не найдены</p>
-          )}
+            )}
+            {!loading && results.map((u, idx) => (
+              <motion.button
+                key={u.id}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                whileHover={{ x: 2 }}
+                onClick={() => startChat(u.id)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.05]"
+              >
+                <Avatar src={u.avatar} name={u.displayName} size="md" />
+                <div className="text-left">
+                  <p className="text-sm font-medium">{u.displayName}</p>
+                  <p className="text-xs text-white/40">@{u.username}</p>
+                </div>
+              </motion.button>
+            ))}
+            {!loading && query.length > 0 && results.length === 0 && (
+              <p className="text-center text-white/35 text-sm py-6">Пользователи не найдены</p>
+            )}
+          </div>
         </div>
       </motion.div>
     </motion.div>
