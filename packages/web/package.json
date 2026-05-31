@@ -9,9 +9,14 @@
     "ios:init": "cap add ios",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios",
-    "ios:run": "npm run build && cap sync ios && cap run ios"
+    "ios:run": "npm run build && cap sync ios && cap run ios",
+    "android:init": "cap add android",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:run": "npm run build && cap sync android && cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
     "@capacitor/app": "^6.0.1",
     "@capacitor/camera": "^6.0.2",
     "@capacitor/core": "^6.1.2",

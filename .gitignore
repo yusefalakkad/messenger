@@ -18,3 +18,20 @@ packages/web/ios/App/build/
 packages/web/ios/.gradle/
 packages/web/ios/DerivedData/
 packages/web/ios/capacitor-cordova-ios-plugins/
+
+# Capacitor Android — Android Studio проект.
+# Аналогично iOS: build/, .gradle/ и зависимости — игнорим;
+# сам app/ модуль с manifest/res — храним.
+packages/web/android/.gradle/
+packages/web/android/build/
+packages/web/android/app/build/
+packages/web/android/captures/
+packages/web/android/local.properties
+packages/web/android/keystore.properties
+packages/web/android/app/release/
+packages/web/android/.idea/
+
+# Подписной keystore — НИКОГДА не коммитим
+*.keystore
+*.jks
+google-services.json
