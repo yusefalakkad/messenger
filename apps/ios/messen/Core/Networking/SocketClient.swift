@@ -22,6 +22,12 @@ final class SocketClient: ObservableObject {
     let userStatus       = PassthroughSubject<UserStatusEvent, Never>()
     let chatCreated      = PassthroughSubject<Chat, Never>()
 
+    // Calls
+    let callIncoming = PassthroughSubject<IncomingCallEvent, Never>()
+    let callAccepted = PassthroughSubject<CallAcceptedEvent, Never>()
+    let callEnded    = PassthroughSubject<CallEndedEvent, Never>()
+    let callSignal   = PassthroughSubject<CallSignalEvent, Never>()
+
     // MARK: - Internals
 
     private var manager: SocketManager?
@@ -109,6 +115,36 @@ final class SocketClient: ObservableObject {
         socket?.emit("message:edit", payload)
     }
 
+    // MARK: - Call signaling
+
+    func initiateCall(callId: String, peerId: String, chatId: String, callType: CallType) {
+        socket?.emit("call:initiate", [
+            "callId": callId,
+            "peerId": peerId,
+            "chatId": chatId,
+            "callType": callType.rawValue,
+        ])
+    }
+
+    func acceptCall(callId: String) {
+        socket?.emit("call:accept", ["callId": callId])
+    }
+
+    func rejectCall(callId: String) {
+        socket?.emit("call:reject", ["callId": callId])
+    }
+
+    func endCall(callId: String) {
+        socket?.emit("call:end", ["callId": callId])
+    }
+
+    func sendCallSignal(callId: String, signal: CallSignal) {
+        guard let data = try? JSONEncoder().encode(signal),
+              let obj  = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return }
+        socket?.emit("call:signal", ["callId": callId, "signal": obj])
+    }
+
     private func emit<E: Encodable>(_ event: String, _ payload: E) {
         guard let data = try? JSONEncoder().encode(payload),
               let obj  = try? JSONSerialization.jsonObject(with: data, options: [])
@@ -183,6 +219,53 @@ final class SocketClient: ObservableObject {
                   let userId = dict["userId"] as? String,
                   let status = dict["status"] as? String else { return }
             self.userStatus.send(.init(userId: userId, status: status))
+        }
+
+        // ── Calls ──
+        s.on("call:incoming") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let callId   = dict["callId"]   as? String,
+                  let chatId   = dict["chatId"]   as? String,
+                  let callerId = dict["callerId"] as? String,
+                  let typeRaw  = dict["callType"] as? String,
+                  let type     = CallType(rawValue: typeRaw) else { return }
+            let event = IncomingCallEvent(
+                callId: callId,
+                chatId: chatId,
+                callerId: callerId,
+                callerName: (dict["callerName"] as? String) ?? "Звонок",
+                callerAvatar: dict["callerAvatar"] as? String,
+                callType: type
+            )
+            self.callIncoming.send(event)
+        }
+
+        s.on("call:accepted") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let callId = dict["callId"] as? String,
+                  let peerId = dict["peerId"] as? String else { return }
+            self.callAccepted.send(.init(callId: callId, peerId: peerId))
+        }
+
+        s.on("call:ended") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let callId = dict["callId"] as? String else { return }
+            self.callEnded.send(.init(callId: callId, reason: dict["reason"] as? String))
+        }
+
+        s.on("call:signal") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let callId = dict["callId"] as? String,
+                  let sigDict = dict["signal"] as? [String: Any] else { return }
+            // Декодируем CallSignal через JSON-round-trip
+            guard let raw = try? JSONSerialization.data(withJSONObject: sigDict),
+                  let signal = try? JSONDecoder().decode(CallSignal.self, from: raw)
+            else { return }
+            self.callSignal.send(.init(callId: callId, signal: signal))
         }
     }
 

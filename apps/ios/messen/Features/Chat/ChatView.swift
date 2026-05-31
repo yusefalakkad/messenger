@@ -117,10 +117,19 @@ struct ChatView: View {
 
             Spacer()
 
-            // Заглушки под кнопки звонка (включим в след. сессии WebRTC)
-            HStack(spacing: 8) {
-                headerIcon("phone.fill")
-                headerIcon("video.fill")
+            // Кнопки звонка — direct-чат, есть другой участник
+            if vm.chat.type == .direct, let other = vm.otherMember {
+                HStack(spacing: 8) {
+                    Button {
+                        CallManager.shared.startCall(to: other, in: vm.chat, type: .audio)
+                    } label: { headerIcon("phone.fill") }
+                    .buttonStyle(PressDownStyle())
+
+                    Button {
+                        CallManager.shared.startCall(to: other, in: vm.chat, type: .video)
+                    } label: { headerIcon("video.fill") }
+                    .buttonStyle(PressDownStyle())
+                }
             }
         }
         .padding(.horizontal, 14)

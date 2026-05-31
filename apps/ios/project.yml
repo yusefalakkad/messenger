@@ -10,6 +10,9 @@ packages:
   SocketIO:
     url: https://github.com/socketio/socket.io-client-swift
     from: "16.1.0"
+  WebRTC:
+    url: https://github.com/stasel/WebRTC
+    from: "120.0.0"
 
 settings:
   base:
@@ -31,6 +34,8 @@ targets:
     dependencies:
       - package: SocketIO
         product: SocketIO
+      - package: WebRTC
+        product: WebRTC
     info:
       path: messen/Info.plist
       properties:
@@ -40,8 +45,8 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIBackgroundModes:
-          - audio
-          - voip
+          - audio          # держать звук во время звонка
+          - voip           # CallKit/PushKit (на будущее)
           - remote-notification
         NSMicrophoneUsageDescription: "Нужен микрофон для голосовых сообщений и звонков"
         NSCameraUsageDescription: "Нужна камера для фото, видео и видео-кружков"
