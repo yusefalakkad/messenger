@@ -73,9 +73,9 @@ final class WebRTCManager: NSObject {
     private func setupAudioSession() {
         rtcAudioSession.lockForConfiguration()
         do {
-            try rtcAudioSession.setCategory(AVAudioSession.Category.playAndRecord.rawValue,
+            try rtcAudioSession.setCategory(.playAndRecord,
                                             with: [.allowBluetooth, .defaultToSpeaker])
-            try rtcAudioSession.setMode(AVAudioSession.Mode.voiceChat.rawValue)
+            try rtcAudioSession.setMode(.voiceChat)
         } catch {
             print("[WebRTC] audio session error:", error)
         }
