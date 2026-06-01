@@ -1,6 +1,6 @@
 {
-  "name": "messen",
-  "short_name": "messen",
+  "name": "Dakka",
+  "short_name": "Dakka",
   "description": "Общение, которое чувствуешь. E2E-шифрование, голос, видео, кружки.",
   "start_url": "/",
   "scope": "/",

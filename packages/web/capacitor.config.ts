@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'online.akkdmsg.messen',
-  appName: 'messen',
+  appId: 'online.akkdmsg.dakka',
+  appName: 'Dakka',
   webDir: 'dist',
   bundledWebRuntime: false,
 

@@ -62,8 +62,8 @@ npm run android:run          # build + sync + run
 ### Application ID и имя
 
 В `packages/web/capacitor.config.ts`:
-- `appId: 'online.akkdmsg.messen'` — это будет `applicationId` в Android
-- `appName: 'messen'`
+- `appId: 'online.akkdmsg.dakka'` — это будет `applicationId` в Android
+- `appName: 'Dakka'`
 
 ### API-сервер
 
@@ -73,8 +73,8 @@ npm run android:run          # build + sync + run
 
 Capacitor PushNotifications на Android использует **Firebase Cloud Messaging**.
 
-1. Зайди в [Firebase Console](https://console.firebase.google.com/) → Add project → выбери название (например, "messen-prod")
-2. Add app → **Android** → введи Package name = `online.akkdmsg.messen`
+1. Зайди в [Firebase Console](https://console.firebase.google.com/) → Add project → выбери название (например, "dakka-prod")
+2. Add app → **Android** → введи Package name = `online.akkdmsg.dakka`
 3. Скачай `google-services.json` → положи в `packages/web/android/app/google-services.json`
    (этот файл уже в `.gitignore` — не коммитим)
 4. Перезапусти `npm run android:sync`
@@ -89,8 +89,8 @@ Capacitor PushNotifications на Android использует **Firebase Cloud M
 
 ```bash
 cd packages/web/android/app
-keytool -genkey -v -keystore messen-release.keystore \
-  -alias messen -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkey -v -keystore dakka-release.keystore \
+  -alias dakka -keyalg RSA -keysize 2048 -validity 10000
 ```
 
 ⚠️ **СОХРАНИ ПАРОЛЬ И KEYSTORE** — без них ты не сможешь обновлять опубликованное приложение!
@@ -100,8 +100,8 @@ keytool -genkey -v -keystore messen-release.keystore \
 ```
 storePassword=your_password
 keyPassword=your_password
-keyAlias=messen
-storeFile=messen-release.keystore
+keyAlias=dakka
+storeFile=dakka-release.keystore
 ```
 
 В `packages/web/android/app/build.gradle` уже есть signingConfigs для release-сборки (Capacitor создаёт шаблон).

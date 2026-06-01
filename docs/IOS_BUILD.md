@@ -56,8 +56,8 @@ npm run ios:run         # build + sync + run
 ### Bundle ID и имя
 
 В `packages/web/capacitor.config.ts`:
-- `appId: 'online.akkdmsg.messen'` — изменить при необходимости
-- `appName: 'messen'` — отображаемое имя
+- `appId: 'online.akkdmsg.dakka'` — изменить при необходимости
+- `appName: 'Dakka'` — отображаемое имя
 
 ### API-сервер
 
@@ -95,7 +95,7 @@ server: { url: 'https://akkdmsg.online', cleartext: false }
 
 ## Что нужно дописать вручную
 
-1. **APNs-сертификат**. В Apple Developer Console → Certificates → создай **Apple Push Notification Service SSL** сертификат для `online.akkdmsg.messen`. Залей в Xcode → Signing & Capabilities → "+ Capability" → Push Notifications.
+1. **APNs-сертификат**. В Apple Developer Console → Certificates → создай **Apple Push Notification Service SSL** сертификат для `online.akkdmsg.dakka`. Залей в Xcode → Signing & Capabilities → "+ Capability" → Push Notifications.
 2. **Иконки приложения**. В Xcode → `App/Assets.xcassets/AppIcon.appiconset/` положи свои PNG (нужны размеры 20pt, 29pt, 40pt, 60pt, 76pt, 83.5pt, 1024px). Шаблон 1024×1024 на бренд-градиенте — в `packages/web/public/logo.svg`.
 3. **Splash screen**. По умолчанию использует `#0b0a14` фон. Кастомное изображение — в `App/Assets.xcassets/Splash.imageset/`.
 4. **Бэкенд отправки APNs**. Сейчас токены сохраняются в Redis по ключу `push:native:<userId>`, но отправка через APNs не реализована. Добавь `@parse/node-apn` или `apns2` в `packages/backend` и реализуй отправку.

@@ -56,7 +56,7 @@ export default function AuthPage() {
             transition={{ delay: 0.2 }}
             className="text-3xl font-bold tracking-tight"
           >
-            <span className="text-gradient">messen</span>
+            <span className="text-gradient">Dakka</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}

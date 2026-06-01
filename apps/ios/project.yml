@@ -1,4 +1,4 @@
-name: messen
+name: Dakka
 options:
   bundleIdPrefix: online.akkdmsg
   deploymentTarget:
@@ -24,11 +24,11 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 
 targets:
-  messen:
+  Dakka:
     type: application
     platform: iOS
     sources:
-      - path: messen
+      - path: dakka
         excludes:
           - "**/.DS_Store"
     dependencies:
@@ -37,9 +37,9 @@ targets:
       - package: WebRTC
         product: WebRTC
     info:
-      path: messen/Info.plist
+      path: dakka/Info.plist
       properties:
-        CFBundleDisplayName: messen
+        CFBundleDisplayName: Dakka
         UILaunchScreen:
           UIColorName: BrandBackground
         UISupportedInterfaceOrientations:
@@ -56,9 +56,9 @@ targets:
           NSAllowsArbitraryLoads: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: online.akkdmsg.messen
+        PRODUCT_BUNDLE_IDENTIFIER: online.akkdmsg.dakka
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        CODE_SIGN_ENTITLEMENTS: messen/messen.entitlements
+        CODE_SIGN_ENTITLEMENTS: dakka/Dakka.entitlements

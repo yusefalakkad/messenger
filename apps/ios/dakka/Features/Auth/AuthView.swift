@@ -47,7 +47,7 @@ struct AuthView: View {
                     )
             }
 
-            Text("messen")
+            Text("Dakka")
                 .font(Typo.titleXL)
                 .foregroundStyle(LinearGradient.brandText)
 

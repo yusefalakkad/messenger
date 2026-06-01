@@ -5,7 +5,7 @@ import Security
 /// Все значения сохраняются с `kSecAttrAccessibleAfterFirstUnlock` —
 /// доступны после первого разблокирования, выживают перезагрузки.
 enum KeychainStore {
-    private static let service = "online.akkdmsg.messen"
+    private static let service = "online.akkdmsg.dakka"
 
     @discardableResult
     static func set(_ value: String, for key: String) -> Bool {

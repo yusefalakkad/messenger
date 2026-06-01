@@ -16,7 +16,7 @@ Web push работает из коробки (ключи генерятся а�
 
 [developer.apple.com](https://developer.apple.com) → Account → Certificates, IDs & Profiles → **Keys** → "+"
 
-- Name: `messen-push`
+- Name: `dakka-push`
 - Enable: ☑ **Apple Push Notifications service (APNs)**
 - Continue → Register → **Download** (получишь файл `AuthKey_XXXXXXXXXX.p8`)
 
@@ -25,12 +25,12 @@ Web push работает из коробки (ключи генерятся а�
 Запомни:
 - **Key ID** — это `XXXXXXXXXX` в имени файла (10 символов)
 - **Team ID** — на главной странице developer account (правый верхний угол, ~10 символов)
-- **Bundle ID** — `online.akkdmsg.messen`
+- **Bundle ID** — `online.akkdmsg.dakka`
 
 ### 2. Прописать в .env
 
 ```env
-APNS_BUNDLE_ID=online.akkdmsg.messen
+APNS_BUNDLE_ID=online.akkdmsg.dakka
 APNS_KEY_ID=XXXXXXXXXX
 APNS_TEAM_ID=YYYYYYYYYY
 # Скопируй ВСЁ содержимое .p8 файла, каждый перевод строки замени на \n:
@@ -54,14 +54,14 @@ bash deploy.sh
 
 В логах увидишь:
 ```
-[push-native] APNs initialized { bundle: 'online.akkdmsg.messen', production: false }
+[push-native] APNs initialized { bundle: 'online.akkdmsg.dakka', production: false }
 ```
 
 ## Android (FCM)
 
 ### 1. Создать Firebase проект
 
-[console.firebase.google.com](https://console.firebase.google.com) → Add project → выбери название (например, `messen`).
+[console.firebase.google.com](https://console.firebase.google.com) → Add project → выбери название (например, `dakka`).
 
 В созданном проекте → Settings → Cloud Messaging → должно быть включено.
 
@@ -85,7 +85,7 @@ FCM_SERVICE_ACCOUNT={"type":"service_account","project_id":"...",...}
 ### 4. На Android-клиенте
 
 Capacitor-сборка требует `google-services.json`:
-- В Firebase Console → Add app → **Android** → Package name = `online.akkdmsg.messen`
+- В Firebase Console → Add app → **Android** → Package name = `online.akkdmsg.dakka`
 - Скачать `google-services.json` → положить в `packages/web/android/app/google-services.json`
 - Пересобрать: `npm run android:sync`
 
