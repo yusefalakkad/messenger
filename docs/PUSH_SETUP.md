@@ -89,6 +89,53 @@ Capacitor-сборка требует `google-services.json`:
 - Скачать `google-services.json` → положить в `packages/web/android/app/google-services.json`
 - Пересобрать: `npm run android:sync`
 
+## VoIP push (iOS CallKit)
+
+Отдельный канал для входящих звонков. Будит приложение даже когда оно убито,
+показывает системный CallKit-баннер на lock-screen.
+
+### Хорошие новости
+
+С **token-based авторизацией** (.p8 ключ из APNs-секции выше) **отдельный
+VoIP сертификат не нужен**. Тот же ключ работает для обычных и VoIP-пушей.
+Разница только в `topic`:
+
+- Обычный: `online.akkdmsg.dakka`
+- VoIP:    `online.akkdmsg.dakka.voip`
+
+Бэкенд автоматически выставляет правильный topic в `sendVoIPCallPush()`.
+
+### Что нужно
+
+На стороне Apple Developer Console для Bundle ID `online.akkdmsg.dakka`:
+1. Capabilities → ✓ **Push Notifications**
+2. Capabilities → ✓ **Voice over IP** (через `voip` background mode уже включён в Info.plist)
+
+На клиенте iOS — всё уже сделано в `Core/Call/PushKitManager.swift` +
+`CallKitProvider.swift`. При старте приложение регистрируется в PushKit
+и шлёт VoIP-токен на `/push/voip-token`.
+
+На бэкенде — всё уже сделано в `lib/push-native.ts:sendVoIPCallPush()`.
+При получении `call:initiate` через socket бэк автоматически шлёт VoIP push
+на iOS-устройство получателя.
+
+### VoIP payload
+
+```json
+{
+  "callId": "...",
+  "chatId": "...",
+  "callerId": "...",
+  "callerName": "Иван",
+  "callerAvatar": "https://...",
+  "callType": "audio"
+}
+```
+
+⚠️ Если приложение не вызывает `reportNewIncomingCall` после получения VoIP push,
+iOS отключит VoIP пуши для приложения. Поэтому даже при поломанном payload
+надо репортовать заглушку и сразу её завершать.
+
 ## Проверка end-to-end
 
 Способ 1 — через приложение:

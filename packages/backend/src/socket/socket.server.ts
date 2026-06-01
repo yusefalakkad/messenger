@@ -5,7 +5,7 @@ import { verifyAccessToken } from '../utils/jwt';
 import { prisma } from '../lib/prisma';
 import { redis, setUserOnline, setUserOffline, isUserOnline } from '../lib/redis';
 import { sendPushToUser } from '../lib/push';
-import { sendNativePushToUser } from '../lib/push-native';
+import { sendNativePushToUser, sendVoIPCallPush } from '../lib/push-native';
 import { logger } from '../lib/logger';
 import type { WSClientEvents, WSServerEvents, SendMessagePayload } from '@messenger/shared';
 
@@ -227,6 +227,17 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
         callerName: caller?.displayName ?? socket.username,
         callerAvatar: caller?.avatar ?? undefined,
         chatId,
+        callType,
+      });
+
+      // Параллельно — VoIP push для iOS-устройства если оно не в активной сессии.
+      // VoIP push будит killed-app и показывает системный CallKit-баннер.
+      void sendVoIPCallPush(peerId, {
+        callId,
+        chatId,
+        callerId: userId,
+        callerName: caller?.displayName ?? socket.username,
+        callerAvatar: caller?.avatar ?? undefined,
         callType,
       });
     });

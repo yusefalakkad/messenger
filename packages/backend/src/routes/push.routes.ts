@@ -50,7 +50,7 @@ router.post('/unsubscribe',
   },
 );
 
-// POST /push/native-token  — для iOS/Android (Capacitor)
+// POST /push/native-token  — для iOS/Android (Capacitor + нативный)
 // Сохраняем APNs/FCM-токен в Redis по ключу push:native:<userId>
 router.post('/native-token',
   requireAuth,
@@ -63,6 +63,24 @@ router.post('/native-token',
       const { userId } = req as AuthRequest;
       const { token, platform } = req.body as { token: string; platform: 'ios' | 'android' };
       await redis.sadd(`push:native:${userId}`, JSON.stringify({ token, platform, at: Date.now() }));
+      sendSuccess(res, { ok: true });
+    } catch (err) { next(err); }
+  },
+);
+
+// POST /push/voip-token — для iOS CallKit/PushKit (входящие звонки при killed app)
+// Отдельный токен от обычного APNs — даже сертификат темы другой (bundle.voip).
+router.post('/voip-token',
+  requireAuth,
+  validate([
+    body('token').isString().notEmpty(),
+    body('platform').isIn(['ios']),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { token } = req.body as { token: string };
+      await redis.sadd(`push:voip:${userId}`, JSON.stringify({ token, at: Date.now() }));
       sendSuccess(res, { ok: true });
     } catch (err) { next(err); }
   },

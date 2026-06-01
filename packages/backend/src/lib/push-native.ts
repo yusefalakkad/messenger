@@ -179,6 +179,73 @@ async function sendToFCM(userId: string, tokens: string[], payload: NativePushPa
   }
 }
 
+// ── VoIP push (iOS CallKit) ──────────────────────────────────────────────────
+
+const voipKey = (userId: string) => `push:voip:${userId}`;
+
+export interface VoIPCallPayload {
+  callId: string;
+  chatId: string;
+  callerId: string;
+  callerName: string;
+  callerAvatar?: string;
+  callType: 'audio' | 'video';
+}
+
+/**
+ * Отправляет VoIP push на iOS — будит приложение даже если оно убито,
+ * приложение ОБЯЗАНО показать CallKit-баннер. Используем тот же APNs Auth Key
+ * (.p8), но с pushType='voip' и topic=bundle.voip.
+ */
+export async function sendVoIPCallPush(userId: string, payload: VoIPCallPayload): Promise<void> {
+  if (!apnProvider || !process.env.APNS_BUNDLE_ID) return;
+  const raws = await redis.smembers(voipKey(userId));
+  if (!raws.length) return;
+
+  const tokens = raws
+    .map((r) => { try { return (JSON.parse(r) as { token: string }).token; } catch { return null; } })
+    .filter((t): t is string => !!t);
+
+  try {
+    // @ts-ignore
+    const apn = await import('apn');
+    const note = new apn.Notification();
+    note.topic = `${process.env.APNS_BUNDLE_ID}.voip`;
+    // pushType отсутствует в TS-типах apn@2.x, но рантайм-свойство поддерживается
+    // и обязательно для VoIP-пушей (Apple отвергает без него начиная с iOS 13).
+    (note as any).pushType = 'voip';
+    note.priority = 10;
+    note.expiry = Math.floor(Date.now() / 1000) + 60;  // 1 минута
+    note.payload = payload;
+
+    const result = await apnProvider.send(note, tokens);
+    if (result.failed?.length) {
+      for (const f of result.failed) {
+        const reason = f.response?.reason;
+        if (reason === 'BadDeviceToken' || reason === 'Unregistered') {
+          await pruneVoIPToken(userId, f.device);
+        } else {
+          logger.warn('[push-native] VoIP send failed', { reason, device: f.device });
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('[push-native] VoIP send threw', { err });
+  }
+}
+
+async function pruneVoIPToken(userId: string, token: string): Promise<void> {
+  const raws = await redis.smembers(voipKey(userId));
+  for (const raw of raws) {
+    try {
+      const parsed = JSON.parse(raw) as { token: string };
+      if (parsed.token === token) {
+        await redis.srem(voipKey(userId), raw);
+      }
+    } catch { /* skip */ }
+  }
+}
+
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 
 async function pruneToken(userId: string, token: string): Promise<void> {

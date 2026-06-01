@@ -41,6 +41,10 @@ final class CallManager: ObservableObject {
             startedAt: Date()
         )
         store.state = .outgoing(info)
+        // CallKit: исходящий звонок в систему (для Recents и audio session)
+        CallKitProvider.shared.startOutgoing(
+            callId: callId, calleeName: peer.user.displayName, hasVideo: type == .video
+        )
         SocketClient.shared.initiateCall(
             callId: callId, peerId: peer.userId, chatId: chat.id, callType: type
         )
@@ -64,6 +68,7 @@ final class CallManager: ObservableObject {
     func rejectIncoming() {
         guard case .incoming(let info) = store.state else { return }
         SocketClient.shared.rejectCall(callId: info.id)
+        CallKitProvider.shared.reportRemoteEnded(callId: info.id, reason: .declinedElsewhere)
         teardown()
     }
 
@@ -126,6 +131,7 @@ final class CallManager: ObservableObject {
                 if state == .connected || state == .completed,
                    case .outgoing(let info) = self?.store.state ?? .idle {
                     self?.store.state = .active(info)
+                    CallKitProvider.shared.reportConnected(callId: info.id)
                 }
             }
         }
@@ -194,6 +200,7 @@ final class CallManager: ObservableObject {
 
     private func handleEnded(_ event: CallEndedEvent) {
         guard let info = store.state.info, info.id == event.callId else { return }
+        CallKitProvider.shared.reportRemoteEnded(callId: info.id)
         teardown()
     }
 

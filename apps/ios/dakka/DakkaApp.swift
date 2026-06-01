@@ -8,8 +8,11 @@ struct DakkaApp: App {
     init() {
         // Принудительно тёмная тема навигации
         UINavigationBar.appearance().tintColor = UIColor(Color.brandViolet)
-        // Явная инициализация CallManager — он подпишется на сокет до первого звонка
+        // Явные инициализации синглтонов, чтобы они подписались на сокет/PushKit
+        // ДО прихода первого события
         _ = CallManager.shared
+        _ = CallKitProvider.shared
+        PushKitManager.shared.start()
     }
 
     var body: some Scene {
