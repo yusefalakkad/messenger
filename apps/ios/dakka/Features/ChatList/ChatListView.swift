@@ -44,6 +44,15 @@ struct ChatListView: View {
         .onReceive(SocketClient.shared.chatCreated) { chat in
             vm.upsert(chat)
         }
+        // Группа обновлена (rename / add member / leave) — рефрешим
+        .onReceive(SocketClient.shared.chatUpdated) { _ in
+            Task { await vm.load() }
+        }
+        // Юзер кикнут / покинул чат — удалить из списка
+        .onReceive(SocketClient.shared.chatRemoved) { chatId in
+            vm.chats.removeAll { $0.id == chatId }
+            if path.last == chatId { path.removeLast() }
+        }
         .sheet(isPresented: $showNewChat) {
             NewChatView(onChatCreated: { chat in
                 vm.upsert(chat)

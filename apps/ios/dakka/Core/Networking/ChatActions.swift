@@ -44,4 +44,60 @@ enum ChatActions {
     static func search(chatId: String, query: String) async throws -> [Message] {
         try await APIClient.shared.get("chats/\(chatId)/messages/search", query: ["q": query])
     }
+
+    // MARK: - Group admin
+
+    /// PATCH /chats/:id — переименование/смена аватара.
+    @discardableResult
+    static func renameGroup(chatId: String, name: String) async throws -> Chat {
+        struct Body: Codable { let name: String }
+        var url = AppConfig.apiBaseURL
+        url.append(path: "chats/\(chatId)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        if let token = KeychainStore.get(KeychainStore.Keys.accessToken) {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(Body(name: name))
+        let (data, _) = try await URLSession.shared.data(for: req)
+        struct Env: Decodable { let data: Chat? }
+        let env = try JSONDecoder.iso8601.decode(Env.self, from: data)
+        if let chat = env.data { return chat }
+        throw APIError.invalidResponse
+    }
+
+    /// POST /chats/:id/members
+    static func addGroupMembers(chatId: String, userIds: [String]) async throws -> [ChatMember] {
+        struct Body: Codable { let userIds: [String] }
+        struct Resp: Codable { let added: [String]; let members: [ChatMember] }
+        let r: Resp = try await APIClient.shared.post(
+            "chats/\(chatId)/members",
+            body: Body(userIds: userIds)
+        )
+        return r.members
+    }
+
+    /// DELETE /chats/:id/members/:userId — kick или leave (если userId === self)
+    static func removeGroupMember(chatId: String, userId: String) async throws {
+        var url = AppConfig.apiBaseURL
+        url.append(path: "chats/\(chatId)/members/\(userId)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        if let token = KeychainStore.get(KeychainStore.Keys.accessToken) {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw URLError(.badServerResponse)
+        }
+    }
+}
+
+extension JSONDecoder {
+    static var iso8601: JSONDecoder {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }
 }

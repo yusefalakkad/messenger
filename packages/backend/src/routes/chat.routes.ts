@@ -266,6 +266,162 @@ router.delete('/:chatId/messages',
   },
 );
 
+// PATCH /chats/:chatId — переименование группы (только admin/owner)
+router.patch('/:chatId',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('name').optional().isString().isLength({ min: 1, max: 64 }),
+    body('avatar').optional({ nullable: true }).isString(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const { name, avatar } = req.body as { name?: string; avatar?: string | null };
+
+      const member = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!member) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+
+      const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+      if (chat?.type !== 'group') throw new AppError(400, 'NOT_GROUP', 'Only groups can be renamed');
+      if (member.role === 'member') throw new AppError(403, 'INSUFFICIENT_ROLE', 'Admin or owner only');
+
+      const updated = await prisma.chat.update({
+        where: { id: chatId },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(avatar !== undefined ? { avatar } : {}),
+        },
+      });
+
+      // Broadcast обновление всем участникам через комнату чата
+      const io = req.app.get('io') as SocketServer | undefined;
+      io?.to(`chat:${chatId}`).emit('chat:updated', { chatId, name: updated.name, avatar: updated.avatar });
+
+      sendSuccess(res, updated);
+    } catch (err) { next(err); }
+  },
+);
+
+// POST /chats/:chatId/members — добавить участников в группу (admin/owner)
+router.post('/:chatId/members',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('userIds').isArray({ min: 1, max: 50 }),
+    body('userIds.*').isString().notEmpty(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const { userIds } = req.body as { userIds: string[] };
+
+      const member = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!member) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+      if (member.role === 'member') throw new AppError(403, 'INSUFFICIENT_ROLE', 'Admin or owner only');
+
+      const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+      if (chat?.type !== 'group') throw new AppError(400, 'NOT_GROUP', 'Only groups can have members added');
+
+      // Игнорим уже состоящих
+      const existing = await prisma.chatMember.findMany({
+        where: { chatId, userId: { in: userIds } },
+        select: { userId: true },
+      });
+      const existingSet = new Set(existing.map((m) => m.userId));
+      const toAdd = userIds.filter((id) => !existingSet.has(id));
+
+      if (toAdd.length > 0) {
+        await prisma.chatMember.createMany({
+          data: toAdd.map((uid) => ({ chatId, userId: uid, role: 'member' as const })),
+          skipDuplicates: true,
+        });
+      }
+
+      // Возвращаем актуальный список членов
+      const updatedChat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        include: {
+          members: {
+            where: { leftAt: null },
+            include: { user: { select: { id: true, username: true, displayName: true, avatar: true, status: true, publicKey: true } } },
+          },
+        },
+      });
+
+      const io = req.app.get('io') as SocketServer | undefined;
+      if (io && updatedChat) {
+        // Существующим — chat:updated
+        io.to(`chat:${chatId}`).emit('chat:updated', { chatId, members: updatedChat.members });
+        // Новым — chat:new + join в комнату
+        toAdd.forEach((uid) => {
+          io.to(`user:${uid}`).emit('chat:new', { ...updatedChat, unreadCount: 0, lastMessage: null });
+          io.in(`user:${uid}`).socketsJoin(`chat:${chatId}`);
+        });
+      }
+
+      sendSuccess(res, { added: toAdd, members: updatedChat?.members ?? [] });
+    } catch (err) { next(err); }
+  },
+);
+
+// DELETE /chats/:chatId/members/:targetUserId — kick участника
+// или leave если targetUserId === self
+router.delete('/:chatId/members/:targetUserId',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    param('targetUserId').notEmpty(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId, targetUserId } = req.params;
+      const isSelf = targetUserId === userId;
+
+      const me = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!me) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+
+      const target = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId: targetUserId } },
+      });
+      if (!target) throw new AppError(404, 'NOT_FOUND', 'Member not found');
+
+      if (!isSelf) {
+        if (me.role === 'member') throw new AppError(403, 'INSUFFICIENT_ROLE', 'Admin or owner only');
+        // owner > admin > member; admin не может кикнуть owner
+        if (target.role === 'owner') throw new AppError(403, 'CANNOT_KICK_OWNER', 'Cannot kick owner');
+      }
+
+      // Soft delete — ставим leftAt
+      await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId: targetUserId } },
+        data: { leftAt: new Date() },
+      });
+
+      const io = req.app.get('io') as SocketServer | undefined;
+      if (io) {
+        // Уведомить чат об уходе
+        io.to(`chat:${chatId}`).emit('chat:member-left', { chatId, userId: targetUserId });
+        // Удалить ушедшего из комнаты
+        io.in(`user:${targetUserId}`).socketsLeave(`chat:${chatId}`);
+        // Cообщить лично что чат закрылся (для list-update)
+        io.to(`user:${targetUserId}`).emit('chat:removed', { chatId });
+      }
+
+      sendSuccess(res, { removed: targetUserId, isSelf });
+    } catch (err) { next(err); }
+  },
+);
+
 // POST /chats/:chatId/mute — toggle mute, until=null отключает mute
 router.post('/:chatId/mute',
   requireAuth,

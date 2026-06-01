@@ -21,6 +21,8 @@ final class SocketClient: ObservableObject {
     let typingChanged    = PassthroughSubject<TypingEvent, Never>()
     let userStatus       = PassthroughSubject<UserStatusEvent, Never>()
     let chatCreated      = PassthroughSubject<Chat, Never>()
+    let chatUpdated      = PassthroughSubject<ChatUpdate, Never>()
+    let chatRemoved      = PassthroughSubject<String, Never>()  // chatId
 
     // Calls
     let callIncoming = PassthroughSubject<IncomingCallEvent, Never>()
@@ -172,6 +174,33 @@ final class SocketClient: ObservableObject {
             self.chatCreated.send(chat)
         }
 
+        s.on("chat:updated") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let chatId = dict["chatId"] as? String else { return }
+            self.chatUpdated.send(ChatUpdate(
+                chatId: chatId,
+                name: dict["name"] as? String,
+                avatar: dict["avatar"] as? String,
+                fields: dict
+            ))
+        }
+
+        s.on("chat:removed") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let chatId = dict["chatId"] as? String else { return }
+            self.chatRemoved.send(chatId)
+        }
+
+        s.on("chat:member-left") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let chatId = dict["chatId"] as? String else { return }
+            // Просто посылаем chat:updated — UI рефрешит
+            self.chatUpdated.send(ChatUpdate(chatId: chatId, name: nil, avatar: nil, fields: dict))
+        }
+
         s.on("message:new") { [weak self] data, _ in
             guard let self,
                   let dict = data.first,
@@ -278,6 +307,13 @@ final class SocketClient: ObservableObject {
 }
 
 // MARK: - Event payloads
+
+struct ChatUpdate {
+    let chatId: String
+    let name: String?
+    let avatar: String?
+    let fields: [String: Any]
+}
 
 struct MessageUpdate {
     let id: String
