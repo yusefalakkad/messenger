@@ -6,6 +6,7 @@ struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var forwardingMessage: Message?
     @State private var showingCircleRecorder = false
+    @State private var showingProfile = false
 
     init(chat: Chat, currentUserId: String, privateKey: String?) {
         _vm = StateObject(wrappedValue: ChatViewModel(
@@ -72,6 +73,24 @@ struct ChatView: View {
                 onCancel: { showingCircleRecorder = false }
             )
         }
+        .sheet(isPresented: $showingProfile) {
+            ProfilePanel(
+                chat: vm.chat,
+                currentUserId: auth.user?.id,
+                onStartAudioCall: {
+                    if let other = vm.otherMember {
+                        CallManager.shared.startCall(to: other, in: vm.chat, type: .audio)
+                    }
+                },
+                onStartVideoCall: {
+                    if let other = vm.otherMember {
+                        CallManager.shared.startCall(to: other, in: vm.chat, type: .video)
+                    }
+                }
+            )
+            .presentationDetents([.large])
+            .presentationBackground(.ultraThinMaterial)
+        }
     }
 
     // MARK: - Helpers
@@ -90,7 +109,7 @@ struct ChatView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
@@ -101,36 +120,40 @@ struct ChatView: View {
             }
             .buttonStyle(PressDownStyle())
 
-            Avatar(
-                url: vm.chat.displayAvatar(currentUserId: auth.user?.id),
-                name: vm.displayName,
-                size: 38,
-                online: vm.chat.type == .direct ? vm.chat.isOnline(currentUserId: auth.user?.id) : nil
-            )
-
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(vm.displayName)
-                        .font(Typo.bodyB)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    if vm.isE2E {
-                        Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.brandViolet)
+            Button { showingProfile = true } label: {
+                HStack(spacing: 10) {
+                    Avatar(
+                        url: vm.chat.displayAvatar(currentUserId: auth.user?.id),
+                        name: vm.displayName,
+                        size: 38,
+                        online: vm.chat.type == .direct ? vm.chat.isOnline(currentUserId: auth.user?.id) : nil
+                    )
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text(vm.displayName)
+                                .font(Typo.bodyB)
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            if vm.isE2E {
+                                Image(systemName: "checkmark.shield.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.brandViolet)
+                            }
+                        }
+                        Text(subtitle)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(subtitleColor)
+                            .lineLimit(1)
                     }
                 }
-                Text(subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(subtitleColor)
-                    .lineLimit(1)
             }
+            .buttonStyle(PressDownStyle())
 
             Spacer()
 
             // Кнопки звонка — direct-чат, есть другой участник
             if vm.chat.type == .direct, let other = vm.otherMember {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Button {
                         CallManager.shared.startCall(to: other, in: vm.chat, type: .audio)
                     } label: { headerIcon("phone.fill") }

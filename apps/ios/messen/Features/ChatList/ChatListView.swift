@@ -7,6 +7,7 @@ struct ChatListView: View {
 
     @State private var path: [String] = []
     @State private var showNewChat = false
+    @State private var showNewGroup = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -52,6 +53,16 @@ struct ChatListView: View {
             .presentationDetents([.large])
             .presentationBackground(.ultraThinMaterial)
         }
+        .sheet(isPresented: $showNewGroup) {
+            NewGroupView(onGroupCreated: { chat in
+                vm.upsert(chat)
+                showNewGroup = false
+                openChat(chat.id)
+            })
+            .environmentObject(auth)
+            .presentationDetents([.large])
+            .presentationBackground(.ultraThinMaterial)
+        }
     }
 
     private func openChat(_ chatId: String) {
@@ -89,7 +100,14 @@ struct ChatListView: View {
             }
             Spacer()
 
-            Button { showNewChat = true } label: {
+            Menu {
+                Button { showNewChat = true } label: {
+                    Label("Новый чат", systemImage: "bubble.left.fill")
+                }
+                Button { showNewGroup = true } label: {
+                    Label("Новая группа", systemImage: "person.2.fill")
+                }
+            } label: {
                 Image(systemName: "square.and.pencil")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
@@ -98,7 +116,6 @@ struct ChatListView: View {
                     .clipShape(Circle())
                     .shadow(color: Color.brandViolet.opacity(0.5), radius: 12, x: 0, y: 5)
             }
-            .buttonStyle(PressDownStyle())
 
             Menu {
                 Button(role: .destructive) { auth.logout() } label: {
