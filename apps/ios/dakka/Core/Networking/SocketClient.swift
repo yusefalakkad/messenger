@@ -148,10 +148,13 @@ final class SocketClient: ObservableObject {
     }
 
     private func emit<E: Encodable>(_ event: String, _ payload: E) {
+        // SendMessagePayload / другие наши Codable всегда сериализуются в dict,
+        // явно кастуем чтобы Swift выбрал overload emit(_:with:completion:)
+        // принимающий [SocketData] — [String: Any] под него подходит.
         guard let data = try? JSONEncoder().encode(payload),
-              let obj  = try? JSONSerialization.jsonObject(with: data, options: [])
+              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
         else { return }
-        socket?.emit(event, with: [obj], completion: nil)
+        socket?.emit(event, with: [dict], completion: nil)
     }
 
     // MARK: - Wiring
