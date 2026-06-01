@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -11,6 +12,26 @@ import {
  */
 export default function LandingPage() {
   const navigate = useNavigate();
+
+  // index.css фиксит `html, body, #root { overflow: hidden }` чтобы чат не имел
+  // pull-to-refresh оверскролла. Для лендинга это смертельно — страница длинная,
+  // нужен скролл. Временно снимаем правило на время mount'а лендинга.
+  useEffect(() => {
+    const els = [document.documentElement, document.body, document.getElementById('root')];
+    const prev = els.map((el) => el ? { overflow: el.style.overflow, height: el.style.height } : null);
+    els.forEach((el) => {
+      if (!el) return;
+      el.style.overflow = 'auto';
+      el.style.height = 'auto';
+    });
+    return () => {
+      els.forEach((el, i) => {
+        if (!el || !prev[i]) return;
+        el.style.overflow = prev[i]!.overflow;
+        el.style.height = prev[i]!.height;
+      });
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-dark-bg text-white overflow-x-hidden">
@@ -103,8 +124,8 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
 
 function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void }) {
   return (
-    <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-12 lg:pt-24 pb-20 lg:pb-32">
-      <div className="grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-20 items-center">
+    <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-8 lg:pt-16 pb-16 lg:pb-24">
+      <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16 items-center">
         {/* ─── Left: typography hero ─── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -123,7 +144,7 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
           </motion.div>
 
           {/* HUGE typography */}
-          <h1 className="font-extrabold leading-[0.92] tracking-[-0.04em] text-[14vw] sm:text-[12vw] lg:text-[9vw] xl:text-[150px]">
+          <h1 className="font-extrabold leading-[0.92] tracking-[-0.04em] text-[13vw] sm:text-[11vw] lg:text-[8vw] xl:text-[128px]">
             <span className="block text-white">
               ПИШИ<span className="text-white/70">.</span>
             </span>
@@ -300,7 +321,7 @@ function FeatureGrid() {
     { icon: Globe,       title: 'Web, iOS, Android',    desc: 'Один аккаунт, бесшовная синхронизация между устройствами.' },
   ];
   return (
-    <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-20 lg:py-28">
+    <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
       <SectionHeader
         chip="Возможности"
         title="Всё для живого общения"
@@ -333,7 +354,7 @@ function FeatureGrid() {
 
 function PrivacySection() {
   return (
-    <section id="privacy" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-20 lg:py-28">
+    <section id="privacy" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
       <div className="grid lg:grid-cols-2 gap-14 items-center">
         <motion.div
           initial={{ opacity: 0, x: -30 }}
@@ -404,7 +425,7 @@ function PrivacySection() {
 
 function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-20 lg:py-28">
+    <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
       <SectionHeader
         chip="Загрузить"
         title="Везде, где вы есть"

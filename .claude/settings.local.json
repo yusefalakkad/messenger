@@ -68,7 +68,8 @@
       "Bash(grep -v \"useNavigate\\\\|to=\\\\\"\\\\$\")",
       "Bash(curl -sf http://localhost:5173/)",
       "Bash(git commit *)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }
