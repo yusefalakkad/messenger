@@ -96,4 +96,7 @@ dependencies {
     // Media3 ExoPlayer — looping плеер для кружков
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
+
+    // WebRTC — audio/video звонки
+    implementation(libs.webrtc)
 }

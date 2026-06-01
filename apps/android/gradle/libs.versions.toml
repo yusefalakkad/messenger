@@ -16,6 +16,7 @@ datastore = "1.1.1"
 socketio = "2.1.0"
 camerax = "1.4.0"
 media3 = "1.5.1"
+webrtc = "125.6422.06"
 
 [libraries]
 # Compose
@@ -69,6 +70,9 @@ camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = 
 # Media3 ExoPlayer (loop-плеер для кружков и видео)
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+
+# WebRTC (audio/video звонки) — maintained fork от webrtc-sdk
+webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

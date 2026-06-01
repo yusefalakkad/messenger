@@ -20,11 +20,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import online.akkdmsg.dakka.auth.AuthScreen
 import online.akkdmsg.dakka.auth.AuthStore
+import online.akkdmsg.dakka.call.ActiveCallView
+import online.akkdmsg.dakka.call.CallState
+import online.akkdmsg.dakka.call.CallStore
+import online.akkdmsg.dakka.call.IncomingCallView
 import online.akkdmsg.dakka.chat.ChatScreen
 import online.akkdmsg.dakka.chats.ChatListScreen
 import online.akkdmsg.dakka.chats.ChatListViewModel
 import online.akkdmsg.dakka.data.Chat
 import online.akkdmsg.dakka.ui.theme.DakkaTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,10 +44,26 @@ class MainActivity : ComponentActivity() {
                 val auth = remember { AuthStore.get(context) }
                 val user by auth.user.collectAsState()
 
-                if (user == null) {
-                    AuthScreen()
-                } else {
-                    AuthedRoot()
+                Box(Modifier.fillMaxSize()) {
+                    if (user == null) {
+                        AuthScreen()
+                    } else {
+                        AuthedRoot()
+                    }
+                    // Оверлей звонков поверх всего
+                    val callState by CallStore.state.collectAsState()
+                    when (val s = callState) {
+                        CallState.Idle -> {}
+                        is CallState.Incoming -> Box(Modifier.fillMaxSize().zIndex(100f)) {
+                            IncomingCallView(s.info)
+                        }
+                        is CallState.Outgoing -> Box(Modifier.fillMaxSize().zIndex(100f)) {
+                            ActiveCallView(s.info, isOutgoing = true)
+                        }
+                        is CallState.Active -> Box(Modifier.fillMaxSize().zIndex(100f)) {
+                            ActiveCallView(s.info, isOutgoing = false)
+                        }
+                    }
                 }
             }
         }

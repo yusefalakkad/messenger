@@ -119,14 +119,19 @@ fun ChatScreen(
                         )
                     }
                 }
-                // Placeholder кнопки звонков (полная реализация — сессия 5)
-                Box(Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.04f)),
-                    contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Phone, null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
-                }
-                Box(Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.04f)),
-                    contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Videocam, null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
+                // Кнопки звонка — direct-чат
+                val otherMember = vm.chatRef.members.firstOrNull { it.userId != userId }
+                if (chat.type == "direct" && otherMember != null) {
+                    CallIconButton(Icons.Filled.Phone) {
+                        online.akkdmsg.dakka.call.CallManager.startCall(
+                            otherMember, chat.id, online.akkdmsg.dakka.call.CallType.Audio
+                        )
+                    }
+                    CallIconButton(Icons.Filled.Videocam) {
+                        online.akkdmsg.dakka.call.CallManager.startCall(
+                            otherMember, chat.id, online.akkdmsg.dakka.call.CallType.Video
+                        )
+                    }
                 }
             }
 
@@ -201,5 +206,26 @@ fun ChatScreen(
                 onCancel = { showCircleRecorder = false },
             )
         }
+    }
+}
+
+@Composable
+private fun CallIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.04f))
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(16.dp))
     }
 }

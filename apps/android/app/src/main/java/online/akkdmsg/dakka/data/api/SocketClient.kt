@@ -10,6 +10,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
+import online.akkdmsg.dakka.call.CallAcceptedEvent
+import online.akkdmsg.dakka.call.CallEndedEvent
+import online.akkdmsg.dakka.call.CallSignal
+import online.akkdmsg.dakka.call.CallSignalEvent
+import online.akkdmsg.dakka.call.CallType
+import online.akkdmsg.dakka.call.IncomingCallEvent
 import online.akkdmsg.dakka.data.AppConfig
 import online.akkdmsg.dakka.data.Chat
 import online.akkdmsg.dakka.data.Message
@@ -58,6 +64,16 @@ object SocketClient {
 
     private val _chatRemoved = MutableSharedFlow<String>(extraBufferCapacity = 8) // chatId
     val chatRemoved: SharedFlow<String> = _chatRemoved.asSharedFlow()
+
+    // Calls
+    private val _callIncoming = MutableSharedFlow<IncomingCallEvent>(extraBufferCapacity = 4)
+    val callIncoming: SharedFlow<IncomingCallEvent> = _callIncoming.asSharedFlow()
+    private val _callAccepted = MutableSharedFlow<CallAcceptedEvent>(extraBufferCapacity = 4)
+    val callAccepted: SharedFlow<CallAcceptedEvent> = _callAccepted.asSharedFlow()
+    private val _callEnded = MutableSharedFlow<CallEndedEvent>(extraBufferCapacity = 4)
+    val callEnded: SharedFlow<CallEndedEvent> = _callEnded.asSharedFlow()
+    private val _callSignal = MutableSharedFlow<CallSignalEvent>(extraBufferCapacity = 64)
+    val callSignal: SharedFlow<CallSignalEvent> = _callSignal.asSharedFlow()
 
     // ── Internal ─────────────────────────────────────────────────────────────
 
@@ -137,6 +153,25 @@ object SocketClient {
         })
     }
 
+    // ── Call signaling ───────────────────────────────────────────────────────
+
+    fun initiateCall(callId: String, peerId: String, chatId: String, callType: CallType) {
+        socket?.emit("call:initiate", JSONObject().apply {
+            put("callId", callId); put("peerId", peerId); put("chatId", chatId); put("callType", callType.raw)
+        })
+    }
+    fun acceptCall(callId: String)  { socket?.emit("call:accept", JSONObject().put("callId", callId)) }
+    fun rejectCall(callId: String)  { socket?.emit("call:reject", JSONObject().put("callId", callId)) }
+    fun endCall(callId: String)     { socket?.emit("call:end",    JSONObject().put("callId", callId)) }
+
+    fun sendCallSignal(callId: String, signal: CallSignal) {
+        val signalJson = json.encodeToString(CallSignal.serializer(), signal)
+        socket?.emit("call:signal", JSONObject().apply {
+            put("callId", callId)
+            put("signal", JSONObject(signalJson))
+        })
+    }
+
     // ── Wiring ───────────────────────────────────────────────────────────────
 
     private fun wireHandlers(s: Socket) {
@@ -210,6 +245,42 @@ object SocketClient {
         s.on("chat:member-left") { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@on
             o.optString("chatId").takeIf { it.isNotEmpty() }?.let { _chatUpdated.tryEmit(it) }
+        }
+
+        // ── Calls ──
+        s.on("call:incoming") { args ->
+            val o = args.firstOrNull() as? JSONObject ?: return@on
+            _callIncoming.tryEmit(IncomingCallEvent(
+                callId       = o.optString("callId"),
+                chatId       = o.optString("chatId"),
+                callerId     = o.optString("callerId"),
+                callerName   = o.optString("callerName", "Звонок"),
+                callerAvatar = o.optString("callerAvatar").takeIf { it.isNotEmpty() },
+                callType     = CallType.from(o.optString("callType")),
+            ))
+        }
+        s.on("call:accepted") { args ->
+            val o = args.firstOrNull() as? JSONObject ?: return@on
+            _callAccepted.tryEmit(CallAcceptedEvent(
+                callId = o.optString("callId"),
+                peerId = o.optString("peerId"),
+            ))
+        }
+        s.on("call:ended") { args ->
+            val o = args.firstOrNull() as? JSONObject ?: return@on
+            _callEnded.tryEmit(CallEndedEvent(
+                callId = o.optString("callId"),
+                reason = o.optString("reason").takeIf { it.isNotEmpty() },
+            ))
+        }
+        s.on("call:signal") { args ->
+            val o = args.firstOrNull() as? JSONObject ?: return@on
+            val callId = o.optString("callId").takeIf { it.isNotEmpty() } ?: return@on
+            val sig = o.optJSONObject("signal") ?: return@on
+            val signal = runCatching {
+                json.decodeFromString(CallSignal.serializer(), sig.toString())
+            }.getOrNull() ?: return@on
+            _callSignal.tryEmit(CallSignalEvent(callId, signal))
         }
     }
 
