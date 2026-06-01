@@ -51,6 +51,10 @@ export function useAppInit(): boolean {
         } else {
           setupPush().catch(() => { /* нет разрешения / unsupported */ });
         }
+        // Префетч ICE-серверов в фоне — к моменту первого звонка кэш уже прогрет
+        import('@/lib/iceServers').then(({ getIceServers }) => {
+          void getIceServers();
+        });
       }
       if (!cancelled) setReady(true);
     }

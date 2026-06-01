@@ -3,19 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
 import { useCallStore } from '@/stores/call.store';
 import { acceptCall, rejectCall, endCall, sendCallSignal } from '@/lib/socket';
+import { getIceServers } from '@/lib/iceServers';
 import Avatar from '@/components/ui/Avatar';
-
-const TURN_URL  = import.meta.env.VITE_TURN_URL  as string | undefined;
-const TURN_USER = import.meta.env.VITE_TURN_USER as string | undefined;
-const TURN_PASS = import.meta.env.VITE_TURN_PASS as string | undefined;
-
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  ...(TURN_URL && TURN_USER && TURN_PASS
-    ? [{ urls: `turn:${TURN_URL}`, username: TURN_USER, credential: TURN_PASS }]
-    : []),
-];
 
 export default function CallOverlay() {
   const incoming  = useCallStore((s) => s.incoming);
@@ -70,7 +59,9 @@ export default function CallOverlay() {
     iceCandidateQueue.current = [];
     remoteDescReady.current = false;
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    // Динамически получаем ICE-серверы (STUN + TURN) с бэка с кэшем 10 мин
+    const iceServers = await getIceServers();
+    const pc = new RTCPeerConnection({ iceServers });
     pcRef.current = pc;
 
     const stream = await navigator.mediaDevices.getUserMedia({

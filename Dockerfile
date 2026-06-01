@@ -1,12 +1,9 @@
 # ─── Stage 1: Build everything ───────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-ARG VITE_TURN_URL=""
-ARG VITE_TURN_USER="turnuser"
-ARG VITE_TURN_PASS="turnpass123"
-ENV VITE_TURN_URL=$VITE_TURN_URL
-ENV VITE_TURN_USER=$VITE_TURN_USER
-ENV VITE_TURN_PASS=$VITE_TURN_PASS
+# TURN credentials БОЛЬШЕ НЕ ЗАШИВАЮТСЯ в JS-бандл — пароль утёк бы через
+# исходники. Клиент динамически забирает их с /api/webrtc/ice-servers
+# (см. packages/web/src/lib/iceServers.ts).
 
 WORKDIR /app
 COPY package*.json ./
@@ -25,9 +22,9 @@ FROM node:20-alpine AS backend
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
-COPY --from=builder /app/packages/backend/prisma ./packages/backend/prisma
-COPY --from=builder /app/packages/backend/package.json ./packages/backend/package.json
+# Копируем весь backend workspace целиком, включая его внутренние node_modules
+# (workspaces иногда силосят пакеты в `packages/backend/node_modules` вместо корня).
+COPY --from=builder /app/packages/backend ./packages/backend
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY entrypoint.sh /entrypoint.sh

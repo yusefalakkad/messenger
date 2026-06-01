@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { clearKeyCache } from '@/lib/e2e';
+import { clearCache as clearVaultCache, getCached as getVaultCached } from '@/lib/keyVault';
 
 // Безопасное хранилище — работает и в инкогнито
 const safeStorage = {
@@ -48,18 +49,28 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         clearKeyCache();
-        set({ user: null, accessToken: null, isAuthenticated: false });
+        clearVaultCache();
+        // Инвалидируем ICE-кэш (TURN credentials могли быть user-bound)
+        import('@/lib/iceServers').then(({ clearIceServersCache }) => clearIceServersCache());
+        set({ user: null, accessToken: null, privateKey: null, isAuthenticated: false });
       },
     }),
     {
       name: 'messenger-auth',
       storage: createJSONStorage(() => safeStorage),
-      // accessToken не сохраняем (короткоживущий), privateKey храним локально (E2E)
+      // accessToken не сохраняем (короткоживущий),
+      // privateKey НЕ персистим в plaintext — он живёт в sessionStorage (keyVault).
       partialize: (s) => ({
         user: s.user,
-        privateKey: s.privateKey,
         isAuthenticated: s.isAuthenticated,
       }),
+      // При гидрации подхватываем плейнтекст-ключ из sessionStorage, если есть
+      onRehydrateStorage: () => (state) => {
+        if (state?.user?.id) {
+          const cached = getVaultCached(state.user.id);
+          if (cached) state.privateKey = cached;
+        }
+      },
     },
   ),
 );

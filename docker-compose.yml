@@ -29,10 +29,6 @@ services:
     build:
       context: .
       target: nginx-frontend
-      args:
-        VITE_TURN_URL: ${SERVER_IP}:3478
-        VITE_TURN_USER: ${TURN_USER:-turnuser}
-        VITE_TURN_PASS: ${TURN_PASS:-turnpass123}
     container_name: messenger_nginx
     restart: unless-stopped
     ports:
