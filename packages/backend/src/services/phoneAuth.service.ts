@@ -115,6 +115,11 @@ export class PhoneAuthService {
     rawPhone: string,
     code: string,
     meta: { deviceId: string; deviceName?: string; ipAddress?: string; userAgent?: string },
+    /** Опциональный новый publicKey — клиент шлёт когда логинится с устройства,
+     *  на котором нет приватного ключа. Бэк обновляет user.publicKey, клиент
+     *  сохраняет приватный локально. Старые сообщения становятся нерасшифровываемыми
+     *  (приватный ключ был привязан к предыдущему устройству — это by design). */
+    freshPublicKey?: string,
   ): Promise<VerifyCodeResult> {
     const phone = normalizePhone(rawPhone);
     const result = await otpStore.verifyCode(phone, code);
@@ -133,16 +138,24 @@ export class PhoneAuthService {
     const existing = await prisma.user.findUnique({ where: { phone } });
 
     if (existing) {
-      // Привет, старый знакомый — обновляем phoneVerified и выдаём сессию
-      await prisma.user.update({
+      const data: { phoneVerified: boolean; status: 'online'; lastSeenAt: Date; publicKey?: string } = {
+        phoneVerified: true,
+        status: 'online',
+        lastSeenAt: new Date(),
+      };
+      // Если клиент прислал свежий публичный ключ — заменяем (явно: новое устройство).
+      if (freshPublicKey && freshPublicKey.length >= 32 && freshPublicKey.length <= 256) {
+        data.publicKey = freshPublicKey;
+      }
+      const updated = await prisma.user.update({
         where: { id: existing.id },
-        data: { phoneVerified: true, status: 'online', lastSeenAt: new Date() },
+        data,
       });
 
       const tokens = await this._createSession(existing.id, meta);
       return {
         isNewUser: false,
-        tokens: { ...tokens, user: shapeUser(existing) },
+        tokens: { ...tokens, user: shapeUser(updated) },
       };
     }
 

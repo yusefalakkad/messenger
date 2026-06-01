@@ -104,18 +104,25 @@ export default function PhoneAuthForm() {
     setError(null);
     setLoading(true);
     try {
+      // ВСЕГДА генерим свежую пару E2E-ключей при login. Если юзер существует —
+      // бэк заменит его publicKey на этот, и приватный останется только у нас.
+      // Старые сообщения становятся нерасшифровываемыми (приватный был на старом
+      // устройстве) — это by design phone-auth.
+      const { publicKey, privateKey } = await generateKeyPair();
       const { data } = await api.post<{ success: boolean; data: VerifyResp }>(
         '/auth/phone/verify',
-        { phone, code },
+        { phone, code, publicKey },
       );
       const v = data.data;
       if (v.isNewUser) {
+        // Для нового юзера publicKey всё равно установится через complete-profile —
+        // там мы регенерим пару ещё раз. (Не критично, просто чище.)
         setVerifyToken(v.verifyToken!);
         setStep('profile');
       } else {
-        // Существующий юзер — заходим сразу
+        // Существующий юзер — заходим, сохраняем свежий приватный ключ.
         const t = v.tokens!;
-        setAuth(t.user as any, t.accessToken);
+        setAuth(t.user as any, t.accessToken, privateKey);
       }
     } catch (err: any) {
       setError(err?.response?.data?.error?.message ?? 'Неверный код');

@@ -32,13 +32,15 @@ export const verifyCodeValidators = [
   body('code').trim().isString().isLength({ min: 4, max: 10 }),
   body('deviceId').optional().isString().isLength({ min: 8, max: 128 }),
   body('deviceName').optional().isString().isLength({ max: 80 }),
+  // Опциональный свежий publicKey — клиент шлёт при логине с нового устройства
+  body('publicKey').optional().isString().isLength({ min: 32, max: 256 }),
 ];
 
 export async function verifyCode(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { phone, code } = req.body;
+    const { phone, code, publicKey } = req.body;
     const meta = getDeviceMeta(req);
-    const result = await phoneAuthService.verifyCode(phone, code, meta);
+    const result = await phoneAuthService.verifyCode(phone, code, meta, publicKey);
     sendSuccess(res, result);
   } catch (err) { next(err); }
 }
