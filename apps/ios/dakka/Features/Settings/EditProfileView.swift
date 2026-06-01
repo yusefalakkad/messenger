@@ -115,7 +115,7 @@ struct EditProfileView: View {
             }
             .onChange(of: avatarItem) { newValue in
                 guard let newValue else { return }
-                Task {
+                Task { @MainActor in
                     if let prepared = try? await ImagePreparer.prepare(newValue) {
                         await uploadAvatar(prepared: prepared)
                     }
@@ -129,6 +129,7 @@ struct EditProfileView: View {
         }
     }
 
+    @MainActor
     private func uploadAvatar(prepared: ImagePreparer.Prepared) async {
         saving = true; defer { saving = false }
         do {
@@ -166,7 +167,7 @@ struct EditProfileView: View {
     }
 
     private func save() {
-        Task {
+        Task { @MainActor in
             saving = true; defer { saving = false }
             do {
                 struct Body: Codable {

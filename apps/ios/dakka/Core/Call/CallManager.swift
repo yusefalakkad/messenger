@@ -164,8 +164,8 @@ final class CallManager: ObservableObject {
         Task {
             let ok = await requestPermissions(video: store.state.info?.type == .video)
             guard ok, let info = store.state.info else { endCurrent(reason: "no-permission"); return }
-            rtc?.createOffer { [weak self] sdp in
-                guard let self, let sdp else { return }
+            rtc?.createOffer { sdp in
+                guard let sdp else { return }
                 let signal = CallSignal(
                     type: "offer", sdp: sdp.sdp,
                     candidate: nil, sdpMid: nil, sdpMLineIndex: nil

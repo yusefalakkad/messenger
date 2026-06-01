@@ -47,9 +47,10 @@ struct AuthView: View {
                     )
             }
 
-            Text("Dakka")
-                .font(Typo.titleXL)
+            Text("dakka")
+                .font(.system(size: 48, weight: .heavy))
                 .foregroundStyle(LinearGradient.brandText)
+                .tracking(-1)
 
             Text("Общение, которое чувствуешь")
                 .font(Typo.body)
