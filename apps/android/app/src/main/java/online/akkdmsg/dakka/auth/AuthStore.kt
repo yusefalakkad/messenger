@@ -12,6 +12,7 @@ import online.akkdmsg.dakka.data.User
 import online.akkdmsg.dakka.data.api.ApiClient
 import online.akkdmsg.dakka.data.api.SocketClient
 import online.akkdmsg.dakka.data.crypto.E2E
+import online.akkdmsg.dakka.push.PushBootstrap
 
 /**
  * Хранение JWT и юзера в EncryptedSharedPreferences (AES-256-GCM с ключом из Keystore).
@@ -45,6 +46,7 @@ class AuthStore private constructor(context: Context) {
         // Если есть сохранённая сессия — авто-коннект сокета
         if (ApiClient.accessToken != null && _user.value != null) {
             SocketClient.connect()
+            PushBootstrap.requestAndRegisterToken()
         }
     }
 
@@ -58,6 +60,7 @@ class AuthStore private constructor(context: Context) {
         ApiClient.accessToken = accessToken
         _user.value = user
         SocketClient.connect()
+        PushBootstrap.requestAndRegisterToken()
     }
 
     val privateKey: String? get() = prefs.getString(KEY_PRIVATE_KEY, null)

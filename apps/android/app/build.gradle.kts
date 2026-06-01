@@ -5,6 +5,13 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Применяем google-services плагин ТОЛЬКО если google-services.json есть.
+// Без него Firebase Messaging не сможет работать — приложение продолжит
+// функционировать без push-уведомлений (графdegrade).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "online.akkdmsg.dakka"
     compileSdk = 35
@@ -99,4 +106,8 @@ dependencies {
 
     // WebRTC — audio/video звонки
     implementation(libs.webrtc)
+
+    // Firebase Cloud Messaging — push-уведомления
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 }

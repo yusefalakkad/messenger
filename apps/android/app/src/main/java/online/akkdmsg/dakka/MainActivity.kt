@@ -28,6 +28,8 @@ import online.akkdmsg.dakka.chat.ChatScreen
 import online.akkdmsg.dakka.chats.ChatListScreen
 import online.akkdmsg.dakka.chats.ChatListViewModel
 import online.akkdmsg.dakka.data.Chat
+import online.akkdmsg.dakka.settings.EditProfileScreen
+import online.akkdmsg.dakka.settings.SettingsScreen
 import online.akkdmsg.dakka.ui.theme.DakkaTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,18 +72,27 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Внутренняя навигация авторизованной части: list ⇄ chat. */
+private sealed class Route {
+    data object List : Route()
+    data class Chat(val chatId: String) : Route()
+    data object Settings : Route()
+    data object EditProfile : Route()
+}
+
+/** Внутренняя навигация авторизованной части. */
 @Composable
 private fun AuthedRoot() {
     val chatListVm: ChatListViewModel = viewModel()
     val chats by chatListVm.filteredChats.collectAsState()
-    var openChatId by remember { mutableStateOf<String?>(null) }
-    val openChat: Chat? = openChatId?.let { id -> chats.firstOrNull { it.id == id } }
+    var route by remember { mutableStateOf<Route>(Route.List) }
 
     AnimatedContent(
-        targetState = openChat,
+        targetState = route,
         transitionSpec = {
-            if (targetState != null) {
+            val forward = (targetState is Route.Chat || targetState is Route.Settings ||
+                           targetState is Route.EditProfile) && initialState is Route.List ||
+                          (targetState is Route.EditProfile && initialState is Route.Settings)
+            if (forward) {
                 slideInHorizontally { it } + fadeIn() togetherWith
                     slideOutHorizontally { -it / 3 } + fadeOut()
             } else {
@@ -89,17 +100,28 @@ private fun AuthedRoot() {
                     slideOutHorizontally { it } + fadeOut()
             }
         },
-        label = "chats-nav",
+        label = "authed-nav",
     ) { current ->
-        if (current == null) {
-            ChatListScreen(
+        when (current) {
+            is Route.List -> ChatListScreen(
                 vm = chatListVm,
-                onChatClick = { id -> openChatId = id },
+                onChatClick = { id -> route = Route.Chat(id) },
+                onSettingsClick = { route = Route.Settings },
             )
-        } else {
-            ChatScreen(
-                chat = current,
-                onBack = { openChatId = null },
+            is Route.Chat -> {
+                val chat: Chat? = chats.firstOrNull { it.id == current.chatId }
+                if (chat != null) {
+                    ChatScreen(chat = chat, onBack = { route = Route.List })
+                } else {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize())
+                }
+            }
+            is Route.Settings -> SettingsScreen(
+                onBack = { route = Route.List },
+                onEditProfile = { route = Route.EditProfile },
+            )
+            is Route.EditProfile -> EditProfileScreen(
+                onBack = { route = Route.Settings },
             )
         }
     }

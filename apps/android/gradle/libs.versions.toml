@@ -17,6 +17,8 @@ socketio = "2.1.0"
 camerax = "1.4.0"
 media3 = "1.5.1"
 webrtc = "125.6422.06"
+firebase-bom = "33.7.0"
+google-services = "4.4.2"
 
 [libraries]
 # Compose
@@ -73,6 +75,10 @@ media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "medi
 
 # WebRTC (audio/video звонки) — maintained fork от webrtc-sdk
 webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
+
+# Firebase Cloud Messaging — push-уведомления
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
