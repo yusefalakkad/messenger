@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var auth: AuthStore
     @Environment(\.dismiss) private var dismiss
     @State private var showEditProfile = false
+    @State private var show2FA = false
 
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
@@ -30,6 +31,11 @@ struct SettingsView: View {
         .sheet(isPresented: $showEditProfile) {
             EditProfileView()
                 .environmentObject(auth)
+                .presentationDetents([.large])
+                .presentationBackground(.ultraThinMaterial)
+        }
+        .sheet(isPresented: $show2FA) {
+            TwoFactorView()
                 .presentationDetents([.large])
                 .presentationBackground(.ultraThinMaterial)
         }
@@ -91,8 +97,11 @@ struct SettingsView: View {
             section(title: "Приватность и безопасность") {
                 row(icon: "shield.lefthalf.filled", title: "E2E включено по умолчанию",
                     accessory: chip("ВКЛ", color: Color.brandViolet))
-                row(icon: "lock.fill", title: "Двухфакторная защита",
-                    accessory: chip("СКОРО", color: Color.white.opacity(0.4)))
+                Button { show2FA = true } label: {
+                    row(icon: "lock.fill", title: "Двухфакторная защита",
+                        accessory: chevronAccessory)
+                }
+                .buttonStyle(PressDownStyle())
                 row(icon: "key.fill", title: "Активные сессии",
                     accessory: chip("СКОРО", color: Color.white.opacity(0.4)))
             }
@@ -168,6 +177,14 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.04)), alignment: .top)
+    }
+
+    private var chevronAccessory: AnyView {
+        AnyView(
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.4))
+        )
     }
 
     private func chip(_ text: String, color: Color) -> AnyView {
