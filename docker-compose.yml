@@ -147,7 +147,11 @@ services:
   livekit:
     image: livekit/livekit-server:latest
     container_name: messenger_livekit
-    restart: unless-stopped
+    # on-failure:0 = НЕ рестартим при провале (опциональный сервис).
+    # Если LIVEKIT_API_KEY/SECRET не заданы — сервис падает, но это нормально:
+    # nginx использует lazy DNS, /livekit endpoint просто вернёт 502, основной
+    # сайт работает.
+    restart: "no"
     command: ["--config", "/etc/livekit.yaml"]
     volumes:
       - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
