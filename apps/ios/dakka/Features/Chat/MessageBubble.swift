@@ -194,7 +194,7 @@ struct MessageBubble: View {
     private func replyQuote(_ reply: ReplyPreview) -> some View {
         HStack(spacing: 8) {
             Rectangle()
-                .fill(isOwn ? Color.white.opacity(0.6) : LinearGradient.brand)
+                .fill(isOwn ? AnyShapeStyle(Color.white.opacity(0.6)) : AnyShapeStyle(LinearGradient.brand))
                 .frame(width: 3)
                 .clipShape(Capsule())
             VStack(alignment: .leading, spacing: 1) {
