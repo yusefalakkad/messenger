@@ -3,7 +3,9 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import { config } from '../config';
 import { verifyAccessToken } from '../utils/jwt';
 import { prisma } from '../lib/prisma';
-import { redis, setUserOnline, setUserOffline } from '../lib/redis';
+import { redis, setUserOnline, setUserOffline, isUserOnline } from '../lib/redis';
+import { sendPushToUser } from '../lib/push';
+import { sendNativePushToUser } from '../lib/push-native';
 import { logger } from '../lib/logger';
 import type { WSClientEvents, WSServerEvents, SendMessagePayload } from '@messenger/shared';
 
@@ -45,6 +47,21 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     const { userId } = socket;
     logger.debug(`Socket connected: ${userId} (${socket.id})`);
 
+    // Per-socket in-memory token bucket.
+    // event → массив timestamps попыток за последнее окно.
+    const buckets = new Map<string, number[]>();
+    const checkRate = (event: string, max: number, windowMs: number): boolean => {
+      const now = Date.now();
+      const arr = (buckets.get(event) ?? []).filter((t) => now - t < windowMs);
+      if (arr.length >= max) {
+        buckets.set(event, arr);
+        return false;
+      }
+      arr.push(now);
+      buckets.set(event, arr);
+      return true;
+    };
+
     // Mark user online
     await setUserOnline(userId, socket.id);
     await prisma.user.update({ where: { id: userId }, data: { status: 'online' } });
@@ -73,6 +90,10 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     });
 
     socket.on('message:send', async (payload: SendMessagePayload) => {
+      if (!checkRate('message:send', 30, 10_000)) {
+        socket.emit('error', { code: 'RATE_LIMIT', message: 'Slow down — too many messages' });
+        return;
+      }
       try {
         await handleSendMessage(io, socket, payload);
       } catch (err) {
@@ -97,19 +118,49 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       });
     });
 
-    socket.on('message:delete', async ({ messageId, chatId }: WSClientEvents['message:delete']) => {
+    socket.on('message:delete', async ({ messageId }: WSClientEvents['message:delete']) => {
       try {
-        const message = await prisma.message.findFirst({ where: { id: messageId, senderId: userId } });
-        if (!message) return;
+        const message = await prisma.message.findUnique({
+          where: { id: messageId },
+          select: { id: true, chatId: true, senderId: true, deletedAt: true },
+        });
+        if (!message || message.deletedAt) return;
+
+        // Проверяем членство пользователя в чате (chatId берём из БД, не от клиента).
+        const member = await prisma.chatMember.findUnique({
+          where: { chatId_userId: { chatId: message.chatId, userId } },
+          select: { role: true, leftAt: true },
+        });
+        if (!member || member.leftAt) return;
+
+        // Удалить может: автор сообщения или владелец/админ чата.
+        const canDelete =
+          message.senderId === userId ||
+          member.role === 'owner' ||
+          member.role === 'admin';
+        if (!canDelete) return;
+
         await prisma.message.update({ where: { id: messageId }, data: { deletedAt: new Date() } });
-        io.to(`chat:${chatId}`).emit('message:deleted', { messageId, chatId });
+        io.to(`chat:${message.chatId}`).emit('message:deleted', { messageId, chatId: message.chatId });
       } catch (err) {
         logger.error('message:delete error', { err });
       }
     });
 
-    socket.on('message:react', async ({ messageId, chatId, emoji }: WSClientEvents['message:react']) => {
+    socket.on('message:react', async ({ messageId, emoji }: WSClientEvents['message:react']) => {
       try {
+        const message = await prisma.message.findUnique({
+          where: { id: messageId },
+          select: { chatId: true },
+        });
+        if (!message) return;
+
+        const member = await prisma.chatMember.findUnique({
+          where: { chatId_userId: { chatId: message.chatId, userId } },
+          select: { id: true, leftAt: true },
+        });
+        if (!member || member.leftAt) return;
+
         const existing = await prisma.reaction.findUnique({
           where: { messageId_userId_emoji: { messageId, userId, emoji } },
         });
@@ -121,21 +172,32 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
           await prisma.reaction.create({ data: { messageId, userId, emoji } });
           action = 'add';
         }
-        io.to(`chat:${chatId}`).emit('message:reacted', { messageId, chatId, userId, emoji, action });
+        io.to(`chat:${message.chatId}`).emit('message:reacted', { messageId, chatId: message.chatId, userId, emoji, action });
       } catch (err) {
         logger.error('message:react error', { err });
       }
     });
 
-    socket.on('message:edit', async ({ messageId, chatId, content }: WSClientEvents['message:edit']) => {
+    socket.on('message:edit', async ({ messageId, content }: WSClientEvents['message:edit']) => {
       try {
-        const message = await prisma.message.findFirst({ where: { id: messageId, senderId: userId, type: 'text' } });
+        // Редактировать может только автор. type=text для защиты от правки медиа-капшнов.
+        const message = await prisma.message.findFirst({
+          where: { id: messageId, senderId: userId, type: 'text', deletedAt: null },
+          select: { id: true, chatId: true },
+        });
         if (!message) return;
+        if (typeof content !== 'string' || content.length === 0 || content.length > 10_000) return;
+
         const updated = await prisma.message.update({
           where: { id: messageId },
           data: { content, editedAt: new Date() },
         });
-        io.to(`chat:${chatId}`).emit('message:updated', { id: messageId, content, editedAt: updated.editedAt });
+        io.to(`chat:${message.chatId}`).emit('message:updated', {
+          id: messageId,
+          content,
+          editedAt: updated.editedAt,
+          chatId: message.chatId,
+        });
       } catch (err) {
         logger.error('message:edit error', { err });
       }
@@ -144,6 +206,10 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     // ─── Calls (WebRTC signaling relay) ──────────────────────────────────────
 
     socket.on('call:initiate', async ({ callId, peerId, chatId, callType }: WSClientEvents['call:initiate']) => {
+      if (!checkRate('call:initiate', 5, 60_000)) {
+        socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many call attempts' });
+        return;
+      }
       // Проверяем, что оба — участники чата
       const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
       if (!member) return;
@@ -221,6 +287,32 @@ async function handleSendMessage(
   });
   if (!member) throw new Error('Not a member');
 
+  // Block check: если получатель в директе заблокировал отправителя — отказ
+  if (await isBlockedDirect(payload.chatId, userId)) {
+    socket.emit('error', { code: 'BLOCKED', message: 'You are blocked by this user' });
+    return;
+  }
+
+  // Forward: проверяем доступ к источнику
+  if (payload.forwardedFromId) {
+    const sourceMessage = await prisma.message.findUnique({
+      where: { id: payload.forwardedFromId },
+      select: { chatId: true },
+    });
+    if (!sourceMessage) {
+      socket.emit('error', { code: 'FORWARD_SOURCE_MISSING', message: 'Source message not found' });
+      return;
+    }
+    const sourceMember = await prisma.chatMember.findUnique({
+      where: { chatId_userId: { chatId: sourceMessage.chatId, userId } },
+      select: { id: true },
+    });
+    if (!sourceMember) {
+      socket.emit('error', { code: 'FORWARD_NO_ACCESS', message: 'No access to source message' });
+      return;
+    }
+  }
+
   const message = await prisma.message.create({
     data: {
       chatId: payload.chatId,
@@ -230,6 +322,7 @@ async function handleSendMessage(
       encrypted: payload.encrypted ?? false,
       nonce:     payload.nonce,
       replyToId: payload.replyToId,
+      forwardedFromId: payload.forwardedFromId,
       ...(payload.mediaData
         ? {
             media: {
@@ -263,6 +356,37 @@ async function handleSendMessage(
   });
 
   io.to(`chat:${payload.chatId}`).emit('message:new', message);
+
+  // Push офлайн-членам чата (кроме отправителя)
+  void notifyOfflineMembers(payload.chatId, userId, message);
+}
+
+// Sealed-sender-lite: пуш не содержит ни имени отправителя, ни превью текста.
+// Только chatId — клиент сам подтянет содержимое после открытия.
+// Снижает утечку метаданных через push-провайдеров и историю уведомлений ОС.
+async function notifyOfflineMembers(
+  chatId: string,
+  senderId: string,
+  _message: { id: string; type: string; content: string | null; encrypted: boolean },
+): Promise<void> {
+  try {
+    const members = await prisma.chatMember.findMany({
+      where: { chatId, userId: { not: senderId }, leftAt: null },
+      select: { userId: true },
+    });
+
+    await Promise.all(members.map(async (m) => {
+      if (await isUserOnline(m.userId)) return;
+      const payload = { title: 'Новое сообщение', body: '', chatId };
+      // Параллельно: web-push (VAPID) + native (APNs/FCM)
+      await Promise.all([
+        sendPushToUser(m.userId, payload),
+        sendNativePushToUser(m.userId, payload),
+      ]);
+    }));
+  } catch (err) {
+    logger.warn('push fanout failed', { err });
+  }
 }
 
 async function handleMessageRead(
@@ -285,6 +409,25 @@ async function handleMessageRead(
     userId,
     readAt: new Date(),
   });
+}
+
+// Если чат direct — возвращает true, когда получатель заблокировал отправителя.
+// Для group/channel всегда false.
+async function isBlockedDirect(chatId: string, senderId: string): Promise<boolean> {
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    select: { type: true, members: { where: { leftAt: null }, select: { userId: true } } },
+  });
+  if (!chat || chat.type !== 'direct') return false;
+
+  const otherUserId = chat.members.find((m) => m.userId !== senderId)?.userId;
+  if (!otherUserId) return false;
+
+  const contact = await prisma.contact.findUnique({
+    where: { ownerId_targetId: { ownerId: otherUserId, targetId: senderId } },
+    select: { blocked: true },
+  });
+  return !!contact?.blocked;
 }
 
 async function broadcastUserStatus(

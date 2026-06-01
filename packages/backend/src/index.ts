@@ -12,6 +12,8 @@ import { logger } from './lib/logger';
 import { connectDatabase, disconnectDatabase } from './lib/prisma';
 import { connectRedis, redis } from './lib/redis';
 import { initializeMinio } from './lib/minio';
+import { initPush } from './lib/push';
+import { initNativePush } from './lib/push-native';
 import { createSocketServer } from './socket/socket.server';
 import apiRoutes from './routes/index';
 import { errorHandler, notFound } from './middleware/error.middleware';
@@ -21,6 +23,8 @@ async function bootstrap(): Promise<void> {
   await connectDatabase();
   await connectRedis();
   await initializeMinio();
+  await initPush();
+  await initNativePush();
 
   // ─── Express app ───────────────────────────────────────────────────────────
   const app = express();
