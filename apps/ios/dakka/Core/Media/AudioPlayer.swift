@@ -60,11 +60,15 @@ final class AudioPlayer: NSObject, ObservableObject {
         // Observers
         let interval = CMTime(seconds: 0.05, preferredTimescale: 600)
         timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self else { return }
-            let dur = item.duration.seconds
-            if dur.isFinite, dur > 0 {
-                self.totalDuration = dur
-                self.progress = max(0, min(1, time.seconds / dur))
+            // Closure типа @Sendable, но runs на main queue — безопасно
+            // мутировать @MainActor свойства через assumeIsolated.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let dur = item.duration.seconds
+                if dur.isFinite, dur > 0 {
+                    self.totalDuration = dur
+                    self.progress = max(0, min(1, time.seconds / dur))
+                }
             }
         }
         endObserver = NotificationCenter.default.addObserver(

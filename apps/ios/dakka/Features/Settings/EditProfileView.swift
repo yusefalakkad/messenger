@@ -12,6 +12,11 @@ struct EditProfileView: View {
     @State private var saving = false
     @State private var error: String?
 
+    /// Снимок auth.user.* на момент открытия экрана — позволяет canSave
+    /// сравнить без обращения к @MainActor-isolated auth извне body.
+    @State private var initialDisplayName: String = ""
+    @State private var currentAvatar: String?
+
     var body: some View {
         ZStack {
             Color.darkBg.opacity(0.7).ignoresSafeArea()
@@ -51,13 +56,15 @@ struct EditProfileView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            displayName = auth.user?.displayName ?? ""
+            initialDisplayName = auth.user?.displayName ?? ""
+            currentAvatar = auth.user?.avatar
+            displayName = initialDisplayName
         }
     }
 
     private var canSave: Bool {
         let trimmed = displayName.trimmingCharacters(in: .whitespaces)
-        return !trimmed.isEmpty && trimmed != auth.user?.displayName || newAvatarURL != nil
+        return !trimmed.isEmpty && trimmed != initialDisplayName || newAvatarURL != nil
     }
 
     private var closeBar: some View {
@@ -88,8 +95,8 @@ struct EditProfileView: View {
             ) {
                 ZStack(alignment: .bottomTrailing) {
                     Avatar(
-                        url: newAvatarURL ?? auth.user?.avatar,
-                        name: auth.user?.displayName ?? "?",
+                        url: newAvatarURL ?? currentAvatar,
+                        name: initialDisplayName.isEmpty ? "?" : initialDisplayName,
                         size: 110,
                         withGradientRing: true
                     )

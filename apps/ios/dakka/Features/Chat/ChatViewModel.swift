@@ -226,7 +226,8 @@ final class ChatViewModel: ObservableObject {
                     waveform: nil,
                     thumbnailUrl: nil
                 ),
-                replyToId: nil
+                replyToId: nil,
+                forwardedFromId: nil
             )
             SocketClient.shared.send(payload)
             try? FileManager.default.removeItem(at: prepared.fileURL)
@@ -295,7 +296,8 @@ final class ChatViewModel: ObservableObject {
                     waveform: waveform.map { Double($0) },
                     thumbnailUrl: nil
                 ),
-                replyToId: nil
+                replyToId: nil,
+                forwardedFromId: nil
             )
             SocketClient.shared.send(payload)
             // Удаляем локальный временный файл

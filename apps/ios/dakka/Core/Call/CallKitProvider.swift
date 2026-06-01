@@ -116,10 +116,9 @@ extension CallKitProvider: CXProviderDelegate {
     /// Пользователь нажал «Завершить» в системном UI.
     nonisolated func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         Task { @MainActor in
-            if let callId = self.activeCallIds[action.callUUID] {
+            if self.activeCallIds[action.callUUID] != nil {
                 self.activeCallIds.removeValue(forKey: action.callUUID)
                 CallManager.shared.endCurrent(reason: "user-ended")
-                _ = callId
             }
             action.fulfill()
         }
