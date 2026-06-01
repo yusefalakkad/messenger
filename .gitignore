@@ -10,6 +10,11 @@ minio-data/
 postgres-data/
 redis-data/
 
+# SSL-сертификаты nginx — на VPS лежат как копия из /etc/letsencrypt.
+# В репо им не место (приватный ключ!). Также защищает от случайного
+# `git clean -fd` — без gitignore clean бы их удалил.
+nginx/ssl/
+
 # Capacitor iOS — генерится `npm run ios:init`, но сам Xcode-проект
 # (App.xcworkspace, Podfile.lock и т.д.) ХРАНИТЬ В РЕПО НУЖНО, чтобы
 # подпись/настройки переехали между машинами. А вот зависимости — нет.
