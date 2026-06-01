@@ -19,6 +19,11 @@ struct RootView: View {
             .animation(.easeInOut(duration: 0.35), value: auth.isAuthenticated)
 
             callOverlay
+
+            // Toast'ы поверх всего, включая звонки
+            ToastHost()
+                .zIndex(200)
+                .allowsHitTesting(true)
         }
     }
 

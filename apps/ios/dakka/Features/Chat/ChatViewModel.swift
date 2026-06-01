@@ -231,7 +231,7 @@ final class ChatViewModel: ObservableObject {
             SocketClient.shared.send(payload)
             try? FileManager.default.removeItem(at: prepared.fileURL)
         } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            Toast.error("Не удалось отправить", message: (error as? LocalizedError)?.errorDescription)
         }
     }
 
@@ -265,7 +265,7 @@ final class ChatViewModel: ObservableObject {
             SocketClient.shared.send(payload)
             try? FileManager.default.removeItem(at: fileURL)
         } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            Toast.error("Не удалось отправить", message: (error as? LocalizedError)?.errorDescription)
         }
     }
 
@@ -301,7 +301,7 @@ final class ChatViewModel: ObservableObject {
             // Удаляем локальный временный файл
             try? FileManager.default.removeItem(at: fileURL)
         } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            Toast.error("Не удалось отправить", message: (error as? LocalizedError)?.errorDescription)
         }
     }
 

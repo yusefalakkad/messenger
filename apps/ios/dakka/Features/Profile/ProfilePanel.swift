@@ -228,9 +228,12 @@ struct ProfilePanel: View {
             let until: Date? = on ? Date(timeIntervalSinceNow: 60 * 60 * 24 * 365 * 100) : nil
             do {
                 _ = try await ChatActions.setMute(chatId: chat.id, mutedUntil: until)
+                Toast.success(on ? "Уведомления заглушены" : "Уведомления включены", duration: 2)
             } catch {
                 // Откатываем тогл при ошибке
                 isMuted.toggle()
+                Toast.error("Не удалось изменить",
+                            message: (error as? APIError)?.errorDescription)
             }
         }
     }
@@ -240,9 +243,13 @@ struct ProfilePanel: View {
             do {
                 if try await ChatActions.clearMessages(chatId: chat.id) {
                     onChatCleared()
+                    Toast.success("История очищена")
                     dismiss()
                 }
-            } catch { /* TODO: error toast */ }
+            } catch {
+                Toast.error("Не удалось очистить историю",
+                            message: (error as? APIError)?.errorDescription)
+            }
         }
     }
 
@@ -425,8 +432,12 @@ struct ProfilePanel: View {
                     Task {
                         do {
                             _ = try await ChatActions.renameGroup(chatId: chat.id, name: name)
+                            Toast.success("Группа переименована")
                             showRename = false
-                        } catch { /* TODO toast */ }
+                        } catch {
+                            Toast.error("Не удалось переименовать",
+                                        message: (error as? APIError)?.errorDescription)
+                        }
                     }
                 },
                 isDisabled: renameDraft.trimmingCharacters(in: .whitespaces).isEmpty
@@ -444,8 +455,12 @@ struct ProfilePanel: View {
         Task {
             do {
                 try await ChatActions.removeGroupMember(chatId: chat.id, userId: me)
+                Toast.info("Вы покинули группу")
                 dismiss()
-            } catch { /* TODO toast */ }
+            } catch {
+                Toast.error("Не удалось покинуть группу",
+                            message: (error as? APIError)?.errorDescription)
+            }
         }
     }
 
@@ -453,7 +468,11 @@ struct ProfilePanel: View {
         Task {
             do {
                 try await ChatActions.removeGroupMember(chatId: chat.id, userId: member.userId)
-            } catch { /* TODO toast */ }
+                Toast.success("\(member.user.displayName) удалён из группы")
+            } catch {
+                Toast.error("Не удалось удалить участника",
+                            message: (error as? APIError)?.errorDescription)
+            }
             pendingKick = nil
         }
     }
@@ -594,7 +613,11 @@ struct AddMembersToGroupView: View {
         adding = true; defer { adding = false }
         do {
             _ = try await ChatActions.addGroupMembers(chatId: chatId, userIds: selected.map { $0.id })
+            Toast.success("Добавлено \(selected.count)", duration: 2)
             onDone()
-        } catch { /* TODO toast */ }
+        } catch {
+            Toast.error("Не удалось добавить",
+                        message: (error as? APIError)?.errorDescription)
+        }
     }
 }
