@@ -10,7 +10,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -37,6 +42,8 @@ import online.akkdmsg.dakka.ui.theme.DakkaColor
 fun ChatListScreen(
     onChatClick: (String) -> Unit,
     onSettingsClick: () -> Unit,
+    onNewChatClick: () -> Unit,
+    onNewGroupClick: () -> Unit,
     vm: ChatListViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -76,8 +83,31 @@ fun ChatListScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                var newMenuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { newMenuOpen = true }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Новый чат",
+                            tint = Color.White.copy(alpha = 0.85f))
+                    }
+                    DropdownMenu(
+                        expanded = newMenuOpen,
+                        onDismissRequest = { newMenuOpen = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Новый чат") },
+                            leadingIcon = { Icon(Icons.Filled.Person, null) },
+                            onClick = { newMenuOpen = false; onNewChatClick() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Новая группа") },
+                            leadingIcon = { Icon(Icons.Filled.Group, null) },
+                            onClick = { newMenuOpen = false; onNewGroupClick() },
+                        )
+                    }
+                }
                 IconButton(onClick = onSettingsClick) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Настройки", tint = Color.White.copy(alpha = 0.7f))
+                    Icon(Icons.Filled.Settings, contentDescription = "Настройки",
+                        tint = Color.White.copy(alpha = 0.7f))
                 }
             }
 

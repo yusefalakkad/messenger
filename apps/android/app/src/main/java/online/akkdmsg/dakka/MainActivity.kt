@@ -27,7 +27,11 @@ import online.akkdmsg.dakka.call.IncomingCallView
 import online.akkdmsg.dakka.chat.ChatScreen
 import online.akkdmsg.dakka.chats.ChatListScreen
 import online.akkdmsg.dakka.chats.ChatListViewModel
+import online.akkdmsg.dakka.chats.NewChatScreen
+import online.akkdmsg.dakka.chats.NewGroupScreen
 import online.akkdmsg.dakka.data.Chat
+import online.akkdmsg.dakka.profile.AddMembersScreen
+import online.akkdmsg.dakka.profile.ProfilePanel
 import online.akkdmsg.dakka.settings.EditProfileScreen
 import online.akkdmsg.dakka.settings.SettingsScreen
 import online.akkdmsg.dakka.ui.theme.DakkaTheme
@@ -75,6 +79,10 @@ class MainActivity : ComponentActivity() {
 private sealed class Route {
     data object List : Route()
     data class Chat(val chatId: String) : Route()
+    data class Profile(val chatId: String) : Route()
+    data class AddMembers(val chatId: String) : Route()
+    data object NewChat : Route()
+    data object NewGroup : Route()
     data object Settings : Route()
     data object EditProfile : Route()
 }
@@ -107,15 +115,62 @@ private fun AuthedRoot() {
                 vm = chatListVm,
                 onChatClick = { id -> route = Route.Chat(id) },
                 onSettingsClick = { route = Route.Settings },
+                onNewChatClick = { route = Route.NewChat },
+                onNewGroupClick = { route = Route.NewGroup },
             )
             is Route.Chat -> {
                 val chat: Chat? = chats.firstOrNull { it.id == current.chatId }
                 if (chat != null) {
-                    ChatScreen(chat = chat, onBack = { route = Route.List })
+                    ChatScreen(
+                        chat = chat,
+                        onBack = { route = Route.List },
+                        onOpenProfile = { route = Route.Profile(chat.id) },
+                    )
                 } else {
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize())
                 }
             }
+            is Route.Profile -> {
+                val chat: Chat? = chats.firstOrNull { it.id == current.chatId }
+                if (chat != null) {
+                    ProfilePanel(
+                        chat = chat,
+                        onBack = { route = Route.Chat(current.chatId) },
+                        onAddMembers = { route = Route.AddMembers(current.chatId) },
+                        onChatCleared = { route = Route.Chat(current.chatId) },
+                        onLeftChat = { route = Route.List },
+                    )
+                } else {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize())
+                }
+            }
+            is Route.AddMembers -> {
+                val chat: Chat? = chats.firstOrNull { it.id == current.chatId }
+                if (chat != null) {
+                    AddMembersScreen(
+                        chatId = chat.id,
+                        existingMemberIds = chat.members.map { it.userId }.toSet(),
+                        onBack = { route = Route.Profile(current.chatId) },
+                        onDone = { route = Route.Profile(current.chatId) },
+                    )
+                } else {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize())
+                }
+            }
+            is Route.NewChat -> NewChatScreen(
+                onBack = { route = Route.List },
+                onChatCreated = { chat ->
+                    chatListVm.upsert(chat)
+                    route = Route.Chat(chat.id)
+                },
+            )
+            is Route.NewGroup -> NewGroupScreen(
+                onBack = { route = Route.List },
+                onCreated = { chat ->
+                    chatListVm.upsert(chat)
+                    route = Route.Chat(chat.id)
+                },
+            )
             is Route.Settings -> SettingsScreen(
                 onBack = { route = Route.List },
                 onEditProfile = { route = Route.EditProfile },

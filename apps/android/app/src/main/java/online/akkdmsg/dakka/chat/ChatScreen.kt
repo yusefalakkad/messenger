@@ -39,6 +39,7 @@ import online.akkdmsg.dakka.ui.theme.DakkaColor
 fun ChatScreen(
     chat: Chat,
     onBack: () -> Unit,
+    onOpenProfile: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val auth = remember { AuthStore.get(context) }
@@ -87,6 +88,17 @@ fun ChatScreen(
                         tint = Color.White.copy(alpha = 0.85f),
                     )
                 }
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                            onClick = onOpenProfile,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                 Avatar(
                     url = vm.peerAvatar,
                     name = vm.peerName,
@@ -119,6 +131,7 @@ fun ChatScreen(
                         )
                     }
                 }
+                }  // конец Row (clickable обёртка аватара+имени)
                 // Кнопки звонка — direct-чат
                 val otherMember = vm.chatRef.members.firstOrNull { it.userId != userId }
                 if (chat.type == "direct" && otherMember != null) {
