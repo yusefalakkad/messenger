@@ -28,14 +28,20 @@ async function bootstrap(): Promise<void> {
   await initPush();
   await initNativePush();
 
-  // Eagerly init SMS provider — упадём на старте если конфиг неверный, а не при первом OTP-запросе
+  // Eagerly init SMS provider. Конфигурационные ошибки (например пустой
+  // токен в проде) — фатал. Сетевые ошибки (api.telegram.org недоступен) —
+  // warning, сервер всё равно стартует.
   try {
     const sms = getSmsProvider();
     logger.info(`SMS provider: ${sms.name}`);
+  } catch (err) {
+    logger.error(`SMS provider config error: ${(err as Error).message}`);
+    throw err;
+  }
+  try {
     await initTelegramBot(); // no-op если провайдер не telegram-bot
   } catch (err) {
-    logger.error(`SMS provider init failed: ${(err as Error).message}`);
-    throw err;
+    logger.warn(`Telegram bot init failed (non-fatal): ${(err as Error).message}`);
   }
 
   // ─── Express app ───────────────────────────────────────────────────────────

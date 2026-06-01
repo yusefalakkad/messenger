@@ -29,7 +29,19 @@ export async function initTelegramBot(): Promise<void> {
     if (!config.sms.telegramWebhookSecret) {
       throw new Error('TELEGRAM_WEBHOOK_SECRET обязателен при заданном TELEGRAM_WEBHOOK_URL');
     }
-    await bot.setWebhook(config.sms.telegramWebhookUrl, config.sms.telegramWebhookSecret);
+    // setWebhook ходит на api.telegram.org. Если сеть недоступна (VPS без
+    // outbound в TG, провайдер режет) — не валим весь сервер. Логируем warning;
+    // пользователь увидит ошибку при первой попытке OTP-входа.
+    try {
+      await bot.setWebhook(config.sms.telegramWebhookUrl, config.sms.telegramWebhookSecret);
+    } catch (err) {
+      logger.error(
+        `Telegram setWebhook failed: ${(err as Error).message}. ` +
+        `Сервер стартует, но OTP-вход через TG-бот будет недоступен. ` +
+        `Проверь: 1) outbound на api.telegram.org с VPS (curl https://api.telegram.org); ` +
+        `2) корректность TELEGRAM_BOT_TOKEN; 3) что Cloudflare/firewall не режут TG-IP.`,
+      );
+    }
   } else {
     // Dev: снимаем webhook (если был) и запускаем long-polling
     await bot.deleteWebhook();
