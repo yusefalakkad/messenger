@@ -129,6 +129,10 @@ cat > "${RENEW_HOOK}" <<EOF
 #!/bin/bash
 cp /etc/letsencrypt/live/${DOMAIN}/fullchain.pem $(pwd)/nginx/ssl/cert.pem
 cp /etc/letsencrypt/live/${DOMAIN}/privkey.pem   $(pwd)/nginx/ssl/key.pem
+# nginx-unprivileged бежит под uid 101 — даём ему read к ключам
+chown 101:101 $(pwd)/nginx/ssl/cert.pem $(pwd)/nginx/ssl/key.pem
+chmod 644 $(pwd)/nginx/ssl/cert.pem
+chmod 600 $(pwd)/nginx/ssl/key.pem
 docker exec messenger_nginx nginx -s reload 2>/dev/null || true
 EOF
 chmod +x "${RENEW_HOOK}"
