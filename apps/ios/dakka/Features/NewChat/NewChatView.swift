@@ -140,31 +140,18 @@ struct NewChatView: View {
     }
 
     private var promptState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 36))
-                .foregroundStyle(LinearGradient.brand)
-            Text("Найди собеседника")
-                .font(Typo.bodyB)
-                .foregroundStyle(.white)
-            Text("Введи @username или часть имени")
-                .font(Typo.small)
-                .foregroundStyle(.white.opacity(0.45))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.bottom, 80)
+        EmptyState(
+            iconName: "person.crop.circle.badge.plus",
+            title: "Найди собеседника",
+            subtitle: "Введи @username или часть имени"
+        )
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 28))
-                .foregroundStyle(.white.opacity(0.35))
-            Text("Никого не нашлось")
-                .font(Typo.body)
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.bottom, 80)
+        EmptyState(
+            iconName: "magnifyingglass",
+            title: "Никого не нашлось",
+            subtitle: "Попробуй другое имя"
+        )
     }
 }

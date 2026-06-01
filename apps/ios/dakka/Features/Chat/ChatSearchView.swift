@@ -88,29 +88,20 @@ struct ChatSearchView: View {
             ProgressView().tint(.brandViolet)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if query.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "magnifyingglass.circle")
-                    .font(.system(size: 28))
-                    .foregroundStyle(LinearGradient.brand)
-                Text("Поиск по сообщениям")
-                    .font(Typo.bodyB).foregroundStyle(.white)
-                Text("E2E-зашифрованные сообщения не индексируются")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 30)
+            EmptyState(
+                iconName: "magnifyingglass",
+                title: "Поиск по сообщениям",
+                subtitle: "E2E-зашифрованные сообщения не индексируются"
+            )
         } else if let error {
             Text(error).font(Typo.small).foregroundStyle(Color(hex: 0xFCA5A5))
                 .padding()
         } else if results.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "tray").font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.35))
-                Text("Ничего не найдено").font(Typo.body).foregroundStyle(.white.opacity(0.5))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            EmptyState(
+                iconName: "tray",
+                title: "Ничего не найдено",
+                subtitle: "Попробуй другие слова"
+            )
         } else {
             ScrollView {
                 LazyVStack(spacing: 6) {

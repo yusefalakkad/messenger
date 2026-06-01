@@ -62,17 +62,15 @@ struct ForwardSheet: View {
     @ViewBuilder
     private var content: some View {
         if vm.loading && vm.chats.isEmpty {
-            ProgressView().tint(.brandViolet)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if vm.filtered.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "tray").font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.35))
-                Text("Нет чатов")
-                    .font(Typo.body)
-                    .foregroundStyle(.white.opacity(0.5))
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(0..<5, id: \.self) { _ in
+                        ChatRowSkeleton().padding(.horizontal, 12)
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if vm.filtered.isEmpty {
+            EmptyState(iconName: "tray", title: "Нет чатов")
         } else {
             ScrollView {
                 LazyVStack(spacing: 4) {

@@ -172,13 +172,14 @@ struct ChatListView: View {
     @ViewBuilder
     private var content: some View {
         if vm.loading && vm.chats.isEmpty {
-            VStack(spacing: 8) {
-                ProgressView().tint(.brandViolet)
-                Text("Загрузка чатов…")
-                    .font(Typo.small)
-                    .foregroundStyle(.white.opacity(0.5))
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        ChatRowSkeleton().padding(.horizontal, 12)
+                    }
+                }
+                .padding(.top, 4)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = vm.error, vm.chats.isEmpty {
             errorView(error)
         } else if vm.filtered.isEmpty {
@@ -209,29 +210,30 @@ struct ChatListView: View {
         }
     }
 
+    @ViewBuilder
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(LinearGradient.brand)
-                    .blur(radius: 16).opacity(0.35)
-                    .frame(width: 60, height: 60)
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    .frame(width: 60, height: 60)
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.white.opacity(0.45))
+        if !vm.search.isEmpty {
+            EmptyState(
+                iconName: "magnifyingglass",
+                title: "Ничего не нашлось",
+                subtitle: "Попробуй другой запрос"
+            )
+        } else {
+            EmptyState(
+                iconName: "bubble.left.and.bubble.right.fill",
+                title: "Здесь пока тихо",
+                subtitle: "Начни первый чат — нажми ✏ в шапке"
+            ) {
+                Button {
+                    showNewChat = true
+                } label: {
+                    Text("Создать чат →")
+                        .font(Typo.smallM)
+                        .foregroundStyle(LinearGradient.brandText)
+                        .padding(.top, 4)
+                }
             }
-            Text("Здесь пока тихо")
-                .font(Typo.bodyM)
-                .foregroundStyle(.white.opacity(0.5))
-            Text("Скоро добавим экран нового чата →")
-                .font(.system(size: 12))
-                .foregroundStyle(LinearGradient.brandText)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ msg: String) -> some View {

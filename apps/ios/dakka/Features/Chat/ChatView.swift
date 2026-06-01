@@ -236,8 +236,16 @@ struct ChatView: View {
     @ViewBuilder
     private var messagesScroll: some View {
         if vm.loading && vm.messages.isEmpty {
-            ProgressView().tint(.brandViolet)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    MessageBubbleSkeleton(isOwn: false, width: 180)
+                    MessageBubbleSkeleton(isOwn: true,  width: 140)
+                    MessageBubbleSkeleton(isOwn: false, width: 220)
+                    MessageBubbleSkeleton(isOwn: true,  width: 160)
+                    MessageBubbleSkeleton(isOwn: false, width: 200)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 12)
+            }
         } else if vm.messages.isEmpty {
             emptyMessagesState
         } else {
@@ -288,14 +296,12 @@ struct ChatView: View {
     }
 
     private var emptyMessagesState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 28))
-                .foregroundStyle(LinearGradient.brand)
-            Text("Скажите «привет»")
-                .font(Typo.body)
-                .foregroundStyle(.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EmptyState(
+            iconName: "bubble.left.and.bubble.right.fill",
+            title: "Скажите «привет»",
+            subtitle: vm.isE2E
+                ? "Сообщения защищены сквозным шифрованием"
+                : nil
+        )
     }
 }

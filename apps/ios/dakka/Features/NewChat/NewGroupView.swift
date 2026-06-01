@@ -104,15 +104,10 @@ struct NewGroupView: View {
             ProgressView().tint(.brandViolet)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if vm.query.isEmpty && vm.results.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "person.crop.circle.badge.plus")
-                    .font(.system(size: 32))
-                    .foregroundStyle(LinearGradient.brand)
-                Text("Найди и добавь участников")
-                    .font(Typo.bodyM).foregroundStyle(.white.opacity(0.55))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 80)
+            EmptyState(
+                iconName: "person.crop.circle.badge.plus",
+                title: "Найди и добавь участников"
+            )
         } else {
             ScrollView {
                 LazyVStack(spacing: 4) {
