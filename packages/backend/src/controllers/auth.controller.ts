@@ -180,6 +180,11 @@ export async function twoFactorDisable(req: Request, res: Response, next: NextFu
     if (!user?.twoFactorEnabled || !user.twoFactorSecret) {
       throw new AppError(400, '2FA_NOT_ENABLED', '2FA is not enabled');
     }
+    // Phone-OTP юзеры не имеют password — 2FA-disable для них недоступен.
+    // Им следует disable 2FA через login flow (которого пока нет).
+    if (!user.passwordHash) {
+      throw new AppError(400, 'NO_PASSWORD', 'Account has no password. Disable 2FA via support.');
+    }
 
     const validPassword = await argon2.verify(user.passwordHash, req.body.password);
     if (!validPassword) throw new AppError(401, 'INVALID_PASSWORD', 'Wrong password');

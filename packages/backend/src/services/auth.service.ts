@@ -11,7 +11,7 @@ import { AppError } from '../utils/response';
 import type { AuthTokens } from '@messenger/shared';
 
 export type LoginResult =
-  | { kind: 'tokens'; user: { id: string; username: string; displayName: string; avatar: string | null }; tokens: AuthTokens }
+  | { kind: 'tokens'; user: { id: string; username: string | null; displayName: string | null; avatar: string | null }; tokens: AuthTokens }
   | { kind: '2fa-required'; twoFactorToken: string };
 
 // Argon2id — recommended by OWASP (stronger than bcrypt)
@@ -32,7 +32,7 @@ export class AuthService {
     phone?: string;
     email?: string;
     publicKey: string;
-  }): Promise<{ user: { id: string; username: string; displayName: string }; tokens: AuthTokens }> {
+  }): Promise<{ user: { id: string; username: string | null; displayName: string | null }; tokens: AuthTokens }> {
     // Check uniqueness
     const existing = await prisma.user.findFirst({
       where: {
@@ -96,6 +96,11 @@ export class AuthService {
     });
 
     if (!user) throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid login or password');
+    // Юзер мог зарегистрироваться через phone+OTP — у него нет password.
+    // Логин по паролю для таких аккаунтов недоступен.
+    if (!user.passwordHash) {
+      throw new AppError(401, 'NO_PASSWORD_LOGIN', 'This account uses phone login. Use /auth/phone/request.');
+    }
 
     const valid = await argon2.verify(user.passwordHash, data.password);
     if (!valid) throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid login or password');

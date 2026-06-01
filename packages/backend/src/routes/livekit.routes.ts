@@ -67,7 +67,7 @@ router.post('/token',
 
       const at = new AccessToken(config.livekit.apiKey, config.livekit.apiSecret, {
         identity: userId,
-        name: member.user.displayName ?? member.user.username,
+        name: member.user.displayName ?? member.user.username ?? undefined,
         ttl: TOKEN_TTL_SEC,
       });
 
