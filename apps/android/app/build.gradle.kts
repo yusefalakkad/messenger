@@ -82,4 +82,7 @@ dependencies {
 
     // Images
     implementation(libs.coil.compose)
+
+    // Real-time WebSocket (socket.io v4 compatible)
+    implementation(libs.socketio.client)
 }

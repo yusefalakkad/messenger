@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import online.akkdmsg.dakka.data.User
 import online.akkdmsg.dakka.data.api.ApiClient
+import online.akkdmsg.dakka.data.api.SocketClient
+import online.akkdmsg.dakka.data.crypto.E2E
 
 /**
  * Хранение JWT и юзера в EncryptedSharedPreferences (AES-256-GCM с ключом из Keystore).
@@ -40,6 +42,10 @@ class AuthStore private constructor(context: Context) {
     init {
         // Восстанавливаем токен в ApiClient при старте
         ApiClient.accessToken = prefs.getString(KEY_TOKEN, null)
+        // Если есть сохранённая сессия — авто-коннект сокета
+        if (ApiClient.accessToken != null && _user.value != null) {
+            SocketClient.connect()
+        }
     }
 
     fun setAuth(user: User, accessToken: String, privateKey: String? = null) {
@@ -51,17 +57,20 @@ class AuthStore private constructor(context: Context) {
         }
         ApiClient.accessToken = accessToken
         _user.value = user
+        SocketClient.connect()
     }
 
     val privateKey: String? get() = prefs.getString(KEY_PRIVATE_KEY, null)
 
     fun logout() {
+        SocketClient.disconnect()
         prefs.edit()
             .remove(KEY_USER)
             .remove(KEY_TOKEN)
             // Приватный ключ оставляем — нужен для расшифровки старых сообщений при повторном логине
             .apply()
         ApiClient.accessToken = null
+        E2E.clearCache()
         _user.value = null
     }
 

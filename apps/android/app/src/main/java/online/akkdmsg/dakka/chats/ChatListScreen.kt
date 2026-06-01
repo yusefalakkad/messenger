@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import online.akkdmsg.dakka.auth.AuthStore
+import online.akkdmsg.dakka.data.api.SocketClient
 import online.akkdmsg.dakka.ui.components.AmbientBackground
 import online.akkdmsg.dakka.ui.theme.Brand
+import online.akkdmsg.dakka.ui.theme.DakkaColor
 
 /**
  * Заглушка списка чатов. Полная реализация со списком, WebSocket'ом, навигацией
@@ -32,6 +34,7 @@ fun ChatListScreen() {
     val context = LocalContext.current
     val auth = remember { AuthStore.get(context) }
     val user by auth.user.collectAsState()
+    val socketConnected by SocketClient.connected.collectAsState()
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground()
@@ -82,14 +85,30 @@ fun ChatListScreen() {
                         color = Color.White.copy(alpha = 0.55f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Box(
-                        Modifier
-                            .padding(top = 8.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Brand.gradient)
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    Row(
+                        Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text("Auth работает • API подключён", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Brand.gradient)
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text("Auth ✓", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (socketConnected) DakkaColor.Online.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                if (socketConnected) "WebSocket ●" else "WebSocket …",
+                                color = if (socketConnected) DakkaColor.Online else Color.White.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
             }

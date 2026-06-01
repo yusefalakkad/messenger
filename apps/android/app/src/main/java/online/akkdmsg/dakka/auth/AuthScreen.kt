@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import online.akkdmsg.dakka.data.api.AuthApi
+import online.akkdmsg.dakka.data.crypto.E2E
 import online.akkdmsg.dakka.ui.components.AmbientBackground
 import online.akkdmsg.dakka.ui.components.BrandButton
 import online.akkdmsg.dakka.ui.components.BrandTextField
@@ -303,13 +304,18 @@ fun AuthScreen() {
                                         deviceName = "Android",
                                     )
                                 } else {
-                                    AuthApi.register(
+                                    // Генерируем E2E key pair — приватный остаётся на устройстве
+                                    val keys = E2E.generateKeyPair()
+                                    val r = AuthApi.register(
                                         username = username.trim(),
                                         displayName = displayName.trim(),
                                         password = password,
                                         phone = phone.takeIf { it.isNotBlank() },
-                                        publicKey = null,  // TODO: E2E генерация в след. сессии
+                                        publicKey = keys.publicKeyB64,
                                     )
+                                    // Сохраняем приватный ключ через setAuth ниже
+                                    auth.setAuth(r.user, r.tokens.accessToken, keys.privateKeyB64)
+                                    return@launch
                                 }
                                 auth.setAuth(resp.user, resp.tokens.accessToken)
                             } catch (e: Exception) {
