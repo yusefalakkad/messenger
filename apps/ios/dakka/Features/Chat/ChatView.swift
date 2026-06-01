@@ -279,12 +279,12 @@ struct ChatView: View {
                     .padding(.vertical, 8)
                 }
                 .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
-                .onChange(of: vm.messages.count) { _, _ in
+                .onChange(of: vm.messages.count) { _ in
                     withAnimation(.easeOut(duration: 0.25)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
-                .onChange(of: scrollToMessageId) { _, id in
+                .onChange(of: scrollToMessageId) { id in
                     guard let id else { return }
                     withAnimation(.easeInOut(duration: 0.4)) {
                         proxy.scrollTo(id, anchor: .center)

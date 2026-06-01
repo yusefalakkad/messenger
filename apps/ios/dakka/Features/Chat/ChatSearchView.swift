@@ -65,7 +65,7 @@ struct ChatSearchView: View {
                 .focused($focused)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .onChange(of: query) { _, _ in
+                .onChange(of: query) { _ in
                     debouncedSearch()
                 }
             if !query.isEmpty {

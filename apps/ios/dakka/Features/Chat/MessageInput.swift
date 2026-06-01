@@ -60,7 +60,7 @@ struct MessageInput: View {
                 .foregroundStyle(.white.opacity(0.55))
                 .padding(8)
         }
-        .onChange(of: photoItem) { _, newValue in
+        .onChange(of: photoItem) { newValue in
             guard let newValue else { return }
             Task {
                 do {
@@ -83,7 +83,7 @@ struct MessageInput: View {
                 .tint(.brandViolet)
                 .focused($focused)
                 .lineLimit(1...6)
-                .onChange(of: text) { _, _ in onTextChanged() }
+                .onChange(of: text) { _ in onTextChanged() }
                 .onSubmit { if hasText { onSend() } }
         }
         .padding(.horizontal, 12)

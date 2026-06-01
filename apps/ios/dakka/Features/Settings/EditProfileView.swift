@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 
+@MainActor
 struct EditProfileView: View {
     @EnvironmentObject var auth: AuthStore
     @Environment(\.dismiss) private var dismiss
@@ -105,7 +106,7 @@ struct EditProfileView: View {
                         .shadow(color: Color.brandViolet.opacity(0.5), radius: 8)
                 }
             }
-            .onChange(of: avatarItem) { _, newValue in
+            .onChange(of: avatarItem) { newValue in
                 guard let newValue else { return }
                 Task {
                     if let prepared = try? await ImagePreparer.prepare(newValue) {

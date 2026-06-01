@@ -187,7 +187,7 @@ struct ProfilePanel: View {
             .background(Color.white.opacity(0.03))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .onChange(of: isMuted) { _, newValue in toggleMute(newValue) }
+            .onChange(of: isMuted) { newValue in toggleMute(newValue) }
 
             Button(role: .destructive) { confirmClear = true } label: {
                 HStack(spacing: 10) {
@@ -536,7 +536,7 @@ struct AddMembersToGroupView: View {
                 .focused($focused)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .onChange(of: query) { _, _ in Task { await search() } }
+                .onChange(of: query) { _ in Task { await search() } }
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .background(Color.white.opacity(0.04))
