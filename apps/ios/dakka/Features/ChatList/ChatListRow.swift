@@ -54,8 +54,16 @@ struct ChatListRow: View {
                         Image(systemName: "bell.slash.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(.white.opacity(0.4))
+                            .transition(.scale.combined(with: .opacity))
                     }
                     Spacer(minLength: 6)
+                    if chat.isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.brandViolet)
+                            .rotationEffect(.degrees(35))
+                            .transition(.scale.combined(with: .opacity))
+                    }
                     if let date = chat.lastMessage?.createdAt {
                         Text(Self.relFmt.localizedString(for: date, relativeTo: Date()))
                             .font(.system(size: 11, weight: .medium))
@@ -85,8 +93,16 @@ struct ChatListRow: View {
         .padding(.trailing, 12)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(active ? Color.white.opacity(0.07) : Color.clear)
+                .fill(rowBackground)
         )
         .contentShape(Rectangle())
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: chat.pinnedAt)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: chat.mutedUntil)
+    }
+
+    private var rowBackground: Color {
+        if active { return Color.white.opacity(0.07) }
+        if chat.isPinned { return Color.brandViolet.opacity(0.06) }
+        return Color.clear
     }
 }

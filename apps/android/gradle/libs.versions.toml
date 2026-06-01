@@ -19,6 +19,7 @@ media3 = "1.5.1"
 webrtc = "125.6422.06"
 firebase-bom = "33.7.0"
 google-services = "4.4.2"
+zxing-core = "3.5.3"
 
 [libraries]
 # Compose
@@ -79,6 +80,9 @@ webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webr
 # Firebase Cloud Messaging — push-уведомления
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+
+# ZXing — генерация QR-кодов (2FA)
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing-core" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

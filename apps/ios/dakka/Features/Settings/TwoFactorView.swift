@@ -136,7 +136,7 @@ struct TwoFactorView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.07), lineWidth: 1))
                     Button {
-                        UIPasteboard.general.string = secret
+                        SensitiveClipboard.copy(secret)
                     } label: {
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 14, weight: .semibold))
@@ -210,7 +210,7 @@ struct TwoFactorView: View {
             }
 
             GhostButton(action: {
-                UIPasteboard.general.string = codes.joined(separator: "\n")
+                SensitiveClipboard.copy(codes.joined(separator: "\n"))
             }) {
                 HStack {
                     Image(systemName: "doc.on.doc")

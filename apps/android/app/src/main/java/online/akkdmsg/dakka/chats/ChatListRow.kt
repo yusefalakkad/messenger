@@ -1,11 +1,16 @@
 package online.akkdmsg.dakka.chats
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,11 +29,13 @@ import online.akkdmsg.dakka.ui.components.Avatar
 import online.akkdmsg.dakka.ui.theme.Brand
 import online.akkdmsg.dakka.ui.theme.DakkaColor
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatListRow(
     chat: Chat,
     currentUserId: String?,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val lastMsg = chat.lastMessage
@@ -45,15 +52,18 @@ fun ChatListRow(
         }
     }
     val online = chat.isOnline(currentUserId).takeIf { chat.type == "direct" }
+    val isPinned = chat.pinnedAt != null
+    val isMuted = remember(chat.mutedUntil) { isCurrentlyMuted(chat.mutedUntil) }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
+                onLongClick = onLongClick,
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -76,6 +86,15 @@ fun ChatListRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                if (isMuted) {
+                    Spacer(Modifier.size(4.dp))
+                    Icon(
+                        Icons.Filled.NotificationsOff,
+                        contentDescription = "Без звука",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
             if (preview.isNotEmpty()) {
                 Text(
@@ -88,19 +107,32 @@ fun ChatListRow(
             }
         }
 
-        if (chat.unreadCount > 0) {
-            Box(
-                Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(Brand.gradient),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = if (chat.unreadCount > 99) "99+" else chat.unreadCount.toString(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (isPinned) {
+                Icon(
+                    Icons.Filled.PushPin,
+                    contentDescription = "Закреплено",
+                    tint = DakkaColor.Violet,
+                    modifier = Modifier.size(14.dp),
                 )
+            }
+            if (chat.unreadCount > 0) {
+                Box(
+                    Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Brand.gradient),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (chat.unreadCount > 99) "99+" else chat.unreadCount.toString(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
             }
         }
     }

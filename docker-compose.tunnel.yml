@@ -1,0 +1,117 @@
+# Запуск мессенджера на ноуте через Cloudflare Tunnel.
+# Никаких открытых портов, белого IP и пробросов не требуется.
+# Пользуйся: ./setup-tunnel.sh
+
+name: messenger
+
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    container_name: messenger_backend
+    restart: unless-stopped
+    expose:
+      - "4000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-messenger}:${POSTGRES_PASSWORD:-messenger_secret}@postgres:5432/${POSTGRES_DB:-messenger_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      MINIO_ENDPOINT: minio
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: .
+      target: nginx-frontend
+      args:
+        # TURN не работает через Cloudflare Tunnel (UDP).
+        # Оставляем пустым — звонки пойдут только по STUN (P2P, без relay).
+        VITE_TURN_URL: ""
+        VITE_TURN_USER: ""
+        VITE_TURN_PASS: ""
+    container_name: messenger_nginx
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/nginx.tunnel.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: messenger_cloudflared
+    restart: unless-stopped
+    # --protocol http2: используем TCP 443 вместо QUIC/UDP 7844
+    # (UDP часто режут российские провайдеры/DPI)
+    # --edge-ip-version 4: некоторые edge на IPv6 недоступны из РФ
+    command: tunnel --no-autoupdate --protocol http2 --edge-ip-version 4 run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: messenger_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-messenger}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-messenger_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-messenger_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-messenger}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: messenger_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secret} --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: messenger_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_secret123}
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  app-network:
+    driver: bridge

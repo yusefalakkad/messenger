@@ -35,3 +35,4 @@ packages/web/android/.idea/
 *.keystore
 *.jks
 google-services.json
+.claude/worktrees/

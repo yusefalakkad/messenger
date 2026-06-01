@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.CircularProgressIndicator
@@ -20,6 +21,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import android.widget.Toast
+import online.akkdmsg.dakka.data.Message
+import online.akkdmsg.dakka.util.copyToClipboard
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +61,13 @@ fun ChatScreen(
     val draft by vm.draft.collectAsState()
     val typing by vm.typingUsers.collectAsState()
     val loading by vm.loading.collectAsState()
+    val replyingTo by vm.replyingTo.collectAsState()
+    val editing by vm.editing.collectAsState()
     var showCircleRecorder by remember { mutableStateOf(false) }
+    var showVideoRecorder by remember { mutableStateOf(false) }
+    var contextMessage by remember { mutableStateOf<Message?>(null) }
+    var forwardMessage by remember { mutableStateOf<Message?>(null) }
+    var showSearch by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
 
@@ -65,6 +75,17 @@ fun ChatScreen(
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // Скролл к конкретному сообщению (из поиска)
+    val scrollTarget by vm.scrollTarget.collectAsState()
+    LaunchedEffect(scrollTarget, messages.size) {
+        val tid = scrollTarget ?: return@LaunchedEffect
+        val idx = messages.indexOfFirst { it.id == tid }
+        if (idx >= 0) {
+            listState.animateScrollToItem(idx)
+            vm.consumeScrollTarget()
         }
     }
 
@@ -132,6 +153,7 @@ fun ChatScreen(
                     }
                 }
                 }  // конец Row (clickable обёртка аватара+имени)
+                CallIconButton(Icons.Filled.Search) { showSearch = true }
                 // Кнопки звонка — direct-чат
                 val otherMember = vm.chatRef.members.firstOrNull { it.userId != userId }
                 if (chat.type == "direct" && otherMember != null) {
@@ -193,9 +215,31 @@ fun ChatScreen(
                                 message = msg,
                                 isOwn = msg.senderId == userId,
                                 decrypted = vm.displayContent(msg),
+                                currentUserId = userId,
+                                onLongPress = { contextMessage = msg },
+                                onReactionToggle = { emoji -> vm.react(msg, emoji) },
                             )
                         }
                     }
+                }
+            }
+
+            // Reply / Edit bars
+            AnimatedVisibility(visible = replyingTo != null) {
+                replyingTo?.let { rp ->
+                    ReplyBar(
+                        previewText = vm.previewText(rp),
+                        authorName = rp.sender?.displayName ?: "—",
+                        onCancel = vm::cancelReply,
+                    )
+                }
+            }
+            AnimatedVisibility(visible = editing != null) {
+                editing?.let { em ->
+                    EditBar(
+                        previewText = vm.displayContent(em) ?: em.content.orEmpty(),
+                        onCancel = vm::cancelEdit,
+                    )
                 }
             }
 
@@ -205,8 +249,74 @@ fun ChatScreen(
                 onTextChange = vm::setDraft,
                 onSend = vm::sendDraft,
                 onImagePicked = { uri -> vm.sendImage(context, uri) },
+                onVideoPicked = { uri -> vm.sendVideoFromUri(context, uri) },
                 onVoiceRecorded = { file, dur, wf -> vm.sendVoice(file, dur, wf) },
                 onCircleRequested = { showCircleRecorder = true },
+                onVideoRequested = { showVideoRecorder = true },
+            )
+        }
+
+        // Context-menu — long-press
+        contextMessage?.let { msg ->
+            MessageContextMenu(
+                message = msg,
+                isOwn = msg.senderId == userId,
+                onDismiss = { contextMessage = null },
+                onReact = { emoji ->
+                    vm.react(msg, emoji)
+                    contextMessage = null
+                },
+                onReply = {
+                    vm.beginReply(msg)
+                    contextMessage = null
+                },
+                onCopy = {
+                    val text = vm.displayContent(msg) ?: msg.content.orEmpty()
+                    context.copyToClipboard(text, sensitive = true)
+                    Toast.makeText(context, "Скопировано", Toast.LENGTH_SHORT).show()
+                    contextMessage = null
+                },
+                onEdit = {
+                    vm.beginEdit(msg)
+                    contextMessage = null
+                },
+                onDelete = {
+                    vm.delete(msg)
+                    contextMessage = null
+                },
+                onForward = {
+                    forwardMessage = msg
+                    contextMessage = null
+                },
+            )
+        }
+
+        // Forward — выбор чата
+        forwardMessage?.let { msg ->
+            ForwardSheet(
+                excludeChatId = chat.id,
+                onDismiss = { forwardMessage = null },
+                onPick = { targetChatId ->
+                    vm.forward(msg, targetChatId)
+                    forwardMessage = null
+                    Toast.makeText(context, "Переслано", Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
+
+        // Поиск внутри чата
+        if (showSearch) {
+            ChatSearchScreen(
+                chatId = chat.id,
+                onClose = { showSearch = false },
+                onResultClick = { messageId ->
+                    showSearch = false
+                    val idx = messages.indexOfFirst { it.id == messageId }
+                    if (idx >= 0) {
+                        // scroll сделаем в LaunchedEffect ниже
+                        vm.requestScrollTo(messageId)
+                    }
+                },
             )
         }
 
@@ -217,6 +327,16 @@ fun ChatScreen(
                     vm.sendCircle(file, dur)
                 },
                 onCancel = { showCircleRecorder = false },
+            )
+        }
+
+        if (showVideoRecorder) {
+            VideoRecorderScreen(
+                onRecorded = { file, dur ->
+                    showVideoRecorder = false
+                    vm.sendVideo(file, dur)
+                },
+                onCancel = { showVideoRecorder = false },
             )
         }
     }

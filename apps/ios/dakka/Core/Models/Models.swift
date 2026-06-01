@@ -136,6 +136,11 @@ struct Chat: Codable, Identifiable, Hashable {
     let lastMessage: LastMessage?
     let unreadCount: Int?
 
+    /// Per-user state (приходит с бэка для текущего юзера).
+    let pinnedAt: Date?
+    let archivedAt: Date?
+    let mutedUntil: Date?
+
     /// Имя для отображения: имя группы или имя другого участника в direct-чате.
     func displayName(currentUserId: String?) -> String {
         if type == .group { return name ?? "Группа" }
@@ -155,11 +160,55 @@ struct Chat: Codable, Identifiable, Hashable {
     }
 
     /// Заглушён ли чат для текущего юзера.
+    /// Сначала смотрим на новый top-level `mutedUntil`,
+    /// затем фолбэк на устаревший `members[].mutedUntil`.
     func isMuted(currentUserId: String?) -> Bool {
+        if let until = mutedUntil, until > Date() { return true }
         guard let me = members.first(where: { $0.userId == currentUserId }),
               let until = me.mutedUntil
         else { return false }
         return until > Date()
+    }
+
+    var isPinned: Bool { pinnedAt != nil }
+    var isArchived: Bool { archivedAt != nil }
+
+    /// Возвращает копию чата с обновлённым per-user state — для оптимистичных
+    /// апдейтов и реакции на socket-событие `chat:state-updated`.
+    ///
+    /// Используем «обёртку» `ChatStateField` чтобы различать
+    /// «не трогать» и «выставить в nil» — двойной Optional в публичном API
+    /// слишком легко перепутать на стороне вызова.
+    func withState(pinnedAt: ChatStateField<Date> = .keep,
+                   archivedAt: ChatStateField<Date> = .keep,
+                   mutedUntil: ChatStateField<Date> = .keep) -> Chat {
+        Chat(
+            id: id,
+            type: type,
+            name: name,
+            avatar: avatar,
+            members: members,
+            lastMessage: lastMessage,
+            unreadCount: unreadCount,
+            pinnedAt: pinnedAt.apply(self.pinnedAt),
+            archivedAt: archivedAt.apply(self.archivedAt),
+            mutedUntil: mutedUntil.apply(self.mutedUntil)
+        )
+    }
+}
+
+/// Маркер изменения опционального поля в `Chat.withState`.
+///   • `.keep`        — оставить текущее значение
+///   • `.set(value)`  — установить новое значение (включая nil)
+enum ChatStateField<T> {
+    case keep
+    case set(T?)
+
+    func apply(_ current: T?) -> T? {
+        switch self {
+        case .keep:        return current
+        case .set(let v):  return v
+        }
     }
 }
 

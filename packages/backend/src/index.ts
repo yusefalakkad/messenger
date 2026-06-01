@@ -14,6 +14,8 @@ import { connectRedis, redis } from './lib/redis';
 import { initializeMinio } from './lib/minio';
 import { initPush } from './lib/push';
 import { initNativePush } from './lib/push-native';
+import { getSmsProvider } from './services/sms';
+import { initTelegramBot, stopTelegramBot } from './services/telegram/bootstrap';
 import { createSocketServer } from './socket/socket.server';
 import apiRoutes from './routes/index';
 import { errorHandler, notFound } from './middleware/error.middleware';
@@ -26,8 +28,23 @@ async function bootstrap(): Promise<void> {
   await initPush();
   await initNativePush();
 
+  // Eagerly init SMS provider — упадём на старте если конфиг неверный, а не при первом OTP-запросе
+  try {
+    const sms = getSmsProvider();
+    logger.info(`SMS provider: ${sms.name}`);
+    await initTelegramBot(); // no-op если провайдер не telegram-bot
+  } catch (err) {
+    logger.error(`SMS provider init failed: ${(err as Error).message}`);
+    throw err;
+  }
+
   // ─── Express app ───────────────────────────────────────────────────────────
   const app = express();
+
+  // SECURITY: trust proxy ОБЯЗАТЕЛЬНО ставится ДО rateLimit/morgan, иначе
+  // express-rate-limit видит nginx-IP вместо клиентского → один общий бакет
+  // для всех клиентов = эффективно нет rate-limit.
+  app.set('trust proxy', 1);
 
   // Security headers
   app.use(helmet({
@@ -67,9 +84,6 @@ async function bootstrap(): Promise<void> {
     legacyHeaders: false,
   }));
 
-  // Trust proxy (for correct IP in rate limiting behind nginx/etc.)
-  app.set('trust proxy', 1);
-
   // Health check
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), env: config.env });
@@ -99,6 +113,7 @@ async function bootstrap(): Promise<void> {
   // ─── Graceful shutdown ─────────────────────────────────────────────────────
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`Received ${signal}, shutting down...`);
+    stopTelegramBot();
     httpServer.close(async () => {
       await disconnectDatabase();
       await redis.quit();

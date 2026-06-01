@@ -8,10 +8,12 @@ struct MessageInput: View {
     let onVoiceRecorded: (URL, TimeInterval, [CGFloat]) -> Void
     let onImageSelected: (ImagePreparer.Prepared) -> Void
     let onCircleRequested: () -> Void
+    let onVideoRequested: () -> Void
 
     @FocusState private var focused: Bool
     @StateObject private var recorder = AudioRecorder()
     @State private var photoItem: PhotosPickerItem?
+    @State private var showAttachMenu = false
 
     private var hasText: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -50,16 +52,29 @@ struct MessageInput: View {
     // MARK: - Static input pieces
 
     private var attachButton: some View {
-        PhotosPicker(
-            selection: $photoItem,
-            matching: .images,
-            photoLibrary: .shared()
-        ) {
+        Menu {
+            Button {
+                showAttachMenu = true
+            } label: {
+                Label("Фото", systemImage: "photo")
+            }
+            Button {
+                onVideoRequested()
+            } label: {
+                Label("Видео", systemImage: "video")
+            }
+        } label: {
             Image(systemName: "paperclip")
                 .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(.white.opacity(0.55))
                 .padding(8)
         }
+        .photosPicker(
+            isPresented: $showAttachMenu,
+            selection: $photoItem,
+            matching: .images,
+            photoLibrary: .shared()
+        )
         .onChange(of: photoItem) { newValue in
             guard let newValue else { return }
             Task {

@@ -119,7 +119,11 @@ object E2E {
         theirPublicKeyB64: String,
         myPrivateKeyB64: String,
     ): SecretKeySpec {
-        val cacheKey = theirPublicKeyB64.take(16)
+        // CRITICAL: cache key должен зависеть ОТ ВСЕГО публичного ключа.
+        // У всех P-256 SPKI base64 первые ~36 символов идентичны (DER-префикс),
+        // поэтому take(16) возвращал бы одинаковую строку для разных пиров
+        // → cross-chat confidentiality break. Используем SHA-256(full pub).
+        val cacheKey = sha256Hex(theirPublicKeyB64)
         synchronized(cacheLock) { sharedKeyCache[cacheKey] }?.let { return it }
 
         val theirPubBytes = runCatching { Base64.decode(theirPublicKeyB64, Base64.NO_WRAP) }
@@ -148,5 +152,13 @@ object E2E {
     /** Очистить кэш — вызывать при logout. */
     fun clearCache() {
         synchronized(cacheLock) { sharedKeyCache.clear() }
+    }
+
+    private fun sha256Hex(s: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(s.toByteArray(Charsets.UTF_8))
+        val sb = StringBuilder(digest.size * 2)
+        for (b in digest) sb.append("%02x".format(b))
+        return sb.toString()
     }
 }

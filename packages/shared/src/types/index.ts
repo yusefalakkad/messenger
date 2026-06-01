@@ -65,6 +65,10 @@ export interface Chat {
   members: ChatMember[];
   lastMessage?: Message;
   unreadCount: number;
+  // Per-user state (set by backend for the requesting user)
+  pinnedAt?:   string | null;
+  archivedAt?: string | null;
+  mutedUntil?: string | null;
 }
 
 export interface ChatMember {
@@ -185,6 +189,8 @@ export interface SendMessagePayload {
     waveform?: number[];
   };
   replyToId?: string;
+  // Forward: client уже расшифровал источник и перешифровал контент под целевой чат
+  forwardedFromId?: string;
   encrypted?: boolean;
 }
 

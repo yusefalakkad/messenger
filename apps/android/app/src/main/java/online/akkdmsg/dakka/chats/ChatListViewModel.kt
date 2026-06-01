@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import online.akkdmsg.dakka.data.Chat
-import online.akkdmsg.dakka.data.api.ChatApi
+import online.akkdmsg.dakka.data.api.ChatActions
 import online.akkdmsg.dakka.data.api.SocketClient
 
 class ChatListViewModel : ViewModel() {
@@ -25,9 +25,16 @@ class ChatListViewModel : ViewModel() {
     val error:   StateFlow<String?> = _error.asStateFlow()
     val search:  StateFlow<String>  = _search
 
-    /** Отфильтрованный + отсортированный по lastMessage.createdAt список. */
+    /**
+     * Отфильтрованный, без архивных. Сортировка: pinned → по lastMessage.createdAt.
+     */
     val filteredChats: StateFlow<List<Chat>> = combine(_chats, _search) { chats, q ->
-        val sorted = chats.sortedByDescending { it.lastMessage?.createdAt ?: "" }
+        val visible = chats.filter { it.archivedAt == null }
+        val sorted = visible.sortedWith(
+            compareByDescending<Chat> { it.pinnedAt != null }
+                .thenByDescending { it.pinnedAt ?: "" }
+                .thenByDescending { it.lastMessage?.createdAt ?: "" }
+        )
         if (q.isBlank()) sorted
         else sorted.filter { c ->
             (c.name ?: "").contains(q, ignoreCase = true) ||
@@ -37,6 +44,19 @@ class ChatListViewModel : ViewModel() {
                 }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Архивные чаты, отсортированные по дате архивации. */
+    val archivedChats: StateFlow<List<Chat>> = _chats
+        .map { chats ->
+            chats.filter { it.archivedAt != null }
+                .sortedByDescending { it.archivedAt ?: "" }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Кол-во архивных — для бейджа в шапке. */
+    val archivedCount: StateFlow<Int> = archivedChats
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     init {
         // Real-time обновления — подгружаем список при новом сообщении
@@ -55,6 +75,26 @@ class ChatListViewModel : ViewModel() {
                 _chats.value = _chats.value.filter { it.id != id }
             }
         }
+        viewModelScope.launch {
+            SocketClient.chatStateUpdated.collect { u ->
+                _chats.value = _chats.value.map { c ->
+                    if (c.id != u.chatId) c else c.copy(
+                        // pinned=false => сбрасываем pinnedAt; иначе берём новое если пришло.
+                        pinnedAt = when {
+                            u.pinned == false -> null
+                            u.pinnedAtPresent -> u.pinnedAt
+                            else -> c.pinnedAt
+                        },
+                        archivedAt = when {
+                            u.archived == false -> null
+                            u.archivedAtPresent -> u.archivedAt
+                            else -> c.archivedAt
+                        },
+                        mutedUntil = if (u.mutedUntilPresent) u.mutedUntil else c.mutedUntil,
+                    )
+                }
+            }
+        }
 
         reload()
     }
@@ -66,7 +106,8 @@ class ChatListViewModel : ViewModel() {
             _loading.value = true
             _error.value = null
             try {
-                _chats.value = ChatApi.listChats()
+                // Грузим includeArchived=1 — фильтрация активных/архивных идёт уже в Flow.
+                _chats.value = ChatActions.listChats(includeArchived = true)
             } catch (e: Exception) {
                 _error.value = e.message ?: "Не удалось загрузить чаты"
             } finally {

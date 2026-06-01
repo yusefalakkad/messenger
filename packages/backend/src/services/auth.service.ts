@@ -3,8 +3,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../lib/prisma';
 import { redis, blacklistToken } from '../lib/redis';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
+import {
+  signTwoFactorToken, verifyTwoFactorToken,
+  verifyTotp, consumeRecoveryCode,
+} from '../lib/twofa';
 import { AppError } from '../utils/response';
 import type { AuthTokens } from '@messenger/shared';
+
+export type LoginResult =
+  | { kind: 'tokens'; user: { id: string; username: string; displayName: string; avatar: string | null }; tokens: AuthTokens }
+  | { kind: '2fa-required'; twoFactorToken: string };
 
 // Argon2id — recommended by OWASP (stronger than bcrypt)
 const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
@@ -74,7 +82,7 @@ export class AuthService {
     deviceName?: string;
     ipAddress?: string;
     userAgent?: string;
-  }): Promise<{ user: { id: string; username: string; displayName: string; avatar: string | null }; tokens: AuthTokens }> {
+  }): Promise<LoginResult> {
     const user = await prisma.user.findFirst({
       where: {
         deletedAt: null,
@@ -84,7 +92,7 @@ export class AuthService {
           { email: data.login },
         ],
       },
-      select: { id: true, username: true, displayName: true, avatar: true, passwordHash: true },
+      select: { id: true, username: true, displayName: true, avatar: true, passwordHash: true, twoFactorEnabled: true },
     });
 
     if (!user) throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid login or password');
@@ -92,23 +100,76 @@ export class AuthService {
     const valid = await argon2.verify(user.passwordHash, data.password);
     if (!valid) throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid login or password');
 
-    // Upsert session for this device
-    const tokens = await this._createSession(user.id, data.deviceId, {
-      deviceName: data.deviceName,
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-    });
+    // Если 2FA включён — отдаём interstitial токен, ждём шага 2.
+    if (user.twoFactorEnabled) {
+      return {
+        kind: '2fa-required',
+        twoFactorToken: signTwoFactorToken(user.id, data.deviceId, data.deviceName),
+      };
+    }
 
-    // Update online status
-    await prisma.user.update({
-      where: { id: user.id },
+    return await this._finishLogin(user.id, data.deviceId, data);
+  }
+
+  // Завершение логина после успешной 2FA-проверки (или сразу если 2FA выключен).
+  private async _finishLogin(
+    userId: string,
+    deviceId: string,
+    meta: { deviceName?: string; ipAddress?: string; userAgent?: string },
+  ): Promise<Extract<LoginResult, { kind: 'tokens' }>> {
+    const tokens = await this._createSession(userId, deviceId, meta);
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
       data: { status: 'online', lastSeenAt: new Date() },
+      select: { id: true, username: true, displayName: true, avatar: true },
     });
 
-    return {
-      user: { id: user.id, username: user.username, displayName: user.displayName, avatar: user.avatar },
-      tokens,
-    };
+    return { kind: 'tokens', user: updatedUser, tokens };
+  }
+
+  // Шаг 2: подтвердить 2FA-код (TOTP или recovery) с interstitial токеном.
+  async verifyTwoFactor(data: {
+    twoFactorToken: string;
+    code: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<Extract<LoginResult, { kind: 'tokens' }>> {
+    let payload;
+    try { payload = verifyTwoFactorToken(data.twoFactorToken); }
+    catch { throw new AppError(401, 'INVALID_2FA_TOKEN', '2FA token expired, login again'); }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, twoFactorEnabled: true, twoFactorSecret: true, twoFactorRecovery: true },
+    });
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      throw new AppError(400, '2FA_NOT_ENABLED', '2FA is not enabled');
+    }
+
+    // Сначала проверим TOTP, потом — recovery
+    if (verifyTotp(user.twoFactorSecret, data.code)) {
+      return await this._finishLogin(payload.sub, payload.deviceId, {
+        deviceName: payload.deviceName,
+        ipAddress:  data.ipAddress,
+        userAgent:  data.userAgent,
+      });
+    }
+
+    const recov = consumeRecoveryCode(data.code, user.twoFactorRecovery);
+    if (recov.valid) {
+      await prisma.user.update({
+        where: { id: payload.sub },
+        data: { twoFactorRecovery: recov.remaining },
+      });
+      return await this._finishLogin(payload.sub, payload.deviceId, {
+        deviceName: payload.deviceName,
+        ipAddress:  data.ipAddress,
+        userAgent:  data.userAgent,
+      });
+    }
+
+    throw new AppError(401, 'INVALID_2FA_CODE', 'Invalid 2FA code');
   }
 
   // ─── Refresh ───────────────────────────────────────────────────────────────

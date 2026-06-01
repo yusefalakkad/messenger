@@ -6,6 +6,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import online.akkdmsg.dakka.data.ApiEnvelope
 import online.akkdmsg.dakka.data.AppConfig
 import online.akkdmsg.dakka.data.Chat
 import online.akkdmsg.dakka.data.ChatMember
@@ -81,6 +82,71 @@ object ChatActions {
                 raw,
             )
             env.data ?: throw RuntimeException("empty rename response")
+        }
+    }
+
+    // ── Pin / Archive / Mute (PATCH) ────────────────────────────────────────
+
+    @Serializable private data class PinReq(val pinned: Boolean)
+    @Serializable private data class ArchiveReq(val archived: Boolean)
+    @Serializable private data class MuteUntilReq(val until: String? = null)
+
+    /**
+     * @throws ApiClient.ApiException В частности statusCode=400 — лимит закрепов исчерпан.
+     */
+    suspend fun pinChat(chatId: String, pinned: Boolean) {
+        patchVoid(
+            path = "chats/$chatId/pin",
+            bodyJson = ApiClient.json.encodeToString(PinReq.serializer(), PinReq(pinned)),
+        )
+    }
+
+    suspend fun archiveChat(chatId: String, archived: Boolean) {
+        patchVoid(
+            path = "chats/$chatId/archive",
+            bodyJson = ApiClient.json.encodeToString(ArchiveReq.serializer(), ArchiveReq(archived)),
+        )
+    }
+
+    /**
+     * @param until ISO-8601, "forever", или null (снять mute).
+     */
+    suspend fun muteChat(chatId: String, until: String?) {
+        patchVoid(
+            path = "chats/$chatId/mute",
+            bodyJson = ApiClient.json.encodeToString(MuteUntilReq.serializer(), MuteUntilReq(until)),
+        )
+    }
+
+    suspend fun listArchivedChats(): List<Chat> =
+        ApiClient.get("chats/archived")
+
+    suspend fun listChats(includeArchived: Boolean = false): List<Chat> =
+        if (includeArchived) ApiClient.get("chats", query = mapOf("includeArchived" to "1"))
+        else ApiClient.get("chats")
+
+    /** PATCH без разбора тела ответа — только проверка success + парсинг error message. */
+    private suspend fun patchVoid(
+        path: String,
+        bodyJson: String,
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val url = "${AppConfig.API_BASE_URL.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
+        val req = Request.Builder().url(url).patch(
+            bodyJson.toRequestBody("application/json; charset=utf-8".toMediaType())
+        ).apply {
+            ApiClient.accessToken?.let { header("Authorization", "Bearer $it") }
+            header("Accept", "application/json")
+        }.build()
+        val resp = http.newCall(req).execute()
+        if (!resp.isSuccessful) {
+            val raw = resp.body?.string().orEmpty()
+            val msg = runCatching {
+                ApiClient.json.decodeFromString(
+                    ApiEnvelope.serializer(kotlinx.serialization.json.JsonElement.serializer()),
+                    raw,
+                ).error?.message
+            }.getOrNull() ?: "HTTP ${resp.code}"
+            throw ApiClient.ApiException(resp.code, msg)
         }
     }
 

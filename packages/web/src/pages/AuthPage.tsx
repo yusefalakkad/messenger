@@ -1,12 +1,8 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ShieldCheck } from 'lucide-react';
-import LoginForm from '@/components/auth/LoginForm';
-import RegisterForm from '@/components/auth/RegisterForm';
+import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden">
       {/* Глубокий ambient-фон: три парящих градиентных пятна */}
@@ -84,40 +80,7 @@ export default function AuthPage() {
           transition={{ delay: 0.3, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
           className="glass-card p-6 relative"
         >
-          {/* Tabs */}
-          <div className="relative flex bg-white/[0.04] border border-white/[0.06] rounded-xl p-1 mb-6">
-            {(['login', 'register'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setMode(tab)}
-                className={`relative flex-1 py-2.5 rounded-lg text-sm font-medium z-10 ${
-                  mode === tab ? 'text-white' : 'text-white/45 hover:text-white/75'
-                }`}
-              >
-                {mode === tab && (
-                  <motion.span
-                    layoutId="tab-indicator"
-                    transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                    className="absolute inset-0 rounded-lg bg-brand-gradient shadow-glow-violet"
-                    style={{ zIndex: -1 }}
-                  />
-                )}
-                <span className="relative">{tab === 'login' ? 'Войти' : 'Регистрация'}</span>
-              </button>
-            ))}
-          </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={mode}
-              initial={{ opacity: 0, x: mode === 'login' ? -12 : 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: mode === 'login' ? 12 : -12 }}
-              transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-            >
-              {mode === 'login' ? <LoginForm /> : <RegisterForm />}
-            </motion.div>
-          </AnimatePresence>
+          <PhoneAuthForm />
         </motion.div>
       </motion.div>
     </div>

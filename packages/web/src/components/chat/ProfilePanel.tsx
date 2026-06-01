@@ -1,13 +1,15 @@
 /**
  * Панель профиля собеседника — открывается при нажатии на имя в шапке.
- * Показывает: аватар, имя, @username, статус, все фото/видео из чата.
+ * Показывает: аватар, имя, @username, статус, safety number, все фото/видео из чата.
  */
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Image as ImageIcon, Film } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import ImageViewer from '@/components/media/ImageViewer';
+import SafetyNumberView from './SafetyNumberView';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth.store';
 import type { Chat, ChatMember } from '@messenger/shared';
 
 interface MediaItem {
@@ -28,10 +30,13 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
   const [viewer,   setViewer]   = useState<{ src: string; type: 'image' | 'video' } | null>(null);
   const [loading,  setLoading]  = useState(true);
 
+  const myUserId = useAuthStore((s) => s.user?.id);
   const name     = chat.type === 'direct' ? otherMember?.user.displayName : chat.name;
   const username = chat.type === 'direct' ? otherMember?.user.username   : undefined;
   const avatar   = chat.type === 'direct' ? otherMember?.user.avatar      : chat.avatar;
   const isOnline = otherMember?.user.status === 'online';
+  const myPublicKey = chat.members.find((m) => m.userId === myUserId)?.user.publicKey;
+  const theirPublicKey = otherMember?.user.publicKey;
 
   useEffect(() => {
     api.get(`/chats/${chat.id}/media`)
@@ -81,6 +86,15 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
               </p>
             </div>
           </div>
+
+          {/* Safety number (только для direct-чатов с известными ключами) */}
+          {chat.type === 'direct' && myPublicKey && theirPublicKey && (
+            <SafetyNumberView
+              myPublicKey={myPublicKey}
+              theirPublicKey={theirPublicKey}
+              chatId={chat.id}
+            />
+          )}
 
           {/* Медиа-галерея */}
           <div className="px-4 py-4">

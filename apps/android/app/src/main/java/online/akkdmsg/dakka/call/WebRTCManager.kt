@@ -1,7 +1,9 @@
 package online.akkdmsg.dakka.call
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
+import android.media.projection.MediaProjection
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
@@ -15,9 +17,12 @@ import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpReceiver
+import org.webrtc.RtpSender
+import org.webrtc.ScreenCapturerAndroid
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import org.webrtc.SurfaceTextureHelper
+import org.webrtc.VideoCapturer
 import org.webrtc.VideoSource
 import org.webrtc.VideoTrack
 
@@ -47,6 +52,20 @@ class WebRTCManager(
     private var videoCapturer: CameraVideoCapturer? = null
     private var videoSource: VideoSource? = null
     private var audioSource: AudioSource? = null
+
+    // Sender, через который идёт видео — он один на весь звонок, мы лишь меняем
+    // его track при переключении камера ↔ экран.
+    private var videoSender: RtpSender? = null
+
+    // Скрин-захват: отдельные source + capturer, активны только во время шеринга.
+    private var screenCapturer: ScreenCapturerAndroid? = null
+    private var screenSource: VideoSource? = null
+    private var screenTrack: VideoTrack? = null
+    private var screenSurfaceHelper: SurfaceTextureHelper? = null
+    /** Сохраняем оригинальный камера-трек, чтобы вернуть его при остановке шеринга. */
+    private var cameraTrackBackup: VideoTrack? = null
+
+    val isSharingScreen: Boolean get() = screenTrack != null
 
     var localVideoTrack: VideoTrack? = null
         private set
@@ -136,9 +155,89 @@ class WebRTCManager(
             capturer.startCapture(1280, 720, 30)
 
             val v = factory.createVideoTrack("video0", src)
-            pc.addTrack(v, listOf(streamId))
+            videoSender = pc.addTrack(v, listOf(streamId))
             localVideoTrack = v
         }
+    }
+
+    // ── Screen share ─────────────────────────────────────────────────────────
+
+    /**
+     * Запускает захват экрана через [ScreenCapturerAndroid] и подменяет track
+     * у уже существующего video-sender'а. Камера-capturer ставится на паузу,
+     * чтобы экономить батарею; оригинальный трек сохраняется для отката.
+     *
+     * @param mediaProjectionPermissionData Intent с RESULT_OK из
+     *   [android.media.projection.MediaProjectionManager.createScreenCaptureIntent].
+     */
+    fun startScreenShare(mediaProjectionPermissionData: Intent): Boolean {
+        if (!isVideo) return false
+        val pc = peer ?: return false
+        val sender = videoSender ?: return false
+        if (screenTrack != null) return true // уже идёт
+
+        // Останавливаем камеру, чтобы не держала питание.
+        try { videoCapturer?.stopCapture() } catch (_: Exception) {}
+
+        val callback = object : MediaProjection.Callback() {
+            override fun onStop() {
+                // Пользователь остановил из системного UI — снимаем трек.
+                stopScreenShare()
+            }
+        }
+        val capturer = ScreenCapturerAndroid(mediaProjectionPermissionData, callback)
+        val src = factory.createVideoSource(true /* isScreencast */)
+        val helper = SurfaceTextureHelper.create("ScreenCapture", eglBase.eglBaseContext)
+        capturer.initialize(helper, context, src.capturerObserver)
+        // Разрешение/FPS захвата; реальный поток адаптируется WebRTC.
+        capturer.startCapture(1280, 720, 15)
+
+        val track = factory.createVideoTrack("screen0", src)
+        track.setEnabled(true)
+
+        // Запоминаем камера-track, чтобы вернуть его.
+        cameraTrackBackup = localVideoTrack
+
+        // Заменяем track в существующем sender'e — без renegotiation.
+        sender.setTrack(track, /* takeOwnership = */ false)
+
+        screenCapturer = capturer
+        screenSource = src
+        screenTrack = track
+        screenSurfaceHelper = helper
+        // localVideoTrack теперь указывает на screen, чтобы превью UI показывало то же,
+        // что отправляется удалённой стороне.
+        localVideoTrack = track
+        return true
+    }
+
+    /** Возвращает камеру обратно. Безопасно вызывать повторно. */
+    fun stopScreenShare() {
+        if (screenTrack == null) return
+        val sender = videoSender
+
+        // Возвращаем камеру в sender (если она была).
+        val cam = cameraTrackBackup
+        if (sender != null && cam != null) {
+            sender.setTrack(cam, false)
+        }
+
+        // Останавливаем экран.
+        try { screenCapturer?.stopCapture() } catch (_: Exception) {}
+        screenCapturer?.dispose()
+        screenSource?.dispose()
+        screenSurfaceHelper?.dispose()
+        screenCapturer = null
+        screenSource = null
+        screenTrack = null
+        screenSurfaceHelper = null
+
+        // Перезапускаем камеру.
+        if (cam != null) {
+            try { videoCapturer?.startCapture(1280, 720, 30) } catch (_: Exception) {}
+            localVideoTrack = cam
+        }
+        cameraTrackBackup = null
     }
 
     private fun createCameraCapturer(): CameraVideoCapturer? {
@@ -206,10 +305,22 @@ class WebRTCManager(
     // ── Teardown ─────────────────────────────────────────────────────────────
 
     fun close() {
+        // Скрин-захват
+        try { screenCapturer?.stopCapture() } catch (_: Exception) {}
+        screenCapturer?.dispose()
+        screenSource?.dispose()
+        screenSurfaceHelper?.dispose()
+        screenCapturer = null
+        screenSource = null
+        screenTrack = null
+        screenSurfaceHelper = null
+        cameraTrackBackup = null
+
         try { videoCapturer?.stopCapture() } catch (_: Exception) {}
         videoCapturer?.dispose()
         videoSource?.dispose()
         audioSource?.dispose()
+        videoSender = null
         peer?.close()
         peer = null
 

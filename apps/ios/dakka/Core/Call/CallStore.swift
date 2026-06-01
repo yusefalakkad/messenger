@@ -26,6 +26,10 @@ final class CallStore: ObservableObject {
     @Published var isMuted: Bool = false
     @Published var isVideoOff: Bool = false
     @Published var isSpeakerOn: Bool = true
+    /// Активен ли шеринг экрана (через Broadcast Upload Extension).
+    /// Реальная заливка фреймов в RTCVideoSource подключается через App Group —
+    /// см. apps/ios/SCREEN_SHARE_SETUP.md.
+    @Published var isSharingScreen: Bool = false
 
     /// Состояние ICE-соединения для отображения статуса.
     @Published var iceState: String = "—"

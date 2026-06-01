@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings } from 'lucide-react';
+import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -13,6 +13,8 @@ import ChatListItem from '@/components/chat/ChatListItem';
 import NewChatModal from '@/components/chat/NewChatModal';
 import NewGroupModal from '@/components/chat/NewGroupModal';
 import SettingsDialog from '@/components/settings/SettingsDialog';
+import ArchivedChatsDialog from '@/components/chat/ArchivedChatsDialog';
+import GroupCallPill from '@/components/call/GroupCallPill';
 
 export default function Sidebar() {
   const { chatId } = useParams();
@@ -27,11 +29,28 @@ export default function Sidebar() {
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showPlus,    setShowPlus]    = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showArchive,  setShowArchive]  = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = chats.filter((c) => {
+  // В основном списке прячем архивные (даже если socket прислал archivedAt после загрузки).
+  // Дополнительно сортируем по pinnedAt DESC, затем по lastMessage — на случай
+  // если socket принёс новое закрепление, а порядок ещё не обновился с сервера.
+  const visibleChats = [...chats]
+    .filter((c) => !c.archivedAt)
+    .sort((a, b) => {
+      const ap = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+      const bp = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+      if (ap !== bp) return bp - ap;
+      const at = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+      const bt = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+      return bt - at;
+    });
+
+  const archivedCount = chats.filter((c) => !!c.archivedAt).length;
+
+  const filtered = visibleChats.filter((c) => {
     if (!search) return true;
     const name = c.type === 'group' ? c.name : c.members.find((m) => m.userId !== user?.id)?.user.displayName;
     return name?.toLowerCase().includes(search.toLowerCase());
@@ -137,6 +156,9 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* ── In-call pill (LiveKit групповой звонок, виден только в активном звонке) ── */}
+      <GroupCallPill />
+
       {/* ── Search ── */}
       <div className="px-3 py-2.5">
         <div className="relative">
@@ -149,6 +171,21 @@ export default function Sidebar() {
           />
         </div>
       </div>
+
+      {/* ── Archive entry ── */}
+      <button
+        onClick={() => setShowArchive(true)}
+        className="mx-3 mb-1.5 flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm bg-white/[0.025] hover:bg-white/[0.06] border border-white/[0.04] transition-colors group"
+        title="Архивные чаты"
+      >
+        <span className="w-7 h-7 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+          <Archive size={14} />
+        </span>
+        <span className="flex-1 text-white/80">Архив</span>
+        {archivedCount > 0 && (
+          <span className="text-[11px] font-semibold text-white/45 px-1.5">{archivedCount}</span>
+        )}
+      </button>
 
       {/* ── Chat list ── */}
       <div className="relative flex-1 overflow-y-auto px-1">
@@ -173,8 +210,10 @@ export default function Sidebar() {
             filtered.map((chat, idx) => (
               <motion.div
                 key={chat.id}
+                layout="position"
                 initial={{ opacity: 0, x: -16 }}
                 animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24, height: 0 }}
                 transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
               >
                 <ChatListItem
@@ -195,6 +234,7 @@ export default function Sidebar() {
       </AnimatePresence>
 
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
+      <ArchivedChatsDialog open={showArchive} onClose={() => setShowArchive(false)} />
     </aside>
   );
 }

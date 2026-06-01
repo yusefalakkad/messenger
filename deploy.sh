@@ -10,8 +10,8 @@ error() { echo -e "${RED}[x]${NC} $1"; exit 1; }
 # ─── Проверка .env ────────────────────────────────────────────────────────────
 if [ ! -f .env ]; then
     cp .env.example .env
-    warn ".env создан из .env.example"
-    warn "Открой .env и замени YOUR_SERVER_IP на реальный IP сервера!"
+    warn ".env создан из .env.example (SERVER_IP=akkdmsg.online)"
+    warn "Проверь .env: при необходимости поменяй SERVER_IP."
     warn "Также поменяй JWT_ACCESS_SECRET и JWT_REFRESH_SECRET на случайные строки."
     echo ""
     read -p "Продолжить после редактирования .env? [y/N] " confirm

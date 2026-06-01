@@ -47,7 +47,9 @@ struct MessageBubble: View {
                             Label("Ответить", systemImage: "arrowshape.turn.up.left")
                         }
                         Button {
-                            UIPasteboard.general.string = displayContent ?? message.content
+                            if let text = displayContent ?? message.content {
+                                SensitiveClipboard.copy(text, expiresIn: 300)
+                            }
                         } label: {
                             Label("Скопировать", systemImage: "doc.on.doc")
                         }
@@ -162,6 +164,10 @@ struct MessageBubble: View {
         case .circle:
             if let m = message.media {
                 CirclePlayerView(media: m, isOwn: isOwn)
+            }
+        case .video:
+            if let m = message.media {
+                VideoMessage(media: m, isOwn: isOwn)
             }
         default:
             textContent

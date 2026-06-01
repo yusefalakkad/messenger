@@ -67,6 +67,22 @@ enum MediaService {
         )
     }
 
+    /// Загружает полноразмерное видео-сообщение.
+    static func uploadVideo(
+        fileURL: URL,
+        duration: TimeInterval,
+        mimeType: String = "video/quicktime",
+        fileName: String = "video.mov"
+    ) async throws -> UploadedMedia {
+        try await upload(
+            path: "media/upload/video",
+            fileURL: fileURL,
+            fileName: fileName,
+            mimeType: mimeType,
+            fields: ["duration": "\(Int(duration.rounded()))"]
+        )
+    }
+
     /// Загружает видео-кружок.
     static func uploadCircle(
         fileURL: URL,

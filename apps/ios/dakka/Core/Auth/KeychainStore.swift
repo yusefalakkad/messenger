@@ -11,12 +11,17 @@ enum KeychainStore {
     static func set(_ value: String, for key: String) -> Bool {
         let data = Data(value.utf8)
         delete(key) // переcоздаём чтобы избежать конфликта attr
+        // Для приватного E2E-ключа усиливаем accessibility: ThisDeviceOnly →
+        // ключ не уходит в iCloud Keychain и не восстановится на другом устройстве.
+        let accessible: CFString = (key == Keys.privateKey)
+            ? kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            : kSecAttrAccessibleAfterFirstUnlock
         let query: [String: Any] = [
             kSecClass as String:        kSecClassGenericPassword,
             kSecAttrService as String:  service,
             kSecAttrAccount as String:  key,
             kSecValueData as String:    data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrAccessible as String: accessible,
         ]
         return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
     }

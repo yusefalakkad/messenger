@@ -44,6 +44,7 @@ import online.akkdmsg.dakka.ui.theme.DakkaColor
 fun SettingsScreen(
     onBack: () -> Unit,
     onEditProfile: () -> Unit,
+    onTwoFactor: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val auth = remember { AuthStore.get(context) }
@@ -135,6 +136,11 @@ fun SettingsScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onTwoFactor,
+                        )
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -146,7 +152,7 @@ fun SettingsScreen(
                         color = Color.White,
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Chip("СКОРО", Color.White.copy(alpha = 0.4f))
+                    Icon(Icons.Filled.ChevronRight, null, tint = Color.White.copy(alpha = 0.4f))
                 }
                 Divider()
                 Row(

@@ -1,14 +1,9 @@
 import SwiftUI
 
-/// Корневой экран авторизации: логотип, чип-плашка, табы Login/Register.
+/// Корневой экран авторизации: логотип, чип-плашка, единый phone+OTP flow.
+/// Старые табы Login/Register удалены — мы перешли на phone-auth как в Telegram.
 struct AuthView: View {
-    enum Mode: String, CaseIterable {
-        case login = "Войти"
-        case register = "Регистрация"
-    }
-    @State private var mode: Mode = .login
     @State private var appeared = false
-    @Namespace private var tabAnim
 
     var body: some View {
         ZStack {
@@ -94,8 +89,7 @@ struct AuthView: View {
 
     private var card: some View {
         VStack(spacing: 18) {
-            tabs
-            formArea
+            PhoneAuthView()
         }
         .padding(20)
         .background(cardBackground)
@@ -123,59 +117,6 @@ struct AuthView: View {
         }
     }
 
-    private var tabs: some View {
-        HStack(spacing: 0) {
-            ForEach(Mode.allCases, id: \.self) { m in
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
-                        mode = m
-                    }
-                } label: {
-                    ZStack {
-                        if mode == m {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(LinearGradient.brand)
-                                .shadow(color: Color.brandViolet.opacity(0.55), radius: 14, y: 5)
-                                .matchedGeometryEffect(id: "tab", in: tabAnim)
-                        }
-                        Text(m.rawValue)
-                            .font(Typo.bodyM)
-                            .foregroundStyle(.white.opacity(mode == m ? 1 : 0.5))
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 38)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-        )
-    }
-
-    private var formArea: some View {
-        ZStack(alignment: .top) {
-            if mode == .login {
-                LoginView()
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .offset(x: -20)),
-                        removal:   .opacity.combined(with: .offset(x: -20))
-                    ))
-            } else {
-                RegisterView()
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .offset(x: 20)),
-                        removal:   .opacity.combined(with: .offset(x: 20))
-                    ))
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: mode)
-    }
 }
 
 #Preview {

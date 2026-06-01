@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, MonitorUp, MonitorOff } from 'lucide-react';
 import { useCallStore } from '@/stores/call.store';
 import { acceptCall, rejectCall, endCall, sendCallSignal } from '@/lib/socket';
 import { getIceServers } from '@/lib/iceServers';
@@ -29,7 +29,13 @@ export default function CallOverlay() {
   const [muted,     setMuted]     = useState(false);
   const [camOff,    setCamOff]    = useState(false);
   const [callTimer, setCallTimer] = useState(0);
+  const [sharingScreen, setSharingScreen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Сохраняем исходный камера-трек, чтобы вернуть его после остановки шеринга.
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
+  // Текущий displayMedia stream — нужен, чтобы остановить tracks при teardown.
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   // Назначаем remote stream на элементы после рендера
   useEffect(() => {
@@ -45,6 +51,9 @@ export default function CallOverlay() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current = null;
+    cameraTrackRef.current = null;
     pcRef.current?.close();
     pcRef.current = null;
     iceCandidateQueue.current = [];
@@ -53,6 +62,7 @@ export default function CallOverlay() {
     setCallTimer(0);
     setMuted(false);
     setCamOff(false);
+    setSharingScreen(false);
   }, []);
 
   const startPeer = useCallback(async (callId: string, callType: 'audio' | 'video', isInitiator: boolean) => {
@@ -178,6 +188,95 @@ export default function CallOverlay() {
     setCamOff((c) => !c);
   };
 
+  // Восстановление камеры после остановки шеринга экрана.
+  const restoreCameraTrack = useCallback(async () => {
+    const pc = pcRef.current;
+    if (!pc) return;
+    const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+    if (!sender) return;
+
+    let cameraTrack = cameraTrackRef.current;
+    // Если оригинальный трек был остановлен (например, при паузе), получаем новый.
+    if (!cameraTrack || cameraTrack.readyState === 'ended') {
+      try {
+        const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        cameraTrack = camStream.getVideoTracks()[0] ?? null;
+      } catch {
+        cameraTrack = null;
+      }
+    }
+
+    if (cameraTrack) {
+      await sender.replaceTrack(cameraTrack);
+      // Обновляем локальный stream / превью.
+      const local = localStreamRef.current;
+      if (local) {
+        local.getVideoTracks().forEach((t) => {
+          if (t !== cameraTrack) local.removeTrack(t);
+        });
+        if (!local.getVideoTracks().includes(cameraTrack)) local.addTrack(cameraTrack);
+        if (localVideoRef.current) localVideoRef.current.srcObject = local;
+      }
+      cameraTrack.enabled = !camOff;
+      cameraTrackRef.current = cameraTrack;
+    } else {
+      // Камеры нет — отправляем «пустой» null-трек (некоторые браузеры допускают).
+      try { await sender.replaceTrack(null); } catch { /* ignore */ }
+    }
+  }, [camOff]);
+
+  const toggleScreenShare = useCallback(async () => {
+    const pc = pcRef.current;
+    if (!pc) return;
+
+    if (sharingScreen) {
+      // Останавливаем шеринг → возвращаем камеру.
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setSharingScreen(false);
+      await restoreCameraTrack();
+      return;
+    }
+
+    let displayStream: MediaStream;
+    try {
+      displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch {
+      return; // Пользователь отменил выбор окна / экрана.
+    }
+    const displayTrack = displayStream.getVideoTracks()[0];
+    if (!displayTrack) {
+      displayStream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
+    // Запоминаем текущий камера-трек, чтобы восстановить.
+    const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+    if (!cameraTrackRef.current) {
+      cameraTrackRef.current = sender?.track ?? null;
+    }
+
+    if (sender) {
+      await sender.replaceTrack(displayTrack);
+    } else {
+      // На audio-звонке video-sender'а нет: добавляем трек.
+      pc.addTrack(displayTrack, displayStream);
+    }
+    screenStreamRef.current = displayStream;
+    setSharingScreen(true);
+
+    // Локальное превью показывает то, чем мы делимся.
+    if (localVideoRef.current) localVideoRef.current.srcObject = displayStream;
+
+    // Автоматическая остановка по кнопке браузера «Stop sharing».
+    displayTrack.onended = async () => {
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setSharingScreen(false);
+      await restoreCameraTrack();
+    };
+  }, [sharingScreen, restoreCameraTrack]);
+
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const isVideo = active?.callType === 'video' || incoming?.callType === 'video' || outgoing?.callType === 'video';
 
@@ -207,7 +306,13 @@ export default function CallOverlay() {
                 <video ref={remoteVideoRef} autoPlay playsInline
                   className="absolute inset-0 w-full h-full object-cover" />
                 <video ref={localVideoRef} autoPlay playsInline muted
-                  className={`absolute bottom-20 right-4 w-28 h-40 rounded-2xl object-cover border-2 border-white/20 z-10 ${camOff ? 'hidden' : ''}`} />
+                  className={`absolute bottom-20 right-4 w-28 h-40 rounded-2xl object-cover border-2 border-white/20 z-10 ${camOff && !sharingScreen ? 'hidden' : ''}`} />
+                {sharingScreen && (
+                  <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-medium backdrop-blur-md">
+                    <MonitorUp size={14} />
+                    <span>Вы делитесь экраном</span>
+                  </div>
+                )}
               </>
             )}
 
@@ -277,6 +382,17 @@ export default function CallOverlay() {
                     {!isVideo && (
                       <button className="w-12 h-12 rounded-full bg-dark-hover flex items-center justify-center text-white/60">
                         <Volume2 size={18} />
+                      </button>
+                    )}
+                    {isVideo && (
+                      <button onClick={toggleScreenShare}
+                        title={sharingScreen ? 'Остановить показ экрана' : 'Поделиться экраном'}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                          sharingScreen
+                            ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400'
+                            : 'bg-dark-hover text-white/60 hover:text-white'
+                        }`}>
+                        {sharingScreen ? <MonitorOff size={18} /> : <MonitorUp size={18} />}
                       </button>
                     )}
                     <button onClick={handleEnd}

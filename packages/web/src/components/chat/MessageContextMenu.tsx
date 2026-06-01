@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Reply, Pencil, Trash2 } from 'lucide-react';
+import { Reply, Pencil, Trash2, CornerUpRight, Copy } from 'lucide-react';
 import type { Message } from '@messenger/shared';
 
 const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
@@ -18,11 +18,12 @@ interface Props {
   onReply:  () => void;
   onEdit?:  () => void;
   onDelete: () => void;
+  onForward?: () => void;
   onReact:  (emoji: string) => void;
 }
 
 export default function MessageContextMenu({
-  message, isOwn, x, y, onClose, onReply, onEdit, onDelete, onReact,
+  message, isOwn, x, y, onClose, onReply, onEdit, onDelete, onForward, onReact,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -91,6 +92,26 @@ export default function MessageContextMenu({
           >
             <Pencil size={16} className="text-white/50" />
             <span>Редактировать</span>
+          </button>
+        )}
+
+        {onForward && (
+          <button
+            onClick={() => { onForward(); onClose(); }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
+          >
+            <CornerUpRight size={16} className="text-white/50" />
+            <span>Переслать</span>
+          </button>
+        )}
+
+        {message.type === 'text' && !message.encrypted && message.content && (
+          <button
+            onClick={() => { navigator.clipboard.writeText(message.content!).catch(() => {}); onClose(); }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
+          >
+            <Copy size={16} className="text-white/50" />
+            <span>Копировать</span>
           </button>
         )}
 

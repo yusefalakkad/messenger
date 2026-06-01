@@ -12,17 +12,28 @@ datasource db {
 
 model User {
   id           String    @id @default(cuid())
-  username     String    @unique
-  displayName  String
+  // Phone — primary identifier (E.164, like +71234567890). Required for new users.
   phone        String?   @unique
+  phoneVerified Boolean  @default(false)
+  // Username — optional public handle. May be null right after sign-up until user picks one.
+  username     String?   @unique
+  // Display name — заполняется при complete-profile, до этого может быть null.
+  displayName  String?
+  // Email — legacy / optional. Не используется для login после миграции на phone-OTP.
   email        String?   @unique
-  passwordHash String
+  // passwordHash больше не используется новыми регистрациями (phone+OTP). Оставлено для legacy и для 2FA-disable требующего пароль (опционально).
+  passwordHash String?
   avatar       String?
   bio          String?
   status       UserStatus @default(offline)
   lastSeenAt   DateTime?
   // E2E encryption: client sends public key on registration
-  publicKey    String    // X25519 public key (base64)
+  publicKey    String?   // P-256 SPKI public key (base64). Может быть null до завершения профиля.
+
+  // ─── 2FA (TOTP) ─────────────────────────────────────────────────────────────
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?   // base32 TOTP secret, set after setup, null until enabled
+  twoFactorRecovery String[]  @default([])  // SHA-256 hex hashes of 10 one-time recovery codes
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -64,6 +75,21 @@ model Session {
 
   @@index([userId])
   @@index([refreshToken])
+}
+
+// ─── TelegramAuthLink ─────────────────────────────────────────────────────────
+// Связка номер ↔ telegram chat_id. Создаётся когда пользователь делится контактом
+// с нашим ботом. Используется для отправки OTP-кодов прямо в бот-чат.
+
+model TelegramAuthLink {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  chatId    BigInt
+  username  String?  // TG @username, если есть
+  linkedAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@index([chatId])
 }
 
 // ─── Contact ──────────────────────────────────────────────────────────────────
@@ -117,9 +143,11 @@ model ChatMember {
   role     ChatMemberRole @default(member)
   // E2E: group session key encrypted with this member's public key
   encryptedSessionKey String?
-  mutedUntil DateTime?
-  joinedAt   DateTime @default(now())
-  leftAt     DateTime?
+  mutedUntil  DateTime?
+  pinnedAt    DateTime?
+  archivedAt  DateTime?
+  joinedAt    DateTime @default(now())
+  leftAt      DateTime?
 
   @@unique([chatId, userId])
   @@index([userId])

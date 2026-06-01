@@ -23,6 +23,7 @@ final class SocketClient: ObservableObject {
     let chatCreated      = PassthroughSubject<Chat, Never>()
     let chatUpdated      = PassthroughSubject<ChatUpdate, Never>()
     let chatRemoved      = PassthroughSubject<String, Never>()  // chatId
+    let chatStateUpdated = PassthroughSubject<ChatStateUpdate, Never>()
 
     // Calls
     let callIncoming = PassthroughSubject<IncomingCallEvent, Never>()
@@ -196,6 +197,34 @@ final class SocketClient: ObservableObject {
             self.chatRemoved.send(chatId)
         }
 
+        s.on("chat:state-updated") { [weak self] data, _ in
+            guard let self,
+                  let dict = data.first as? [String: Any],
+                  let chatId = dict["chatId"] as? String else { return }
+            let iso = ISO8601DateFormatter()
+            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let isoBasic = ISO8601DateFormatter()
+            // Двухступенчатый парсер: с .withFractionalSeconds и без
+            func parseDate(_ key: String) -> Date? {
+                guard let raw = dict[key] as? String else { return nil }
+                return iso.date(from: raw) ?? isoBasic.date(from: raw)
+            }
+            let update = ChatStateUpdate(
+                chatId: chatId,
+                pinned: dict["pinned"] as? Bool,
+                archived: dict["archived"] as? Bool,
+                pinnedAt: parseDate("pinnedAt"),
+                archivedAt: parseDate("archivedAt"),
+                mutedUntil: parseDate("mutedUntil"),
+                // Бэк может прислать `pinnedAt: null` / `archivedAt: null`, чтобы
+                // явно снять флаг. Различаем «ключа нет» и «значение null».
+                pinnedAtExplicitlyNull: dict.keys.contains("pinnedAt") && dict["pinnedAt"] is NSNull,
+                archivedAtExplicitlyNull: dict.keys.contains("archivedAt") && dict["archivedAt"] is NSNull,
+                mutedUntilExplicitlyNull: dict.keys.contains("mutedUntil") && dict["mutedUntil"] is NSNull
+            )
+            self.chatStateUpdated.send(update)
+        }
+
         s.on("chat:member-left") { [weak self] data, _ in
             guard let self,
                   let dict = data.first as? [String: Any],
@@ -316,6 +345,23 @@ struct ChatUpdate {
     let name: String?
     let avatar: String?
     let fields: [String: Any]
+}
+
+/// Событие `chat:state-updated`.
+///
+/// Бэк присылает либо булевый флаг (`pinned: true`), либо точное время
+/// (`pinnedAt: "2026-06-01T…"` / `null`). Здесь храним оба, плюс маркеры
+/// «значение прислали как `null`» — чтобы UI мог честно снять флаг.
+struct ChatStateUpdate {
+    let chatId: String
+    let pinned: Bool?
+    let archived: Bool?
+    let pinnedAt: Date?
+    let archivedAt: Date?
+    let mutedUntil: Date?
+    let pinnedAtExplicitlyNull: Bool
+    let archivedAtExplicitlyNull: Bool
+    let mutedUntilExplicitlyNull: Bool
 }
 
 struct MessageUpdate {

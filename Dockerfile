@@ -19,22 +19,26 @@ RUN npm run build --workspace=packages/web
 
 # ─── Stage 2: Backend runtime ────────────────────────────────────────────────
 FROM node:20-alpine AS backend
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl tini
+# SECURITY: non-root юзер. Без этого баг в Express → root в контейнере.
+RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
-# Копируем весь backend workspace целиком, включая его внутренние node_modules
-# (workspaces иногда силосят пакеты в `packages/backend/node_modules` вместо корня).
-COPY --from=builder /app/packages/backend ./packages/backend
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
-COPY entrypoint.sh /entrypoint.sh
+COPY --from=builder --chown=app:app /app/node_modules ./node_modules
+COPY --from=builder --chown=app:app /app/packages/backend ./packages/backend
+COPY --from=builder --chown=app:app /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=app:app /app/packages/shared/package.json ./packages/shared/package.json
+COPY --chown=app:app entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+USER app
 EXPOSE 4000
-ENTRYPOINT ["/entrypoint.sh"]
+# tini = правильная обработка SIGTERM (graceful shutdown в node)
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 
 # ─── Stage 3: Nginx + built frontend ─────────────────────────────────────────
-FROM nginx:stable-alpine AS nginx-frontend
+# nginxinc/nginx-unprivileged — стандартный non-root образ, listen 8080 (не 80).
+# В docker-compose маппинг "80:8080" / "443:8443" обрабатывает host-side.
+FROM nginxinc/nginx-unprivileged:stable-alpine AS nginx-frontend
 COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
-EXPOSE 80 443
+EXPOSE 8080 8443
 CMD ["nginx", "-g", "daemon off;"]

@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject var auth: AuthStore
     @ObservedObject private var callStore = CallStore.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -20,10 +21,33 @@ struct RootView: View {
 
             callOverlay
 
+            // Privacy cover: скрываем содержимое в task-switcher / при потере фокуса.
+            PrivacyCoverView()
+                .opacity(scenePhase == .active ? 0 : 1)
+                .animation(.easeInOut(duration: 0.18), value: scenePhase)
+                .allowsHitTesting(scenePhase != .active)
+                .zIndex(300)
+
             // Toast'ы поверх всего, включая звонки
             ToastHost()
                 .zIndex(200)
                 .allowsHitTesting(true)
+        }
+    }
+
+    @ViewBuilder
+    private func PrivacyCoverView() -> some View {
+        ZStack {
+            AmbientBackground()
+                .ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 56, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                Text("Dakka")
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+            }
         }
     }
 

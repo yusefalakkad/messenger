@@ -7,6 +7,7 @@ import { redis, setUserOnline, setUserOffline, isUserOnline } from '../lib/redis
 import { sendPushToUser } from '../lib/push';
 import { sendNativePushToUser, sendVoIPCallPush } from '../lib/push-native';
 import { logger } from '../lib/logger';
+import { extractObjectName } from '../lib/minio';
 import type { WSClientEvents, WSServerEvents, SendMessagePayload } from '@messenger/shared';
 
 declare module 'socket.io' {
@@ -81,11 +82,27 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
     // ─── Events ─────────────────────────────────────────────────────────────
 
-    socket.on('chat:join', ({ chatId }: WSClientEvents['chat:join']) => {
-      socket.join(`chat:${chatId}`);
+    socket.on('chat:join', async ({ chatId }: WSClientEvents['chat:join']) => {
+      // SECURITY: только участник чата может слушать его room.
+      // Без проверки любой авторизованный юзер мог бы подслушивать чужие чаты.
+      if (!chatId || typeof chatId !== 'string') return;
+      try {
+        const member = await prisma.chatMember.findUnique({
+          where: { chatId_userId: { chatId, userId } },
+          select: { leftAt: true },
+        });
+        if (!member || member.leftAt) {
+          socket.emit('error', { code: 'FORBIDDEN', message: 'Not a member of this chat' });
+          return;
+        }
+        socket.join(`chat:${chatId}`);
+      } catch (err) {
+        logger.error('chat:join check failed', { err: (err as Error).message, chatId, userId });
+      }
     });
 
     socket.on('chat:leave', ({ chatId }: WSClientEvents['chat:leave']) => {
+      if (!chatId || typeof chatId !== 'string') return;
       socket.leave(`chat:${chatId}`);
     });
 
@@ -103,6 +120,8 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     });
 
     socket.on('message:read', async ({ messageId, chatId }: WSClientEvents['message:read']) => {
+      // Защита от спама read-ивентов (накачка БД + флуд broadcast'ов)
+      if (!checkRate('message:read', 100, 10_000)) return;
       try {
         await handleMessageRead(io, socket, messageId, chatId);
       } catch (err) {
@@ -205,22 +224,47 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
     // ─── Calls (WebRTC signaling relay) ──────────────────────────────────────
 
+    // SECURITY: Redis-set участников звонка — без него любой авторизованный
+    // юзер мог join'нуть call:<callId> и подслушивать SDP / завершать звонок.
+    // Ключ TTL 1 час — сам по себе чистится если звонок не завершён аккуратно.
+    const CALL_PEERS_KEY  = (callId: string) => `call:${callId}:peers`;
+    const CALL_META_KEY   = (callId: string) => `call:${callId}:meta`;
+    const CALL_TTL_SEC    = 3600;
+
+    const isCallParticipant = async (callId: string): Promise<boolean> => {
+      if (typeof callId !== 'string' || callId.length === 0 || callId.length > 64) return false;
+      const ok = await redis.sismember(CALL_PEERS_KEY(callId), userId);
+      return ok === 1;
+    };
+
     socket.on('call:initiate', async ({ callId, peerId, chatId, callType }: WSClientEvents['call:initiate']) => {
       if (!checkRate('call:initiate', 5, 60_000)) {
         socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many call attempts' });
         return;
       }
-      // Проверяем, что оба — участники чата
-      const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
-      if (!member) return;
+      // Базовая валидация
+      if (typeof callId !== 'string' || callId.length === 0 || callId.length > 64) return;
+      if (typeof peerId !== 'string' || typeof chatId !== 'string') return;
 
-      // Вступаем в комнату звонка
+      // Оба должны быть участниками чата
+      const [meMember, peerMember] = await Promise.all([
+        prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } }, select: { id: true } }),
+        prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId: peerId } }, select: { id: true } }),
+      ]);
+      if (!meMember || !peerMember) {
+        socket.emit('error', { code: 'CALL_FORBIDDEN', message: 'Both users must be in the chat' });
+        return;
+      }
+
+      // Регистрируем участников звонка в Redis (TTL 1ч)
+      await redis.sadd(CALL_PEERS_KEY(callId), userId, peerId);
+      await redis.expire(CALL_PEERS_KEY(callId), CALL_TTL_SEC);
+      await redis.set(CALL_META_KEY(callId), JSON.stringify({ chatId, initiator: userId }), 'EX', CALL_TTL_SEC);
+
       socket.join(`call:${callId}`);
 
-      // Получаем имя звонящего для отображения
       const caller = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, avatar: true } });
 
-      // Отправляем входящий звонок
       io.to(`user:${peerId}`).emit('call:incoming', {
         callId,
         callerId: userId,
@@ -230,8 +274,6 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
         callType,
       });
 
-      // Параллельно — VoIP push для iOS-устройства если оно не в активной сессии.
-      // VoIP push будит killed-app и показывает системный CallKit-баннер.
       void sendVoIPCallPush(peerId, {
         callId,
         chatId,
@@ -242,22 +284,28 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       });
     });
 
-    socket.on('call:accept', ({ callId }: WSClientEvents['call:accept']) => {
+    socket.on('call:accept', async ({ callId }: WSClientEvents['call:accept']) => {
+      if (!(await isCallParticipant(callId))) return;
       socket.join(`call:${callId}`);
       socket.to(`call:${callId}`).emit('call:accepted', { callId, peerId: userId });
     });
 
-    socket.on('call:reject', ({ callId }: WSClientEvents['call:reject']) => {
+    socket.on('call:reject', async ({ callId }: WSClientEvents['call:reject']) => {
+      if (!(await isCallParticipant(callId))) return;
       io.to(`call:${callId}`).emit('call:ended', { callId, reason: 'rejected' });
+      await redis.del(CALL_PEERS_KEY(callId), CALL_META_KEY(callId));
       socket.leave(`call:${callId}`);
     });
 
-    socket.on('call:end', ({ callId }: WSClientEvents['call:end']) => {
+    socket.on('call:end', async ({ callId }: WSClientEvents['call:end']) => {
+      if (!(await isCallParticipant(callId))) return;
       io.to(`call:${callId}`).emit('call:ended', { callId, reason: 'ended' });
+      await redis.del(CALL_PEERS_KEY(callId), CALL_META_KEY(callId));
       socket.leave(`call:${callId}`);
     });
 
-    socket.on('call:signal', ({ callId, signal }: WSClientEvents['call:signal']) => {
+    socket.on('call:signal', async ({ callId, signal }: WSClientEvents['call:signal']) => {
+      if (!(await isCallParticipant(callId))) return;
       socket.to(`call:${callId}`).emit('call:signal', { callId, signal });
     });
 
@@ -292,16 +340,78 @@ async function handleSendMessage(
 ): Promise<void> {
   const { userId } = socket;
 
+  // ── Validation ─────────────────────────────────────────────────────────────
+  if (!payload || typeof payload !== 'object') {
+    socket.emit('error', { code: 'BAD_PAYLOAD', message: 'Invalid payload' });
+    return;
+  }
+  if (typeof payload.chatId !== 'string' || payload.chatId.length === 0 || payload.chatId.length > 64) {
+    socket.emit('error', { code: 'BAD_CHAT_ID' });
+    return;
+  }
+  const ALLOWED_TYPES = new Set(['text', 'image', 'video', 'voice', 'circle', 'file']);
+  if (typeof payload.type !== 'string' || !ALLOWED_TYPES.has(payload.type)) {
+    socket.emit('error', { code: 'BAD_TYPE', message: 'Type not allowed' });
+    return;
+  }
+  if (payload.content != null) {
+    if (typeof payload.content !== 'string' || payload.content.length > 10_000) {
+      socket.emit('error', { code: 'CONTENT_TOO_LONG' });
+      return;
+    }
+  }
+  if (payload.nonce != null && (typeof payload.nonce !== 'string' || payload.nonce.length > 128)) {
+    socket.emit('error', { code: 'BAD_NONCE' });
+    return;
+  }
+  if (payload.replyToId != null && (typeof payload.replyToId !== 'string' || payload.replyToId.length > 64)) {
+    socket.emit('error', { code: 'BAD_REPLY_ID' });
+    return;
+  }
+  if (payload.forwardedFromId != null && (typeof payload.forwardedFromId !== 'string' || payload.forwardedFromId.length > 64)) {
+    socket.emit('error', { code: 'BAD_FORWARD_ID' });
+    return;
+  }
+  if (payload.mediaData?.size != null
+      && (typeof payload.mediaData.size !== 'number' || payload.mediaData.size < 0 || payload.mediaData.size > 200 * 1024 * 1024)) {
+    socket.emit('error', { code: 'MEDIA_TOO_LARGE' });
+    return;
+  }
+
   // Verify membership
   const member = await prisma.chatMember.findUnique({
     where: { chatId_userId: { chatId: payload.chatId, userId } },
   });
   if (!member) throw new Error('Not a member');
 
+  // SECURITY: replyToId должен указывать на сообщение из того же чата
+  if (payload.replyToId) {
+    const replyTarget = await prisma.message.findUnique({
+      where: { id: payload.replyToId },
+      select: { chatId: true },
+    });
+    if (!replyTarget || replyTarget.chatId !== payload.chatId) {
+      socket.emit('error', { code: 'BAD_REPLY_TARGET', message: 'Reply target not in this chat' });
+      return;
+    }
+  }
+
   // Block check: если получатель в директе заблокировал отправителя — отказ
   if (await isBlockedDirect(payload.chatId, userId)) {
     socket.emit('error', { code: 'BLOCKED', message: 'You are blocked by this user' });
     return;
+  }
+
+  // SECURITY: валидация mediaData.url — пользователь может прикрепить ТОЛЬКО
+  // объект, который сам загрузил (путь начинается с <type>/<userId>/).
+  // Без этой проверки можно прикреплять чужие медиа к своим сообщениям и через
+  // membership-проверку в GET /media/:object получать доступ к чужим файлам.
+  if (payload.mediaData) {
+    const ownershipOk = isMediaOwnedByUser(payload.mediaData, payload.type, userId);
+    if (!ownershipOk) {
+      socket.emit('error', { code: 'MEDIA_FORBIDDEN', message: 'Media URL does not belong to you' });
+      return;
+    }
   }
 
   // Forward: проверяем доступ к источнику
@@ -411,6 +521,26 @@ async function handleMessageRead(
 ): Promise<void> {
   const { userId } = socket;
 
+  // Базовая валидация
+  if (typeof messageId !== 'string' || typeof chatId !== 'string'
+      || messageId.length > 64 || chatId.length > 64) return;
+
+  // SECURITY: проверяем что:
+  //  1) юзер действительно состоит в этом чате
+  //  2) messageId принадлежит этому чату (не подделка из чужого чата)
+  const [member, message] = await Promise.all([
+    prisma.chatMember.findUnique({
+      where: { chatId_userId: { chatId, userId } },
+      select: { leftAt: true },
+    }),
+    prisma.message.findUnique({
+      where: { id: messageId },
+      select: { chatId: true },
+    }),
+  ]);
+  if (!member || member.leftAt) return;
+  if (!message || message.chatId !== chatId) return;
+
   await prisma.messageRead.upsert({
     where: { messageId_userId: { messageId, userId } },
     update: {},
@@ -458,4 +588,42 @@ async function broadcastUserStatus(
   memberships.forEach(({ chatId }) => {
     io.to(`chat:${chatId}`).emit('user:status', { userId, status, lastSeenAt });
   });
+}
+
+/**
+ * Проверяет что URL (и опционально thumbnailUrl) в payload.mediaData принадлежат
+ * текущему юзеру: путь объекта в MinIO должен иметь префикс `<type>/<userId>/`.
+ *
+ * Без этой проверки можно прикреплять чужие объекты (получая через них доступ
+ * к чужим медиа в `GET /api/media/...`).
+ */
+function isMediaOwnedByUser(
+  mediaData: { url?: string; thumbnailUrl?: string | null } | null | undefined,
+  messageType: string,
+  userId: string,
+): boolean {
+  if (!mediaData?.url || typeof mediaData.url !== 'string') return false;
+
+  const allowedPrefixes = expectedPrefixesFor(messageType, userId);
+  if (!check(mediaData.url, allowedPrefixes)) return false;
+  if (mediaData.thumbnailUrl && !check(mediaData.thumbnailUrl, allowedPrefixes)) return false;
+  return true;
+
+  function check(url: string, prefixes: string[]): boolean {
+    const obj = extractObjectName(url);
+    if (!obj) return false;
+    if (obj.includes('..') || obj.startsWith('/')) return false;
+    return prefixes.some((p) => obj.startsWith(p));
+  }
+
+  function expectedPrefixesFor(type: string, uid: string): string[] {
+    switch (type) {
+      case 'image':  return [`image/${uid}/`];
+      case 'video':  return [`video/${uid}/`];
+      case 'voice':  return [`voice/${uid}/`];
+      case 'circle': return [`circle/${uid}/`, `video/${uid}/`]; // circle хранится как video в зависимости от платформы
+      case 'file':   return [`file/${uid}/`];
+      default:       return []; // text/system не должны иметь mediaData
+    }
+  }
 }

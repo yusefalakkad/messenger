@@ -1,4 +1,6 @@
 import * as Minio from 'minio';
+import crypto from 'node:crypto';
+import { Readable } from 'stream';
 import { config } from '../config';
 import { logger } from './logger';
 
@@ -17,18 +19,8 @@ export async function initializeMinio(): Promise<void> {
     await minioClient.makeBucket(bucketName, 'us-east-1');
     logger.info(`MinIO bucket '${bucketName}' created`);
   }
-  // Всегда устанавливаем политику публичного чтения
-  const policy = JSON.stringify({
-    Version: '2012-10-17',
-    Statement: [{
-      Effect: 'Allow',
-      Principal: { AWS: ['*'] },
-      Action: ['s3:GetObject'],
-      Resource: [`arn:aws:s3:::${bucketName}/*`],
-    }],
-  });
-  await minioClient.setBucketPolicy(bucketName, policy);
-  logger.info(`MinIO bucket '${bucketName}' ready`);
+  // Bucket остаётся приватным — раздача идёт через GET /api/media/:path с auth-проверкой.
+  logger.info(`MinIO bucket '${bucketName}' ready (private)`);
 }
 
 export async function uploadFile(
@@ -44,12 +36,29 @@ export async function uploadFile(
     size,
     { 'Content-Type': mimeType },
   );
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-  return `${clientUrl}/media/${objectName}`;
+  // Относительный URL — раздаётся через auth-checked backend route.
+  return `/api/media/${objectName}`;
 }
 
 export async function deleteFile(objectName: string): Promise<void> {
   await minioClient.removeObject(config.minio.bucket, objectName);
+}
+
+export async function getObjectStream(objectName: string): Promise<Readable> {
+  return minioClient.getObject(config.minio.bucket, objectName);
+}
+
+export async function statObject(objectName: string): Promise<Minio.BucketItemStat> {
+  return minioClient.statObject(config.minio.bucket, objectName);
+}
+
+/** Извлекает objectName из URL вида `/api/media/foo/bar.jpg` или старого `${CLIENT_URL}/media/...`. */
+export function extractObjectName(url: string): string | null {
+  const apiMatch = url.match(/\/api\/media\/(.+)$/);
+  if (apiMatch) return apiMatch[1];
+  const legacyMatch = url.match(/\/media\/(.+)$/);
+  if (legacyMatch) return legacyMatch[1];
+  return null;
 }
 
 export function generateObjectName(
@@ -57,7 +66,9 @@ export function generateObjectName(
   type: 'image' | 'video' | 'voice' | 'circle' | 'avatar' | 'file',
   ext: string,
 ): string {
+  // 16 байт = 128 бит энтропии. ~3.4e38 вариантов — не подобрать перебором,
+  // в отличие от Math.random().toString(36).slice(2,8) (~2 млрд вариантов на timestamp).
+  const random = crypto.randomBytes(16).toString('hex');
   const timestamp = Date.now();
-  const random = Math.random().toString(36).slice(2, 8);
   return `${type}/${userId}/${timestamp}_${random}.${ext}`;
 }

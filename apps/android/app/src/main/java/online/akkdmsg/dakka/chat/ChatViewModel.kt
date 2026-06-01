@@ -43,6 +43,12 @@ class ChatViewModel(
     private val _typingUsers = MutableStateFlow<Set<String>>(emptySet())
     val typingUsers: StateFlow<Set<String>> = _typingUsers.asStateFlow()
 
+    private val _replyingTo = MutableStateFlow<Message?>(null)
+    val replyingTo: StateFlow<Message?> = _replyingTo.asStateFlow()
+
+    private val _editing = MutableStateFlow<Message?>(null)
+    val editing: StateFlow<Message?> = _editing.asStateFlow()
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
@@ -82,6 +88,28 @@ class ChatViewModel(
         _draft.value = ""
         SocketClient.setTyping(chat.id, false)
 
+        // Edit mode: отправляем message:edit вместо нового сообщения
+        val editingMsg = _editing.value
+        if (editingMsg != null) {
+            _editing.value = null
+            val recipient = chat.otherMember(currentUserId)
+            val recipientPub = recipient?.user?.publicKey
+            if (isE2E && privateKey != null && !recipientPub.isNullOrBlank()) {
+                runCatching {
+                    val enc = E2E.encryptText(t, recipientPub, privateKey)
+                    SocketClient.editMessage(editingMsg.id, chat.id, enc.ciphertextB64, enc.nonceB64, true)
+                }.onFailure {
+                    SocketClient.editMessage(editingMsg.id, chat.id, t, null, false)
+                }
+            } else {
+                SocketClient.editMessage(editingMsg.id, chat.id, t, null, false)
+            }
+            return
+        }
+
+        val replyId = _replyingTo.value?.id
+        _replyingTo.value = null
+
         val recipient = chat.otherMember(currentUserId)
         val recipientPub = recipient?.user?.publicKey
         val payload: SendMessagePayload = if (isE2E && privateKey != null && !recipientPub.isNullOrBlank()) {
@@ -93,16 +121,70 @@ class ChatViewModel(
                     content = enc.ciphertextB64,
                     nonce = enc.nonceB64,
                     encrypted = true,
+                    replyToId = replyId,
                 )
             } catch (e: Exception) {
-                // fallback на plaintext если шифрование сломалось
-                SendMessagePayload(chatId = chat.id, type = "text", content = t, encrypted = false)
+                SendMessagePayload(chatId = chat.id, type = "text", content = t,
+                    encrypted = false, replyToId = replyId)
             }
         } else {
-            SendMessagePayload(chatId = chat.id, type = "text", content = t, encrypted = false)
+            SendMessagePayload(chatId = chat.id, type = "text", content = t,
+                encrypted = false, replyToId = replyId)
         }
         SocketClient.send(payload)
     }
+
+    // ── Reply / Edit / Delete / React / Forward ──────────────────────────────
+
+    fun beginReply(message: Message) {
+        _replyingTo.value = message
+        _editing.value = null
+    }
+    fun cancelReply() { _replyingTo.value = null }
+
+    fun beginEdit(message: Message) {
+        if (message.senderId != currentUserId) return
+        _editing.value = message
+        _replyingTo.value = null
+        _draft.value = displayContent(message) ?: message.content.orEmpty()
+    }
+    fun cancelEdit() {
+        _editing.value = null
+        _draft.value = ""
+    }
+
+    fun react(message: Message, emoji: String) {
+        SocketClient.reactToMessage(message.id, chat.id, emoji)
+    }
+
+    fun delete(message: Message) {
+        SocketClient.deleteMessageRemote(message.id, chat.id)
+        // Локально удаляем для отзывчивости
+        _messages.value = _messages.value.filter { it.id != message.id }
+    }
+
+    fun forward(message: Message, targetChatId: String) {
+        SocketClient.send(SendMessagePayload(
+            chatId = targetChatId,
+            type = message.type,
+            forwardedFromId = message.id,
+        ))
+    }
+
+    /** Короткое превью для ReplyBar/cited-message. */
+    fun previewText(msg: Message): String = when (msg.type) {
+        "voice"  -> "🎙 Голосовое"
+        "image"  -> "📷 Фото"
+        "circle" -> "⭕ Видео-кружок"
+        "video"  -> "🎬 Видео"
+        "file"   -> "📎 Файл"
+        else     -> displayContent(msg)?.takeIf { it.isNotBlank() } ?: msg.content.orEmpty()
+    }
+
+    private val _scrollTarget = MutableStateFlow<String?>(null)
+    val scrollTarget: StateFlow<String?> = _scrollTarget.asStateFlow()
+    fun requestScrollTo(messageId: String) { _scrollTarget.value = messageId }
+    fun consumeScrollTarget() { _scrollTarget.value = null }
 
     /**
      * Возвращает текст для отображения: расшифрованный (если encrypted),
@@ -185,6 +267,65 @@ class ChatViewModel(
         }
     }
 
+    // ── Видео (полноразмерное) ───────────────────────────────────────────────
+
+    fun sendVideo(file: File, durationSec: Int) {
+        viewModelScope.launch {
+            try {
+                if (file.length() > 100L * 1024 * 1024) {
+                    _error.value = "Видео слишком большое (макс. 100 МБ)"
+                    file.delete()
+                    return@launch
+                }
+                val media = MediaService.uploadVideo(file, durationSec)
+                val payload = SendMessagePayload(
+                    chatId = chat.id,
+                    type = "video",
+                    mediaData = MediaPayload(
+                        url = media.url,
+                        mimeType = media.mimeType,
+                        size = media.size,
+                        duration = durationSec.toDouble(),
+                        width = media.width,
+                        height = media.height,
+                    ),
+                )
+                SocketClient.send(payload)
+                file.delete()
+            } catch (e: Exception) {
+                _error.value = "Не удалось отправить видео: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Загрузить готовый видео-файл из системного picker'а (content:// uri).
+     * Копирует во временный кэш-файл и шлёт через [sendVideo].
+     */
+    fun sendVideoFromUri(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            try {
+                val resolver = context.contentResolver
+                val tmp = File(context.cacheDir, "video-pick-${System.currentTimeMillis()}.mp4")
+                resolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { out -> input.copyTo(out) }
+                } ?: run {
+                    _error.value = "Не удалось прочитать видео"
+                    return@launch
+                }
+                if (tmp.length() > 100L * 1024 * 1024) {
+                    _error.value = "Видео слишком большое (макс. 100 МБ)"
+                    tmp.delete()
+                    return@launch
+                }
+                // duration не известен из uri — оставим 0, сервер всё равно сохранит как есть
+                sendVideo(tmp, 0)
+            } catch (e: Exception) {
+                _error.value = "Не удалось отправить видео: ${e.message}"
+            }
+        }
+    }
+
     // ── Кружок ───────────────────────────────────────────────────────────────
 
     fun sendCircle(file: File, durationSec: Int) {
@@ -247,6 +388,15 @@ class ChatViewModel(
                 if (event.chatId != chat.id || event.userId == currentUserId) return@collect
                 _typingUsers.value = if (event.isTyping) _typingUsers.value + event.userId
                                     else _typingUsers.value - event.userId
+            }
+        }
+        // Реакции, edit — бэк шлёт только messageId; перезатягиваем список.
+        viewModelScope.launch {
+            SocketClient.messageUpdated.collect { messageId ->
+                if (!_messages.value.any { it.id == messageId }) return@collect
+                try {
+                    _messages.value = ChatApi.listMessages(chat.id).sortedBy { it.createdAt }
+                } catch (_: Exception) { /* offline-ok */ }
             }
         }
     }

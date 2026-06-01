@@ -1,0 +1,36 @@
+# ─── LiveKit SFU config ──────────────────────────────────────────────────────
+# Используется для групповых аудио/видео звонков (до 8 участников).
+# 1-на-1 звонки идут НЕ через LiveKit, а через прямой peer-to-peer WebRTC.
+#
+# LiveKit умеет подставлять переменные окружения в конфиг через ${VAR}-синтаксис
+# (binary lookup: process.env). См. livekit/livekit#1320.
+#
+# ВАЖНО: ${LIVEKIT_API_KEY}/${LIVEKIT_API_SECRET} должны быть заданы в .env.
+# Если оператор предпочитает hardcode — заменить блок keys: на статичные значения.
+
+port: 7880
+
+rtc:
+  # TCP fallback — для клиентов за рестриктивным NAT/firewall, где UDP заблочен.
+  tcp_port: 7881
+  # UDP-диапазон для медиа. Должен совпадать с диапазоном в docker-compose.yml.
+  udp_port_range_start: 50000
+  udp_port_range_end:   50099
+  # use_external_ip — авто-резолв публичного IP через STUN. Нужно когда LiveKit
+  # запущен за NAT (docker bridge, VPS с эластичным IP, и т.д.).
+  use_external_ip: true
+
+# Ключ API/secret для подписи AccessToken. Backend (livekit-server-sdk) подписывает
+# JWT этим же секретом и отдаёт клиенту через POST /api/livekit/token.
+keys:
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+
+logging:
+  level: info
+  json: false
+
+# Ограничения комнаты (auto-cleanup пустых комнат через 5 мин).
+room:
+  auto_create: true
+  empty_timeout: 300
+  max_participants: 8

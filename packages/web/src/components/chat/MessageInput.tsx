@@ -13,11 +13,13 @@ import { clsx } from 'clsx';
 import { sendMessage, sendTyping } from '@/lib/socket';
 import { api } from '@/lib/api';
 import { haptic } from '@/lib/native';
+import { toast } from '@/lib/toast';
 import { encryptText, isChatE2E, getRecipientPublicKey } from '@/lib/e2e';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { editMessage as socketEditMsg } from '@/lib/socket';
 import CircleRecorder from '@/components/media/CircleRecorder';
+import VideoRecorder from '@/components/chat/VideoRecorder';
 import MediaPreview, { type PendingMedia } from '@/components/media/MediaPreview';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import IconBtn from '@/components/ui/IconBtn';
@@ -34,6 +36,7 @@ export default function MessageInput({ chatId }: Props) {
   const [showAttach,   setShowAttach]   = useState(false);
   const [showEmoji,    setShowEmoji]    = useState(false);
   const [showCircle,   setShowCircle]   = useState(false);
+  const [showVideoRec, setShowVideoRec] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const [uploading,    setUploading]    = useState(false);
   const [uploadError,  setUploadError]  = useState<string | null>(null);
@@ -156,19 +159,35 @@ export default function MessageInput({ chatId }: Props) {
     const replyToId = replyingTo?.id;
     setReplyingTo(null);
 
-    if (chat && user && privateKey && isChatE2E(chat)) {
+    if (chat && isChatE2E(chat)) {
+      // E2E-чат — отправка ОБЯЗАНА быть зашифрованной. Никакого fallback в plaintext.
+      if (!user || !privateKey) {
+        haptic.error?.();
+        toast.error('Не удалось отправить: приватный ключ недоступен. Перелогиньтесь.');
+        setText(t); // вернём текст в поле, чтобы пользователь не потерял
+        return;
+      }
       const recipientPub = getRecipientPublicKey(chat, user.id);
-      if (recipientPub) {
-        try {
-          const { ciphertext, nonce } = await encryptText(chatId, t, recipientPub, privateKey);
-          sendMessage({ chatId, type: 'text', content: ciphertext, nonce, encrypted: true, replyToId });
-          return;
-        } catch (err) {
-          console.error('[E2E] Encryption failed, falling back to plaintext', err);
-        }
+      if (!recipientPub) {
+        haptic.error?.();
+        toast.error('Не удалось отправить: у получателя нет ключа шифрования.');
+        setText(t);
+        return;
+      }
+      try {
+        const { ciphertext, nonce } = await encryptText(chatId, t, recipientPub, privateKey);
+        sendMessage({ chatId, type: 'text', content: ciphertext, nonce, encrypted: true, replyToId });
+        return;
+      } catch (err) {
+        console.error('[E2E] Encryption failed', err);
+        haptic.error?.();
+        toast.error('Ошибка шифрования. Сообщение не отправлено.');
+        setText(t);
+        return;
       }
     }
 
+    // Чат БЕЗ E2E (например, групповой) — обычная отправка
     sendMessage({ chatId, type: 'text', content: t, replyToId });
   }, [chatId, text, editingMessage, replyingTo]);
 
@@ -439,11 +458,62 @@ export default function MessageInput({ chatId }: Props) {
     finally { setUploading(false); }
   }, [chatId]);
 
+  // ─── Видео-сообщение (запись через камеру) ──────────────────────────────────
+
+  const handleVideoRecorded = useCallback(async (blob: Blob, duration: number, thumbDataUrl: string) => {
+    setShowVideoRec(false);
+    if (blob.size > 100 * 1024 * 1024) {
+      setUploadError('Видео слишком большое (макс. 100 МБ)');
+      setTimeout(() => setUploadError(null), 3000);
+      return;
+    }
+    setUploading(true);
+    try {
+      // 1. Загружаем превью-кадр (poster)
+      let thumbnailUrl: string | undefined;
+      try {
+        const res = await fetch(thumbDataUrl);
+        const tb  = await res.blob();
+        const tf  = new FormData();
+        tf.append('file', tb, 'thumb.jpg');
+        const { data: td } = await api.post('/media/upload/image', tf);
+        thumbnailUrl = td.data.url;
+      } catch { /* poster — необязательный */ }
+
+      // 2. Загружаем само видео
+      const form = new FormData();
+      form.append('file', blob, 'video.webm');
+      const { data } = await api.post('/media/upload/video', form);
+      const m = data.data;
+
+      sendMessage({
+        chatId,
+        type: 'video',
+        mediaData: {
+          url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size,
+          duration: Math.max(1, Math.round(duration)),
+          width: m.width, height: m.height,
+        },
+      });
+    } catch (err) {
+      console.error('Video upload failed', err);
+      setUploadError('Не удалось отправить видео');
+      setTimeout(() => setUploadError(null), 3000);
+    } finally { setUploading(false); }
+  }, [chatId]);
+
   // ─── Файл (фото / видео) ──────────────────────────────────────────────────────
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Лимит 100 МБ для видео
+    if (type === 'video' && file.size > 100 * 1024 * 1024) {
+      setUploadError('Видео слишком большое (макс. 100 МБ)');
+      setTimeout(() => setUploadError(null), 3000);
+      e.target.value = '';
+      return;
+    }
     setPendingMedia({ file, type, previewUrl: URL.createObjectURL(file) });
     setShowAttach(false);
     e.target.value = '';
@@ -488,6 +558,11 @@ export default function MessageInput({ chatId }: Props) {
         )}
       </AnimatePresence>
       <AnimatePresence>
+        {showVideoRec && (
+          <VideoRecorder onRecorded={handleVideoRecorded} onCancel={() => setShowVideoRec(false)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {pendingMedia && (
           <MediaPreview media={pendingMedia} onSend={handleMediaSend} onCancel={handleMediaCancel} />
         )}
@@ -496,7 +571,7 @@ export default function MessageInput({ chatId }: Props) {
       {/* Hidden file inputs */}
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => handleFileChange(e, 'image')} />
-      <input ref={videoInputRef} type="file" accept="video/*" className="hidden"
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
         onChange={(e) => handleFileChange(e, 'video')} />
 
       {/* ─── Основная панель ─── */}
@@ -583,7 +658,11 @@ export default function MessageInput({ chatId }: Props) {
                   onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
                 />
                 <DropdownItem
-                  icon={<Video size={16} />} label="Видео"
+                  icon={<Video size={16} />} label="Снять видео"
+                  onClick={() => { setShowVideoRec(true); setShowAttach(false); }}
+                />
+                <DropdownItem
+                  icon={<Video size={16} />} label="Видео (файл)"
                   onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}
                 />
                 <DropdownItem

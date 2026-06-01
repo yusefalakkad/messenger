@@ -110,4 +110,7 @@ dependencies {
     // Firebase Cloud Messaging — push-уведомления
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+
+    // ZXing — QR-коды для 2FA
+    implementation(libs.zxing.core)
 }

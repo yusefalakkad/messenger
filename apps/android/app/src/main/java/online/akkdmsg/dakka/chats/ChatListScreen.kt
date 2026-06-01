@@ -1,7 +1,13 @@
 package online.akkdmsg.dakka.chats
 
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
@@ -31,7 +38,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import online.akkdmsg.dakka.auth.AuthStore
+import online.akkdmsg.dakka.data.Chat
+import online.akkdmsg.dakka.data.api.ApiClient
+import online.akkdmsg.dakka.data.api.ChatActions
 import online.akkdmsg.dakka.data.api.SocketClient
 import online.akkdmsg.dakka.ui.components.AmbientBackground
 import online.akkdmsg.dakka.ui.components.Avatar
@@ -44,6 +55,7 @@ fun ChatListScreen(
     onSettingsClick: () -> Unit,
     onNewChatClick: () -> Unit,
     onNewGroupClick: () -> Unit,
+    onArchiveClick: () -> Unit = {},
     vm: ChatListViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -51,9 +63,13 @@ fun ChatListScreen(
     val user by auth.user.collectAsState()
     val socketConnected by SocketClient.connected.collectAsState()
     val chats by vm.filteredChats.collectAsState()
+    val archivedCount by vm.archivedCount.collectAsState()
     val loading by vm.loading.collectAsState()
     val error by vm.error.collectAsState()
     val search by vm.search.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    var menuChat by remember { mutableStateOf<Chat?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         AmbientBackground()
@@ -138,7 +154,45 @@ fun ChatListScreen(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            // Archive bar
+            AnimatedVisibility(
+                visible = archivedCount > 0,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.animateContentSize(),
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.04f))
+                        .clickable(onClick = onArchiveClick)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.Archive,
+                        contentDescription = null,
+                        tint = DakkaColor.Violet,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = "Архив",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = archivedCount.toString(),
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
 
             // Content
             when {
@@ -168,10 +222,55 @@ fun ChatListScreen(
                             chat = chat,
                             currentUserId = user?.id,
                             onClick = { onChatClick(chat.id) },
+                            onLongClick = { menuChat = chat },
+                            modifier = Modifier.animateContentSize(),
                         )
                     }
                 }
             }
+        }
+
+        menuChat?.let { chat ->
+            ChatRowContextMenu(
+                chat = chat,
+                currentUserId = user?.id,
+                onDismiss = { menuChat = null },
+                onTogglePin = {
+                    scope.launch {
+                        runCatching { ChatActions.pinChat(chat.id, chat.pinnedAt == null) }
+                            .onFailure { e ->
+                                val msg = if (e is ApiClient.ApiException && e.statusCode == 400)
+                                    "Можно закрепить не больше 5 чатов"
+                                else e.message ?: "Не удалось"
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                },
+                onToggleArchive = {
+                    scope.launch {
+                        runCatching { ChatActions.archiveChat(chat.id, chat.archivedAt == null) }
+                            .onFailure { e ->
+                                Toast.makeText(
+                                    context,
+                                    e.message ?: "Не удалось",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                    }
+                },
+                onMute = { until ->
+                    scope.launch {
+                        runCatching { ChatActions.muteChat(chat.id, until) }
+                            .onFailure { e ->
+                                Toast.makeText(
+                                    context,
+                                    e.message ?: "Не удалось",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                    }
+                },
+            )
         }
     }
 }

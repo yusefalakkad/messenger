@@ -1,6 +1,7 @@
 package online.akkdmsg.dakka.call
 
 import android.content.Context
+import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -105,6 +106,31 @@ object CallManager {
 
     fun switchCamera() {
         rtc?.switchCamera()
+    }
+
+    /**
+     * Включает шеринг экрана. Должен вызываться после получения RESULT_OK от
+     * [android.media.projection.MediaProjectionManager.createScreenCaptureIntent].
+     * Параллельно стартует foreground-сервис (Android 14+ требование).
+     */
+    fun startScreenShare(permissionData: Intent) {
+        val ctx = appContext ?: return
+        val r = rtc ?: return
+        // Стартуем сервис ДО запуска ScreenCapturer'а — иначе SecurityException на 14+.
+        ScreenShareService.start(ctx)
+        val ok = r.startScreenShare(permissionData)
+        if (ok) {
+            CallStore.setSharingScreen(true)
+        } else {
+            ScreenShareService.stop(ctx)
+        }
+    }
+
+    fun stopScreenShare() {
+        val ctx = appContext
+        rtc?.stopScreenShare()
+        CallStore.setSharingScreen(false)
+        if (ctx != null) ScreenShareService.stop(ctx)
     }
 
     val localVideoTrack get() = rtc?.localVideoTrack
@@ -220,6 +246,8 @@ object CallManager {
     }
 
     private fun teardown() {
+        // Останавливаем foreground-сервис шеринга, если был активен.
+        appContext?.let { ScreenShareService.stop(it) }
         rtc?.close()
         rtc = null
         eglBase?.release()

@@ -8,43 +8,101 @@ import { sendSuccess, AppError } from '../utils/response';
 
 const router = Router();
 
-// GET /chats — list user's chats
+/**
+ * Список чатов с обогащением per-user state.
+ *  - selfMember: { pinnedAt, archivedAt, mutedUntil } текущего юзера
+ *  - unreadCount
+ *  - sorted: pinned первыми (pinnedAt DESC), затем по lastMessage.createdAt DESC
+ *  - archived чаты исключены по умолчанию; ?includeArchived=1 чтобы включить;
+ *    onlyArchived=true возвращает только архив.
+ */
+async function listUserChats(
+  userId: string,
+  opts: { includeArchived?: boolean; onlyArchived?: boolean } = {},
+) {
+  const { includeArchived = false, onlyArchived = false } = opts;
+
+  const memberFilter = onlyArchived
+    ? { userId, leftAt: null, archivedAt: { not: null } }
+    : includeArchived
+      ? { userId, leftAt: null }
+      : { userId, leftAt: null, archivedAt: null };
+
+  const chats = await prisma.chat.findMany({
+    where: { members: { some: memberFilter } },
+    include: {
+      members: {
+        where: { leftAt: null },
+        include: {
+          user: {
+            select: {
+              id: true, username: true, displayName: true, avatar: true,
+              status: true, publicKey: true,
+            },
+          },
+        },
+      },
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: { sender: { select: { id: true, displayName: true } } },
+      },
+    },
+  });
+
+  const enriched = await Promise.all(chats.map(async (chat) => {
+    const selfMember = chat.members.find((m) => m.userId === userId);
+    const unreadCount = await prisma.message.count({
+      where: {
+        chatId: chat.id,
+        deletedAt: null,
+        senderId: { not: userId },
+        reads: { none: { userId } },
+      },
+    });
+    return {
+      ...chat,
+      unreadCount,
+      pinnedAt:   selfMember?.pinnedAt ?? null,
+      archivedAt: selfMember?.archivedAt ?? null,
+      mutedUntil: selfMember?.mutedUntil ?? null,
+    };
+  }));
+
+  // Sort: pinned first (newest pin first), then by lastMessage.createdAt desc.
+  enriched.sort((a, b) => {
+    const aPinned = a.pinnedAt ? a.pinnedAt.getTime() : 0;
+    const bPinned = b.pinnedAt ? b.pinnedAt.getTime() : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    const aLast = a.messages[0]?.createdAt?.getTime() ?? a.updatedAt.getTime();
+    const bLast = b.messages[0]?.createdAt?.getTime() ?? b.updatedAt.getTime();
+    return bLast - aLast;
+  });
+
+  return enriched;
+}
+
+// GET /chats — list user's chats (non-archived by default)
 router.get('/',
+  requireAuth,
+  validate([query('includeArchived').optional().isIn(['0', '1', 'true', 'false'])]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const includeArchived = ['1', 'true'].includes((req.query.includeArchived as string) ?? '');
+      const result = await listUserChats(userId, { includeArchived });
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  },
+);
+
+// GET /chats/archived — only archived chats for current user
+router.get('/archived',
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId } = req as AuthRequest;
-      const chats = await prisma.chat.findMany({
-        where: {
-          members: { some: { userId, leftAt: null } },
-        },
-        include: {
-          members: {
-            where: { leftAt: null },
-            include: { user: { select: { id: true, username: true, displayName: true, avatar: true, status: true, publicKey: true } } },
-          },
-          messages: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            include: { sender: { select: { id: true, displayName: true } } },
-          },
-        },
-        orderBy: { updatedAt: 'desc' },
-      });
-
-      // Attach unread count per chat
-      const result = await Promise.all(chats.map(async (chat) => {
-        const unreadCount = await prisma.message.count({
-          where: {
-            chatId: chat.id,
-            deletedAt: null,
-            senderId: { not: userId },
-            reads: { none: { userId } },
-          },
-        });
-        return { ...chat, unreadCount };
-      }));
-
+      const result = await listUserChats(userId, { onlyArchived: true });
       sendSuccess(res, result);
     } catch (err) { next(err); }
   },
@@ -255,6 +313,13 @@ router.delete('/:chatId/messages',
 
       const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
       if (!member) throw new AppError(403, 'FORBIDDEN', 'You are not a member of this chat');
+
+      // SECURITY: в группах wipe истории — только owner/admin.
+      // В direct-чате разрешён обеим сторонам.
+      const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+      if (chat?.type === 'group' && member.role === 'member') {
+        throw new AppError(403, 'INSUFFICIENT_ROLE', 'Only admins can clear group history');
+      }
 
       await prisma.message.updateMany({
         where: { chatId, deletedAt: null },
@@ -491,6 +556,146 @@ router.get('/:chatId/media',
         }));
 
       sendSuccess(res, result);
+    } catch (err) { next(err); }
+  },
+);
+
+// ─── Per-user chat state: pin / archive / mute ────────────────────────────────
+
+const MAX_PINNED_CHATS = 5;
+// "forever" → 9999-12-31T23:59:59.999Z. Используем для permanent mute.
+const FOREVER_DATE = new Date('9999-12-31T23:59:59.999Z');
+
+function emitChatState(
+  req: Request,
+  userId: string,
+  chatId: string,
+  member: { pinnedAt: Date | null; archivedAt: Date | null; mutedUntil: Date | null },
+): void {
+  const io = req.app.get('io') as SocketServer | undefined;
+  io?.to(`user:${userId}`).emit('chat:state-updated', {
+    chatId,
+    pinned:     member.pinnedAt !== null,
+    archived:   member.archivedAt !== null,
+    pinnedAt:   member.pinnedAt,
+    archivedAt: member.archivedAt,
+    mutedUntil: member.mutedUntil,
+  });
+}
+
+// PATCH /chats/:chatId/pin   body { pinned: boolean }
+router.patch('/:chatId/pin',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('pinned').isBoolean(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const pinned: boolean = req.body.pinned === true || req.body.pinned === 'true';
+
+      const member = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!member || member.leftAt) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+
+      if (pinned && !member.pinnedAt) {
+        // Enforce pin limit (don't count already-pinned chat being re-pinned).
+        const pinnedCount = await prisma.chatMember.count({
+          where: { userId, pinnedAt: { not: null }, leftAt: null },
+        });
+        if (pinnedCount >= MAX_PINNED_CHATS) {
+          throw new AppError(400, 'PIN_LIMIT_REACHED',
+            `Cannot pin more than ${MAX_PINNED_CHATS} chats`);
+        }
+      }
+
+      const updated = await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId } },
+        data: { pinnedAt: pinned ? new Date() : null },
+        select: { pinnedAt: true, archivedAt: true, mutedUntil: true },
+      });
+
+      emitChatState(req, userId, chatId, updated);
+      sendSuccess(res, { chatId, ...updated });
+    } catch (err) { next(err); }
+  },
+);
+
+// PATCH /chats/:chatId/archive   body { archived: boolean }
+router.patch('/:chatId/archive',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('archived').isBoolean(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const archived: boolean = req.body.archived === true || req.body.archived === 'true';
+
+      const member = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!member || member.leftAt) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+
+      const updated = await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId } },
+        data: { archivedAt: archived ? new Date() : null },
+        select: { pinnedAt: true, archivedAt: true, mutedUntil: true },
+      });
+
+      emitChatState(req, userId, chatId, updated);
+      sendSuccess(res, { chatId, ...updated });
+    } catch (err) { next(err); }
+  },
+);
+
+// PATCH /chats/:chatId/mute   body { until: string|null }
+// null/undefined → unmute, "forever" → permanent, иначе ISO-string.
+router.patch('/:chatId/mute',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('until').custom((value) => {
+      if (value === null || value === undefined) return true;
+      if (typeof value !== 'string') throw new Error('until must be string or null');
+      if (value === 'forever') return true;
+      if (Number.isNaN(Date.parse(value))) throw new Error('until must be ISO-8601 or "forever"');
+      return true;
+    }),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const until = req.body.until as string | null | undefined;
+
+      const member = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!member || member.leftAt) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+
+      let mutedUntil: Date | null;
+      if (until === null || until === undefined) {
+        mutedUntil = null;
+      } else if (until === 'forever') {
+        mutedUntil = FOREVER_DATE;
+      } else {
+        mutedUntil = new Date(until);
+      }
+
+      const updated = await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId } },
+        data: { mutedUntil },
+        select: { pinnedAt: true, archivedAt: true, mutedUntil: true },
+      });
+
+      emitChatState(req, userId, chatId, updated);
+      sendSuccess(res, { chatId, ...updated });
     } catch (err) { next(err); }
   },
 );

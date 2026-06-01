@@ -1,10 +1,10 @@
 /**
  * Пузырёк сообщения — текст, голос, фото, видео, кружок.
  */
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
-import { Check, CheckCheck, Play, Pause, Lock } from 'lucide-react';
+import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight } from 'lucide-react';
 import { format } from 'date-fns';
 import Avatar from '@/components/ui/Avatar';
 import ImageViewer from '@/components/media/ImageViewer';
@@ -13,7 +13,25 @@ import { decryptMessage } from '@/lib/e2e';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { deleteMessage, editMessage as socketEditMessage, reactToMessage } from '@/lib/socket';
+import ForwardDialog from './ForwardDialog';
 import type { Message } from '@messenger/shared';
+
+// Парсит текст и подсвечивает @username. Returns массив React-узлов.
+const MENTION_RE = /(@[a-zA-Z0-9_]{3,32})/g;
+function renderRichText(text: string): ReactNode[] {
+  if (!text) return [];
+  return text.split(MENTION_RE).map((part, i) => {
+    if (MENTION_RE.test(part)) {
+      MENTION_RE.lastIndex = 0;
+      return (
+        <span key={i} className="text-primary-300 font-medium cursor-pointer hover:underline">
+          {part}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
 
 interface Props {
   message: Message;
@@ -26,6 +44,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
   const [viewerSrc,  setViewerSrc]  = useState<string | null>(null);
   const [viewerType, setViewerType] = useState<'image' | 'video'>('image');
   const [menuPos,    setMenuPos]    = useState<{ x: number; y: number } | null>(null);
+  const [forwarding, setForwarding] = useState(false);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setReplyingTo     = useChatStore((s) => s.setReplyingTo);
@@ -51,10 +70,11 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   };
 
-  const handleDelete = () => deleteMessage(message.id, message.chatId);
-  const handleEdit   = () => setEditingMessage(message);
-  const handleReply  = () => setReplyingTo(message);
-  const handleReact  = (emoji: string) => reactToMessage(message.id, message.chatId, emoji);
+  const handleDelete  = () => deleteMessage(message.id, message.chatId);
+  const handleEdit    = () => setEditingMessage(message);
+  const handleReply   = () => setReplyingTo(message);
+  const handleForward = () => setForwarding(true);
+  const handleReact   = (emoji: string) => reactToMessage(message.id, message.chatId, emoji);
 
   const time   = format(new Date(message.createdAt), 'HH:mm');
   const isRead = message.readBy && message.readBy.length > 0;
@@ -81,7 +101,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
         </div>
 
         <div
-          className={clsx('flex flex-col max-w-[70%]', isOwn ? 'items-end' : 'items-start')}
+          className={clsx('flex flex-col max-w-[85%] lg:max-w-[70%]', isOwn ? 'items-end' : 'items-start')}
           onContextMenu={handleContextMenu}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
@@ -153,12 +173,20 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
                 />
               )}
 
+              {/* Forwarded badge */}
+              {message.forwardedFromId && (
+                <div className="flex items-center gap-1 mb-1 text-xs text-primary-400/80">
+                  <CornerUpRight size={12} />
+                  <span>Пересланное сообщение</span>
+                </div>
+              )}
+
               {/* Текст (обычный или зашифрованный) */}
               {message.type === 'text' && (
                 message.encrypted
                   ? <EncryptedText message={message} chatId={chatId} />
                   : <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                      {message.content}
+                      {renderRichText(message.content ?? '')}
                       {message.editedAt && <span className="text-white/40 text-xs ml-1">(изм.)</span>}
                     </p>
               )}
@@ -211,10 +239,16 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
             onReply={handleReply}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onForward={handleForward}
             onReact={handleReact}
           />
         )}
       </AnimatePresence>
+
+      {/* Форвард-диалог */}
+      {forwarding && (
+        <ForwardDialog message={message} onClose={() => setForwarding(false)} />
+      )}
 
       {/* Просмотрщик фото/видео */}
       <AnimatePresence>
@@ -499,7 +533,7 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
 
   return (
     <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-      {plaintext}
+      {renderRichText(plaintext)}
     </p>
   );
 }

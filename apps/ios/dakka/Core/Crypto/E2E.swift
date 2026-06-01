@@ -128,15 +128,26 @@ enum E2E {
     // MARK: - Internal: shared key derivation + cache
 
     /// Кэш выведенных AES-ключей — экономит ECDH-операции при потоке сообщений.
-    /// Ключ кэша: первые 16 символов `theirPublicKeyB64`.
+    /// Ключ кэша: SHA-256 от ПОЛНОГО `theirPublicKeyB64`.
+    ///
+    /// CRITICAL: раньше использовалось `prefix(16)`. У всех P-256 SPKI base64
+    /// первые ~36 символов идентичны (DER-префикс алгоритма), поэтому prefix
+    /// возвращал бы одинаковую строку для разных пиров → cross-chat
+    /// confidentiality break (один derived key для всех чатов).
     private static var sharedKeyCache: [String: SymmetricKey] = [:]
     private static let cacheLock = NSLock()
+
+    private static func cacheKey(forPublicKey b64: String) -> String {
+        let data = Data(b64.utf8)
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
 
     private static func deriveSharedKey(
         theirPublicKeyB64: String,
         myPrivateKeyB64: String
     ) throws -> SymmetricKey {
-        let cacheKey = String(theirPublicKeyB64.prefix(16))
+        let cacheKey = Self.cacheKey(forPublicKey: theirPublicKeyB64)
         cacheLock.lock(); defer { cacheLock.unlock() }
         if let cached = sharedKeyCache[cacheKey] { return cached }
 
@@ -165,6 +176,12 @@ enum E2E {
 
         sharedKeyCache[cacheKey] = key
         return key
+    }
+
+    /// Очистить кэш — вызывать при logout.
+    static func clearCache() {
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        sharedKeyCache.removeAll()
     }
 
     /// Полная очистка кэша — вызывать при logout.

@@ -169,4 +169,7 @@ data class Chat(
     val unreadCount: Int = 0,
     val createdAt: String? = null,
     val updatedAt: String? = null,
+    val pinnedAt: String? = null,
+    val archivedAt: String? = null,
+    val mutedUntil: String? = null,
 )

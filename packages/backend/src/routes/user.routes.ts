@@ -30,6 +30,19 @@ router.get('/search',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const q = req.query.q as string;
+      const { userId } = req as AuthRequest;
+
+      // Списки тех, кого я заблокировал и кто заблокировал меня — исключаем из поиска
+      const [blockedByMe, blockingMe] = await Promise.all([
+        prisma.contact.findMany({ where: { ownerId: userId, blocked: true }, select: { targetId: true } }),
+        prisma.contact.findMany({ where: { targetId: userId, blocked: true }, select: { ownerId: true } }),
+      ]);
+      const excludedIds = new Set([
+        userId,
+        ...blockedByMe.map((b) => b.targetId),
+        ...blockingMe.map((b) => b.ownerId),
+      ]);
+
       const users = await prisma.user.findMany({
         where: {
           deletedAt: null,
@@ -38,7 +51,7 @@ router.get('/search',
             { displayName: { contains: q, mode: 'insensitive' } },
             { phone: q },
           ],
-          NOT: { id: (req as AuthRequest).userId },
+          id: { notIn: [...excludedIds] },
         },
         select: { id: true, username: true, displayName: true, avatar: true, bio: true, publicKey: true },
         take: 20,
@@ -82,6 +95,65 @@ router.patch('/me',
         select: { id: true, username: true, displayName: true, avatar: true, bio: true },
       });
       sendSuccess(res, user);
+    } catch (err) { next(err); }
+  },
+);
+
+// POST /users/:id/block — заблокировать юзера
+router.post('/:id/block',
+  requireAuth,
+  validate([param('id').notEmpty()]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const targetId = req.params.id;
+      if (userId === targetId) {
+        res.status(400).json({ success: false, error: { code: 'SELF_BLOCK', message: 'Cannot block yourself' } });
+        return;
+      }
+      const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
+      if (!target) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } }); return; }
+
+      await prisma.contact.upsert({
+        where: { ownerId_targetId: { ownerId: userId, targetId } },
+        create: { ownerId: userId, targetId, blocked: true },
+        update: { blocked: true },
+      });
+      sendSuccess(res, { blocked: true });
+    } catch (err) { next(err); }
+  },
+);
+
+// POST /users/:id/unblock — снять блок
+router.post('/:id/unblock',
+  requireAuth,
+  validate([param('id').notEmpty()]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const targetId = req.params.id;
+      await prisma.contact.updateMany({
+        where: { ownerId: userId, targetId },
+        data: { blocked: false },
+      });
+      sendSuccess(res, { blocked: false });
+    } catch (err) { next(err); }
+  },
+);
+
+// GET /users/me/blocks — список заблокированных
+router.get('/me/blocks',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const blocks = await prisma.contact.findMany({
+        where: { ownerId: userId, blocked: true },
+        select: {
+          target: { select: { id: true, username: true, displayName: true, avatar: true } },
+        },
+      });
+      sendSuccess(res, blocks.map((b) => b.target));
     } catch (err) { next(err); }
   },
 );

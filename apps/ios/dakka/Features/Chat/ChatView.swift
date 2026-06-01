@@ -6,6 +6,7 @@ struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var forwardingMessage: Message?
     @State private var showingCircleRecorder = false
+    @State private var showingVideoRecorder = false
     @State private var showingProfile = false
     @State private var showingSearch = false
     @State private var scrollToMessageId: String?
@@ -51,7 +52,8 @@ struct ChatView: View {
                     onImageSelected: { prepared in
                         Task { await vm.sendImage(prepared: prepared) }
                     },
-                    onCircleRequested: { showingCircleRecorder = true }
+                    onCircleRequested: { showingCircleRecorder = true },
+                    onVideoRequested: { showingVideoRecorder = true }
                 )
             }
         }
@@ -80,6 +82,15 @@ struct ChatView: View {
                     Task { await vm.sendCircle(fileURL: url, duration: dur) }
                 },
                 onCancel: { showingCircleRecorder = false }
+            )
+        }
+        .fullScreenCover(isPresented: $showingVideoRecorder) {
+            VideoRecorderView(
+                onRecorded: { url, dur in
+                    showingVideoRecorder = false
+                    Task { await vm.sendVideo(fileURL: url, duration: dur) }
+                },
+                onCancel: { showingVideoRecorder = false }
             )
         }
         .sheet(isPresented: $showingProfile) {

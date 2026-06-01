@@ -82,10 +82,23 @@ class AuthStore private constructor(context: Context) {
         return runCatching { json.decodeFromString(User.serializer(), raw) }.getOrNull()
     }
 
+    /** Стабильный per-install идентификатор устройства. Используется при login/refresh. */
+    val deviceId: String
+        get() {
+            prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
+            val newId = java.util.UUID.randomUUID().toString()
+            prefs.edit().putString(KEY_DEVICE_ID, newId).apply()
+            return newId
+        }
+
+    val deviceName: String
+        get() = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}"
+
     companion object {
         private const val KEY_USER = "user"
         private const val KEY_TOKEN = "access_token"
         private const val KEY_PRIVATE_KEY = "private_key"
+        private const val KEY_DEVICE_ID = "device_id"
 
         @Volatile
         private var INSTANCE: AuthStore? = null

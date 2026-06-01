@@ -1,5 +1,10 @@
 package online.akkdmsg.dakka.call
 
+import android.app.Activity
+import android.content.Context
+import android.media.projection.MediaProjectionManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +17,8 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.ScreenShare
+import androidx.compose.material.icons.filled.StopScreenShare
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
@@ -31,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import online.akkdmsg.dakka.ui.components.AmbientBackground
@@ -43,7 +51,19 @@ fun ActiveCallView(info: CallInfo, isOutgoing: Boolean) {
     val muted by CallStore.isMuted.collectAsState()
     val videoOff by CallStore.isVideoOff.collectAsState()
     val speaker by CallStore.isSpeakerOn.collectAsState()
+    val sharingScreen by CallStore.isSharingScreen.collectAsState()
     val state by CallStore.state.collectAsState()
+
+    val ctx = LocalContext.current
+    // Лаунчер системного диалога согласия на MediaProjection.
+    val projectionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data ?: return@rememberLauncherForActivityResult
+            CallManager.startScreenShare(data)
+        }
+    }
 
     val remoteTrack = CallManager.remoteVideoTrack
     val localTrack = CallManager.localVideoTrack
@@ -124,6 +144,18 @@ fun ActiveCallView(info: CallInfo, isOutgoing: Boolean) {
                     active = videoOff,
                 ) { CallManager.toggleVideo() }
                 CtrlButton(icon = Icons.Filled.FlipCameraAndroid) { CallManager.switchCamera() }
+                CtrlButton(
+                    icon = if (sharingScreen) Icons.Filled.StopScreenShare else Icons.Filled.ScreenShare,
+                    active = sharingScreen,
+                ) {
+                    if (sharingScreen) {
+                        CallManager.stopScreenShare()
+                    } else {
+                        val mgr = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE)
+                            as MediaProjectionManager
+                        projectionLauncher.launch(mgr.createScreenCaptureIntent())
+                    }
+                }
             } else {
                 CtrlButton(
                     icon = Icons.Filled.VolumeUp,
@@ -132,6 +164,36 @@ fun ActiveCallView(info: CallInfo, isOutgoing: Boolean) {
             }
 
             EndCallButton { CallManager.endCurrent() }
+        }
+
+        // Бейдж-индикатор активного шеринга экрана.
+        if (sharingScreen) {
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 60.dp, start = 16.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0x3334D399))
+                    .border(1.dp, Color(0x6634D399), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.ScreenShare,
+                        contentDescription = null,
+                        tint = Color(0xFF6EE7B7),
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        "Вы делитесь экраном",
+                        color = Color(0xFF6EE7B7),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
         }
     }
 }

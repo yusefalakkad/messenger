@@ -15,6 +15,31 @@ struct ActiveCallView: View {
         ZStack {
             backgroundLayer
 
+            // Индикатор активного шеринга экрана — поверх всех элементов.
+            if store.isSharingScreen {
+                VStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "rectangle.on.rectangle")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Вы делитесь экраном")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .foregroundStyle(Color(red: 0.42, green: 0.91, blue: 0.72))
+                    .background(Color(red: 0.20, green: 0.83, blue: 0.60).opacity(0.20))
+                    .overlay(
+                        Capsule().stroke(Color(red: 0.20, green: 0.83, blue: 0.60).opacity(0.5), lineWidth: 1)
+                    )
+                    .clipShape(Capsule())
+                    .padding(.top, 60)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 20)
+                .zIndex(50)
+            }
+
             VStack(spacing: 20) {
                 Spacer()
 
@@ -125,6 +150,7 @@ struct ActiveCallView: View {
                     fg: .white,
                     action: mgr.switchCamera
                 )
+                screenShareControl
             } else {
                 controlButton(
                     system: store.isSpeakerOn ? "speaker.wave.2.fill" : "speaker.fill",
@@ -148,6 +174,38 @@ struct ActiveCallView: View {
             }
             .buttonStyle(PressDownStyle())
         }
+    }
+
+    /// Кнопка «Поделиться экраном». Использует системный broadcast-picker.
+    ///
+    /// TODO: Подключить Broadcast Upload Extension target в Xcode, чтобы
+    /// фреймы реально доходили до RTCVideoSource. См.
+    /// apps/ios/SCREEN_SHARE_SETUP.md за пошаговой инструкцией. Сейчас
+    /// фактическая заливка кадров не реализована — кнопка лишь показывает
+    /// системный пикер.
+    @ViewBuilder
+    private var screenShareControl: some View {
+        ZStack {
+            // Подсветка-фон (как обычная кнопка).
+            Circle()
+                .fill(store.isSharingScreen ? Color.white : Color.white.opacity(0.15))
+                .frame(width: 56, height: 56)
+                .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+            Image(systemName: store.isSharingScreen ? "rectangle.on.rectangle.slash" : "rectangle.on.rectangle")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(store.isSharingScreen ? .black : .white)
+            // Прозрачный broadcast picker поверх — он ловит тап и открывает
+            // системный диалог.
+            ScreenShareButton(extensionBundleId: nil)
+                .frame(width: 56, height: 56)
+                .accessibilityLabel("Поделиться экраном")
+                .onTapGesture {
+                    // Жест не дойдёт сюда (picker сам обрабатывает), но
+                    // помечаем намерение для UI / отладки.
+                    print("[ScreenShare] Tap: broadcast picker presented")
+                }
+        }
+        .frame(width: 56, height: 56)
     }
 
     private func controlButton(system: String, background: Color, fg: Color, action: @escaping () -> Void) -> some View {

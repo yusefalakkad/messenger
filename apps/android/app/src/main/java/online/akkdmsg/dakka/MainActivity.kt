@@ -18,13 +18,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import online.akkdmsg.dakka.auth.AuthScreen
 import online.akkdmsg.dakka.auth.AuthStore
+import online.akkdmsg.dakka.auth.PhoneAuthScreen
 import online.akkdmsg.dakka.call.ActiveCallView
 import online.akkdmsg.dakka.call.CallState
 import online.akkdmsg.dakka.call.CallStore
 import online.akkdmsg.dakka.call.IncomingCallView
 import online.akkdmsg.dakka.chat.ChatScreen
+import online.akkdmsg.dakka.chats.ArchiveScreen
 import online.akkdmsg.dakka.chats.ChatListScreen
 import online.akkdmsg.dakka.chats.ChatListViewModel
 import online.akkdmsg.dakka.chats.NewChatScreen
@@ -43,6 +44,11 @@ import androidx.compose.ui.zIndex
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Блокируем скриншоты и скрываем содержимое в task switcher.
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+        )
         enableEdgeToEdge()
         setContent {
             DakkaTheme {
@@ -52,7 +58,7 @@ class MainActivity : ComponentActivity() {
 
                 Box(Modifier.fillMaxSize()) {
                     if (user == null) {
-                        AuthScreen()
+                        PhoneAuthScreen()
                     } else {
                         AuthedRoot()
                     }
@@ -85,6 +91,8 @@ private sealed class Route {
     data object NewGroup : Route()
     data object Settings : Route()
     data object EditProfile : Route()
+    data object TwoFactor : Route()
+    data object Archive : Route()
 }
 
 /** Внутренняя навигация авторизованной части. */
@@ -99,7 +107,8 @@ private fun AuthedRoot() {
         transitionSpec = {
             val forward = (targetState is Route.Chat || targetState is Route.Settings ||
                            targetState is Route.EditProfile) && initialState is Route.List ||
-                          (targetState is Route.EditProfile && initialState is Route.Settings)
+                          (targetState is Route.EditProfile && initialState is Route.Settings) ||
+                          (targetState is Route.TwoFactor && initialState is Route.Settings)
             if (forward) {
                 slideInHorizontally { it } + fadeIn() togetherWith
                     slideOutHorizontally { -it / 3 } + fadeOut()
@@ -117,6 +126,12 @@ private fun AuthedRoot() {
                 onSettingsClick = { route = Route.Settings },
                 onNewChatClick = { route = Route.NewChat },
                 onNewGroupClick = { route = Route.NewGroup },
+                onArchiveClick = { route = Route.Archive },
+            )
+            is Route.Archive -> ArchiveScreen(
+                vm = chatListVm,
+                onBack = { route = Route.List },
+                onChatClick = { id -> route = Route.Chat(id) },
             )
             is Route.Chat -> {
                 val chat: Chat? = chats.firstOrNull { it.id == current.chatId }
@@ -174,8 +189,12 @@ private fun AuthedRoot() {
             is Route.Settings -> SettingsScreen(
                 onBack = { route = Route.List },
                 onEditProfile = { route = Route.EditProfile },
+                onTwoFactor = { route = Route.TwoFactor },
             )
             is Route.EditProfile -> EditProfileScreen(
+                onBack = { route = Route.Settings },
+            )
+            is Route.TwoFactor -> online.akkdmsg.dakka.auth.TwoFactorScreen(
                 onBack = { route = Route.Settings },
             )
         }

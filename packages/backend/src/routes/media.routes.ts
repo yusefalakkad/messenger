@@ -2,12 +2,27 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
-import { uploadFile, generateObjectName } from '../lib/minio';
+import { uploadFile, generateObjectName, getObjectStream, statObject } from '../lib/minio';
+import { verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
 import { prisma } from '../lib/prisma';
 import { sendSuccess, AppError } from '../utils/response';
 import { config } from '../config';
 
 const router = Router();
+
+// Извлекает userId из Authorization Bearer или из httpOnly cookie refreshToken.
+// Cookie нужен для <img src="/api/media/..."> — браузер сам шлёт его, header добавить нельзя.
+function authenticateMediaRequest(req: Request): string | null {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    try { return verifyAccessToken(auth.slice(7)).sub; } catch { /* fall through */ }
+  }
+  const cookieToken = (req as Request & { cookies?: Record<string, string> }).cookies?.refreshToken;
+  if (cookieToken) {
+    try { return verifyRefreshToken(cookieToken).sub; } catch { /* fall through */ }
+  }
+  return null;
+}
 
 // Configure multer for different media types
 function createUpload(type: 'image' | 'video' | 'voice' | 'circle') {
@@ -77,5 +92,49 @@ router.post('/upload/:type',
     } catch (err) { next(err); }
   },
 );
+
+// GET /media/*objectName — отдача медиа с проверкой прав.
+// Аватары — доступны любому авторизованному. Медиа в сообщениях — только участникам чата.
+router.get(/^\/(.+)$/, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = authenticateMediaRequest(req);
+    if (!userId) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+
+    const objectName = req.params[0];
+    if (!objectName || objectName.includes('..') || objectName.startsWith('/')) {
+      throw new AppError(400, 'BAD_PATH', 'Invalid object path');
+    }
+
+    // Аватары всегда видимы залогиненным юзерам (имя файла = avatar/...).
+    // Для остального — проверка членства в чате.
+    if (!objectName.startsWith('avatar/')) {
+      const url = `/api/media/${objectName}`;
+      const media = await prisma.media.findFirst({
+        where: { OR: [{ url }, { thumbnailUrl: url }] },
+        select: { message: { select: { chatId: true } } },
+      });
+      if (!media) throw new AppError(404, 'NOT_FOUND', 'Media not found');
+      const member = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId: media.message.chatId, userId } },
+        select: { id: true },
+      });
+      if (!member) throw new AppError(403, 'FORBIDDEN', 'Not a chat member');
+    }
+
+    const stat = await statObject(objectName).catch(() => null);
+    if (!stat) throw new AppError(404, 'NOT_FOUND', 'Object not found');
+
+    res.setHeader('Content-Type', stat.metaData?.['content-type'] ?? 'application/octet-stream');
+    res.setHeader('Content-Length', String(stat.size));
+    res.setHeader('Cache-Control', 'private, max-age=604800, immutable');
+
+    const stream = await getObjectStream(objectName);
+    stream.on('error', (err) => {
+      if (!res.headersSent) res.status(500).end();
+      next(err);
+    });
+    stream.pipe(res);
+  } catch (err) { next(err); }
+});
 
 export default router;

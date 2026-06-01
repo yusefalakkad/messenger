@@ -138,6 +138,24 @@ export function initSocket(): Socket {
     window.dispatchEvent(new CustomEvent('call:signal', { detail: data }));
   });
 
+  // Состояние чата изменилось (pin/archive/mute) — обновляем стор.
+  // Сервер всегда присылает per-user поля; пересортировку делает бэкенд
+  // (мы лишь приподнимем закреплённые наверх в селекторе).
+  socket.on('chat:state-updated', (payload: {
+    chatId: string;
+    pinned?:      boolean;
+    archived?:    boolean;
+    pinnedAt?:    string | null;
+    archivedAt?:  string | null;
+    mutedUntil?:  string | null;
+  }) => {
+    const update: Partial<Chat> = {};
+    if ('pinnedAt'   in payload) update.pinnedAt   = payload.pinnedAt   ?? null;
+    if ('archivedAt' in payload) update.archivedAt = payload.archivedAt ?? null;
+    if ('mutedUntil' in payload) update.mutedUntil = payload.mutedUntil ?? null;
+    getChatStore().updateChat(payload.chatId, update);
+  });
+
   socket.on('user:status', ({ userId, status }: WSServerEvents['user:status']) => {
     useChatStore.setState((s) => ({
       chats: s.chats.map((chat) => ({

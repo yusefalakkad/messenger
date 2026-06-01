@@ -18,14 +18,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,8 +53,10 @@ fun MessageInput(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onImagePicked: (Uri) -> Unit,
+    onVideoPicked: (Uri) -> Unit,
     onVoiceRecorded: (file: File, durationSec: Int, waveform: List<Float>) -> Unit,
     onCircleRequested: () -> Unit,
+    onVideoRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -61,9 +70,15 @@ fun MessageInput(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri: Uri? -> uri?.let(onImagePicked) }
 
+    val videoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri: Uri? -> uri?.let(onVideoPicked) }
+
     val micPermission = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) recorder.start() }
+
+    var attachMenuOpen by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -86,11 +101,42 @@ fun MessageInput(
                 onVoiceRecorded(captured.first, captured.second, captured.third)
             })
         } else {
-            AttachButton(onClick = {
-                photoLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
-            })
+            Box {
+                AttachButton(onClick = { attachMenuOpen = true })
+                DropdownMenu(
+                    expanded = attachMenuOpen,
+                    onDismissRequest = { attachMenuOpen = false },
+                ) {
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Filled.Photo, null) },
+                        text = { Text("Фото") },
+                        onClick = {
+                            attachMenuOpen = false
+                            photoLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Filled.Videocam, null) },
+                        text = { Text("Снять видео") },
+                        onClick = {
+                            attachMenuOpen = false
+                            onVideoRequested()
+                        },
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Filled.VideoFile, null) },
+                        text = { Text("Видео (файл)") },
+                        onClick = {
+                            attachMenuOpen = false
+                            videoLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                            )
+                        },
+                    )
+                }
+            }
             TextArea(text = text, onTextChange = onTextChange, modifier = Modifier.weight(1f))
             if (hasText) {
                 SendCircle(onClick = onSend)

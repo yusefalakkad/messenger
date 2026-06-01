@@ -270,6 +270,47 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Video message (полноразмерное видео)
+
+    func sendVideo(fileURL: URL, duration: TimeInterval) async {
+        do {
+            // Проверка размера — 100 МБ
+            let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? 0
+            if size > 100 * 1024 * 1024 {
+                Toast.error("Видео слишком большое", message: "Максимум 100 МБ")
+                try? FileManager.default.removeItem(at: fileURL)
+                return
+            }
+            let media = try await MediaService.uploadVideo(
+                fileURL: fileURL,
+                duration: duration
+            )
+            let payload = SendMessagePayload(
+                chatId: chat.id,
+                type: MessageType.video.rawValue,
+                content: nil,
+                nonce: nil,
+                encrypted: false,
+                mediaData: MediaPayload(
+                    url: media.url,
+                    mimeType: media.mimeType,
+                    size: media.size,
+                    duration: duration,
+                    width: media.width,
+                    height: media.height,
+                    waveform: nil,
+                    thumbnailUrl: nil
+                ),
+                replyToId: nil,
+                forwardedFromId: nil
+            )
+            SocketClient.shared.send(payload)
+            try? FileManager.default.removeItem(at: fileURL)
+        } catch {
+            Toast.error("Не удалось отправить", message: (error as? LocalizedError)?.errorDescription)
+        }
+    }
+
     // MARK: - Voice message
 
     /// Загружает голосовой файл и отправляет сообщение.

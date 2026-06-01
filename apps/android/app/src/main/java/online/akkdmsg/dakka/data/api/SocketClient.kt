@@ -65,6 +65,9 @@ object SocketClient {
     private val _chatRemoved = MutableSharedFlow<String>(extraBufferCapacity = 8) // chatId
     val chatRemoved: SharedFlow<String> = _chatRemoved.asSharedFlow()
 
+    private val _chatStateUpdated = MutableSharedFlow<ChatStateUpdate>(extraBufferCapacity = 16)
+    val chatStateUpdated: SharedFlow<ChatStateUpdate> = _chatStateUpdated.asSharedFlow()
+
     // Calls
     private val _callIncoming = MutableSharedFlow<IncomingCallEvent>(extraBufferCapacity = 4)
     val callIncoming: SharedFlow<IncomingCallEvent> = _callIncoming.asSharedFlow()
@@ -247,6 +250,39 @@ object SocketClient {
             o.optString("chatId").takeIf { it.isNotEmpty() }?.let { _chatUpdated.tryEmit(it) }
         }
 
+        s.on("chat:state-updated") { args ->
+            val o = args.firstOrNull() as? JSONObject ?: return@on
+            val chatId = o.optString("chatId").takeIf { it.isNotEmpty() } ?: return@on
+            // Различаем "поле отсутствует" (нет изменений) vs "поле = null" (сбросить).
+            // Для строки: hasKey=false → null + present=false; hasKey=true, null → null + present=true.
+            fun str(key: String): Pair<String?, Boolean> =
+                if (!o.has(key)) null to false
+                else if (o.isNull(key)) null to true
+                else o.optString(key).takeIf { it.isNotEmpty() } to true
+            fun bool(key: String): Pair<Boolean?, Boolean> =
+                if (!o.has(key)) null to false
+                else if (o.isNull(key)) null to true
+                else o.optBoolean(key) to true
+            val pinned = bool("pinned").first
+            val archived = bool("archived").first
+            val pinnedAtPair = str("pinnedAt")
+            val archivedAtPair = str("archivedAt")
+            val mutedUntilPair = str("mutedUntil")
+            _chatStateUpdated.tryEmit(
+                ChatStateUpdate(
+                    chatId = chatId,
+                    pinned = pinned,
+                    archived = archived,
+                    pinnedAt = pinnedAtPair.first,
+                    archivedAt = archivedAtPair.first,
+                    mutedUntil = mutedUntilPair.first,
+                    pinnedAtPresent = pinnedAtPair.second,
+                    archivedAtPresent = archivedAtPair.second,
+                    mutedUntilPresent = mutedUntilPair.second,
+                )
+            )
+        }
+
         // ── Calls ──
         s.on("call:incoming") { args ->
             val o = args.firstOrNull() as? JSONObject ?: return@on
@@ -297,3 +333,19 @@ data class MessageDeleted(val messageId: String, val chatId: String)
 data class MessageRead(val messageId: String, val chatId: String, val userId: String, val readAt: String)
 data class TypingEvent(val chatId: String, val userId: String, val isTyping: Boolean)
 data class UserStatusEvent(val userId: String, val status: String)
+
+/**
+ * Событие 'chat:state-updated' — изменения pin/archive/mute текущего пользователя.
+ * `*Present` различает "поле не пришло — оставить как есть" от "поле = null — сбросить".
+ */
+data class ChatStateUpdate(
+    val chatId: String,
+    val pinned: Boolean?,
+    val archived: Boolean?,
+    val pinnedAt: String?,
+    val archivedAt: String?,
+    val mutedUntil: String?,
+    val pinnedAtPresent: Boolean = true,
+    val archivedAtPresent: Boolean = true,
+    val mutedUntilPresent: Boolean = true,
+)

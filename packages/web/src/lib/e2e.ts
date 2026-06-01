@@ -28,17 +28,29 @@ function fromBase64(b64: string): Uint8Array {
 }
 
 // ─── Кэш выведенных ключей ────────────────────────────────────────────────────
-// Ключ кэша: "chatId:первые12симв_pubKey"
-// Один и тот же CryptoKey используется и для шифрования, и для расшифровки.
+//
+// КЛЮЧ КЭША — sha256(chatId || ":" || ПОЛНЫЙ_pubKey).
+//
+// Раньше использовался обрезанный префикс pubKey (slice(0, 12)). У всех P-256
+// SPKI-ключей первые ~36 base64-символов идентичны (DER-префикс алгоритма),
+// поэтому усечённый префикс — фактически одна и та же строка для разных пиров.
+// Это могло привести к подмене shared key между чатами (cross-chat confidentiality
+// break). Хешируем полный публичный ключ → коллизии исключены.
 
 const keyCache = new Map<string, CryptoKey>();
+
+async function computeCacheKey(chatId: string, fullPubKeyB64: string): Promise<string> {
+  const data = new TextEncoder().encode(`${chatId}:${fullPubKeyB64}`);
+  const hash = await window.crypto.subtle.digest('SHA-256', data);
+  return toBase64(new Uint8Array(hash));
+}
 
 async function getSharedKey(
   chatId: string,
   theirPublicKeyB64: string,
   myPrivateKeyB64: string,
 ): Promise<CryptoKey> {
-  const cacheKey = `${chatId}:${theirPublicKeyB64.slice(0, 12)}`;
+  const cacheKey = await computeCacheKey(chatId, theirPublicKeyB64);
   const cached = keyCache.get(cacheKey);
   if (cached) return cached;
 

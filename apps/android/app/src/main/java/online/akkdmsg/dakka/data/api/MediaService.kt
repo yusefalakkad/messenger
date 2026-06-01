@@ -80,6 +80,20 @@ object MediaService {
         fields = mapOf("duration" to durationSec.toString()),
     )
 
+    /** Загружает полноразмерное видео-сообщение (НЕ кружок). */
+    suspend fun uploadVideo(
+        file: File,
+        durationSec: Int,
+        mimeType: String = "video/mp4",
+        fileName: String = "video.mp4",
+    ): UploadedMedia = upload(
+        path = "media/upload/video",
+        file = file,
+        fileName = fileName,
+        mimeType = mimeType,
+        fields = mapOf("duration" to durationSec.toString()),
+    )
+
     // ── Core ────────────────────────────────────────────────────────────────
 
     private suspend fun upload(
