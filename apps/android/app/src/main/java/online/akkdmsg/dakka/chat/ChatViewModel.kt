@@ -11,13 +11,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import online.akkdmsg.dakka.auth.AuthStore
 import online.akkdmsg.dakka.data.Chat
+import online.akkdmsg.dakka.data.MediaPayload
 import online.akkdmsg.dakka.data.Message
 import online.akkdmsg.dakka.data.SendMessagePayload
 import online.akkdmsg.dakka.data.api.ChatApi
+import online.akkdmsg.dakka.data.api.MediaService
 import online.akkdmsg.dakka.data.api.SocketClient
 import online.akkdmsg.dakka.data.crypto.E2E
 import online.akkdmsg.dakka.data.isE2E
 import online.akkdmsg.dakka.data.otherMember
+import online.akkdmsg.dakka.media.ImagePreparer
+import java.io.File
 
 class ChatViewModel(
     private val chat: Chat,
@@ -127,6 +131,57 @@ class ChatViewModel(
             )
         } catch (_: Exception) {
             null
+        }
+    }
+
+    // ── Голос ────────────────────────────────────────────────────────────────
+
+    fun sendVoice(file: File, durationSec: Int, waveform: List<Float>) {
+        viewModelScope.launch {
+            try {
+                val media = MediaService.uploadVoice(file, durationSec, waveform)
+                val payload = SendMessagePayload(
+                    chatId = chat.id,
+                    type = "voice",
+                    mediaData = MediaPayload(
+                        url = media.url,
+                        mimeType = media.mimeType,
+                        size = media.size,
+                        duration = durationSec.toDouble(),
+                        waveform = waveform.map { it.toDouble() },
+                    ),
+                )
+                SocketClient.send(payload)
+                file.delete()
+            } catch (e: Exception) {
+                _error.value = "Не удалось отправить голосовое: ${e.message}"
+            }
+        }
+    }
+
+    // ── Картинка ─────────────────────────────────────────────────────────────
+
+    fun sendImage(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            try {
+                val prepared = ImagePreparer.fromUri(context, uri) ?: return@launch
+                val media = MediaService.uploadImage(prepared.file, prepared.mimeType, prepared.fileName)
+                val payload = SendMessagePayload(
+                    chatId = chat.id,
+                    type = "image",
+                    mediaData = MediaPayload(
+                        url = media.url,
+                        mimeType = media.mimeType,
+                        size = media.size,
+                        width = media.width ?: prepared.width,
+                        height = media.height ?: prepared.height,
+                    ),
+                )
+                SocketClient.send(payload)
+                prepared.file.delete()
+            } catch (e: Exception) {
+                _error.value = "Не удалось отправить фото: ${e.message}"
+            }
         }
     }
 

@@ -185,6 +185,8 @@ fun ChatScreen(
                 text = draft,
                 onTextChange = vm::setDraft,
                 onSend = vm::sendDraft,
+                onImagePicked = { uri -> vm.sendImage(context, uri) },
+                onVoiceRecorded = { file, dur, wf -> vm.sendVoice(file, dur, wf) },
             )
         }
     }

@@ -68,50 +68,52 @@ fun MessageBubble(
                 )
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                if (encryptedFailed) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(
-                            Icons.Filled.Lock, null,
-                            tint = Color.White.copy(alpha = 0.45f),
-                            modifier = Modifier.size(11.dp),
-                        )
+            // Контент в зависимости от типа сообщения
+            when (message.type) {
+                "voice" -> message.media?.let { VoicePlayerView(media = it, isOwn = isOwn) }
+                "image" -> message.media?.let { ImageMessageView(media = it) }
+                else -> {
+                    if (encryptedFailed) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(
+                                Icons.Filled.Lock, null,
+                                tint = Color.White.copy(alpha = 0.45f),
+                                modifier = Modifier.size(11.dp),
+                            )
+                            Text(
+                                text = "Не удалось расшифровать",
+                                color = Color.White.copy(alpha = 0.45f),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    } else {
                         Text(
-                            text = "Не удалось расшифровать",
-                            color = Color.White.copy(alpha = 0.45f),
-                            style = MaterialTheme.typography.bodySmall,
+                            text = decrypted ?: message.content.orEmpty(),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                     }
-                } else {
-                    Text(
-                        text = decrypted ?: message.content.orEmpty(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
                 }
+            }
 
-                // Метаданные
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (message.encrypted == true) {
-                        Icon(
-                            Icons.Filled.Lock, null,
-                            tint = if (isOwn) Color.White.copy(alpha = 0.7f) else DakkaColor.Violet.copy(alpha = 0.7f),
-                            modifier = Modifier.size(9.dp),
-                        )
-                    }
-                    Text(
-                        text = timeStr,
-                        color = if (isOwn) Color.White.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.4f),
-                        style = MaterialTheme.typography.labelSmall,
+            // Метаданные снизу
+            Row(
+                modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (message.encrypted == true) {
+                    Icon(
+                        Icons.Filled.Lock, null,
+                        tint = if (isOwn) Color.White.copy(alpha = 0.7f) else DakkaColor.Violet.copy(alpha = 0.7f),
+                        modifier = Modifier.size(9.dp),
                     )
                 }
+                Text(
+                    text = timeStr,
+                    color = if (isOwn) Color.White.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.4f),
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
     }
