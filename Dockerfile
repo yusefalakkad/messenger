@@ -5,12 +5,20 @@ FROM node:20-alpine AS builder
 # исходники. Клиент динамически забирает их с /api/webrtc/ice-servers
 # (см. packages/web/src/lib/iceServers.ts).
 
+# Build-tools для нативных модулей (argon2, sharp и др.). Нужны как fallback
+# когда node-pre-gyp не может скачать prebuilt-бинарник с GitHub Releases
+# (504 Gateway Timeout, региональная блокировка, и т.п.). На runtime-stage
+# эти пакеты НЕ копируются — там уже готовый .node-файл в node_modules.
+RUN apk add --no-cache python3 make g++ \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
 WORKDIR /app
 COPY package*.json ./
 COPY packages/backend/package*.json ./packages/backend/
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
-RUN npm ci
+# --network-timeout повышает таймаут на скачивание prebuilt-бинарников
+RUN npm ci --fetch-timeout=600000 --fetch-retries=5
 COPY . .
 RUN npx prisma generate --schema=packages/backend/prisma/schema.prisma
 RUN npm run build --workspace=packages/shared
