@@ -1,0 +1,11 @@
+name = "dakka-tg"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# Worker не требует переменных, кроме секрета PROXY_AUTH_TOKEN.
+# Установить:
+#   wrangler secret put PROXY_AUTH_TOKEN
+# (введёшь длинную случайную строку, ту же что положишь в .env как TELEGRAM_API_PROXY_TOKEN)
+
+# Лимиты — для лендинга бесплатного плана хватает с запасом
+# (Free tier: 100k запросов/день, 10ms CPU/запрос).

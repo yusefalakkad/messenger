@@ -2,12 +2,20 @@
  * Тонкая обёртка над Telegram Bot API (api.telegram.org/bot<token>/<method>).
  * Без зависимостей — только нативный fetch.
  *
+ * Поддерживает PROXY-режим: если TELEGRAM_API_BASE задан, идём через прокси
+ * (например Cloudflare Worker), а не напрямую на api.telegram.org. Нужно
+ * когда VPS-хостинг режет outbound в Telegram (типично для RU/CIS).
+ *
  * Документация: https://core.telegram.org/bots/api
  */
 
 import { logger } from '../../lib/logger';
 
-const API_BASE = 'https://api.telegram.org';
+// Дефолт — официальный API. Можно переопределить через env:
+//   TELEGRAM_API_BASE=https://dakka-tg.your-account.workers.dev
+const API_BASE = (process.env.TELEGRAM_API_BASE ?? 'https://api.telegram.org').replace(/\/$/, '');
+// Если задан — отправляем в заголовке X-Auth-Token. Прокси проверяет и форвардит.
+const PROXY_AUTH = process.env.TELEGRAM_API_PROXY_TOKEN ?? '';
 
 export interface TelegramUpdate {
   update_id: number;
@@ -71,9 +79,11 @@ export class TelegramBot {
     timeoutMs = 10_000,
   ): Promise<T> {
     const url = `${API_BASE}/bot${this.token}/${method}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (PROXY_AUTH) headers['X-Auth-Token'] = PROXY_AUTH;
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
