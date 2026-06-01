@@ -37,6 +37,9 @@ COPY --from=builder --chown=app:app /app/packages/shared/dist ./packages/shared/
 COPY --from=builder --chown=app:app /app/packages/shared/package.json ./packages/shared/package.json
 COPY --chown=app:app entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+# Winston file-transport требует writable logs/. Под non-root юзером mkdir
+# в /app не работает, поэтому создаём папку заранее с нужным владельцем.
+RUN mkdir -p /app/logs && chown -R app:app /app/logs
 USER app
 EXPOSE 4000
 # tini = правильная обработка SIGTERM (graceful shutdown в node)
