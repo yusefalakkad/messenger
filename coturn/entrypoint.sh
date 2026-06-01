@@ -6,7 +6,7 @@ ARGS="-n \
   --fingerprint \
   --lt-cred-mech \
   --user=${TURN_USER:-turnuser}:${TURN_PASS:-turnpass123} \
-  --realm=messenger \
+  --realm=${TURN_REALM:-dakka} \
   --log-file=stdout \
   --no-multicast-peers \
   --no-cli \

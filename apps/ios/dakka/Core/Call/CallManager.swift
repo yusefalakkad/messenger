@@ -18,10 +18,25 @@ final class CallManager: ObservableObject {
     private var hasRemoteDescription = false
     private var cancellables = Set<AnyCancellable>()
 
+    /// Кэш ICE-серверов от бэка (STUN + TURN).
+    private var cachedICEServers: [RTCIceServer]?
+    /// Fallback пока кэш не подгружен.
+    private static let fallbackICE: [RTCIceServer] = [
+        RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
+    ]
+
     private let store = CallStore.shared
 
     private init() {
         wireSocket()
+        // Префетчим ICE-серверы при инициализации — к моменту первого звонка
+        // в кэше уже будут TURN credentials.
+        Task { await refreshICEServers() }
+    }
+
+    /// Обновляет кэш ICE-серверов с бэка.
+    private func refreshICEServers() async {
+        cachedICEServers = await ICEServerService.fetch()
     }
 
     // MARK: - Public API (выбор из UI)
@@ -107,7 +122,14 @@ final class CallManager: ObservableObject {
 
     private func setupRTC(isVideo: Bool) {
         guard rtc == nil else { return }
-        let m = WebRTCManager(isVideo: isVideo)
+        // Создаём с STUN-fallback, затем асинхронно подгружаем актуальные
+        // серверы и пересоздаём peer connection если получили TURN.
+        // На практике setupRTC вызывается до createOffer/answer, так что
+        // успеваем подтянуть до обмена ICE кандидатами.
+        let m = WebRTCManager(
+            isVideo: isVideo,
+            iceServers: cachedICEServers ?? Self.fallbackICE
+        )
 
         m.onIceCandidate = { [weak self] candidate in
             guard let self, let info = self.store.state.info else { return }

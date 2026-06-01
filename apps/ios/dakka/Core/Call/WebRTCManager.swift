@@ -39,8 +39,11 @@ final class WebRTCManager: NSObject {
 
     // MARK: - Init
 
-    init(isVideo: Bool) {
+    private let iceServers: [RTCIceServer]
+
+    init(isVideo: Bool, iceServers: [RTCIceServer]) {
         self.isVideo = isVideo
+        self.iceServers = iceServers
         super.init()
         setupPeerConnection()
         setupAudioSession()
@@ -53,11 +56,12 @@ final class WebRTCManager: NSObject {
 
     private func setupPeerConnection() {
         let cfg = RTCConfiguration()
-        cfg.iceServers = [
-            RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
-        ]
+        cfg.iceServers = iceServers
         cfg.sdpSemantics = .unifiedPlan
         cfg.continualGatheringPolicy = .gatherContinually
+        // TURN-only fallback: при необходимости можно форсировать relay,
+        // если STUN не помог за N секунд. По умолчанию all.
+        cfg.iceTransportPolicy = .all
 
         let constraints = RTCMediaConstraints(
             mandatoryConstraints: nil,
