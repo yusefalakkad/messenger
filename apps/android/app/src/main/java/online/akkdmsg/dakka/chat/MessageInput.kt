@@ -47,6 +47,7 @@ fun MessageInput(
     onSend: () -> Unit,
     onImagePicked: (Uri) -> Unit,
     onVoiceRecorded: (file: File, durationSec: Int, waveform: List<Float>) -> Unit,
+    onCircleRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -94,6 +95,7 @@ fun MessageInput(
             if (hasText) {
                 SendCircle(onClick = onSend)
             } else {
+                CircleButton(onClick = onCircleRequested)
                 MicButton(onClick = { micPermission.launch(Manifest.permission.RECORD_AUDIO) })
             }
         }
@@ -166,6 +168,30 @@ private fun SendCircle(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(Icons.Filled.Send, "Send", tint = Color.White, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun CircleButton(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            androidx.compose.material.icons.Icons.Filled.Circle,
+            "Video circle",
+            tint = Color.White.copy(alpha = 0.55f),
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

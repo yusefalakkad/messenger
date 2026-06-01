@@ -56,6 +56,7 @@ fun ChatScreen(
     val draft by vm.draft.collectAsState()
     val typing by vm.typingUsers.collectAsState()
     val loading by vm.loading.collectAsState()
+    var showCircleRecorder by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
 
@@ -187,6 +188,17 @@ fun ChatScreen(
                 onSend = vm::sendDraft,
                 onImagePicked = { uri -> vm.sendImage(context, uri) },
                 onVoiceRecorded = { file, dur, wf -> vm.sendVoice(file, dur, wf) },
+                onCircleRequested = { showCircleRecorder = true },
+            )
+        }
+
+        if (showCircleRecorder) {
+            CircleRecorderScreen(
+                onRecorded = { file, dur ->
+                    showCircleRecorder = false
+                    vm.sendCircle(file, dur)
+                },
+                onCancel = { showCircleRecorder = false },
             )
         }
     }

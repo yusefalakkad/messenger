@@ -85,4 +85,15 @@ dependencies {
 
     // Real-time WebSocket (socket.io v4 compatible)
     implementation(libs.socketio.client)
+
+    // CameraX — запись видео-кружков
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.video)
+    implementation(libs.camerax.view)
+
+    // Media3 ExoPlayer — looping плеер для кружков
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
 }

@@ -70,8 +70,9 @@ fun MessageBubble(
 
             // Контент в зависимости от типа сообщения
             when (message.type) {
-                "voice" -> message.media?.let { VoicePlayerView(media = it, isOwn = isOwn) }
-                "image" -> message.media?.let { ImageMessageView(media = it) }
+                "voice"  -> message.media?.let { VoicePlayerView(media = it, isOwn = isOwn) }
+                "image"  -> message.media?.let { ImageMessageView(media = it) }
+                "circle" -> message.media?.let { CirclePlayerView(media = it) }
                 else -> {
                     if (encryptedFailed) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

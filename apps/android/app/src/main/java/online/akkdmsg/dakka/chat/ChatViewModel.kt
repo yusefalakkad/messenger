@@ -185,6 +185,32 @@ class ChatViewModel(
         }
     }
 
+    // ── Кружок ───────────────────────────────────────────────────────────────
+
+    fun sendCircle(file: File, durationSec: Int) {
+        viewModelScope.launch {
+            try {
+                val media = MediaService.uploadCircle(file, durationSec)
+                val payload = SendMessagePayload(
+                    chatId = chat.id,
+                    type = "circle",
+                    mediaData = MediaPayload(
+                        url = media.url,
+                        mimeType = media.mimeType,
+                        size = media.size,
+                        duration = durationSec.toDouble(),
+                        width = media.width,
+                        height = media.height,
+                    ),
+                )
+                SocketClient.send(payload)
+                file.delete()
+            } catch (e: Exception) {
+                _error.value = "Не удалось отправить кружок: ${e.message}"
+            }
+        }
+    }
+
     // ── Typing indicator с 2-секундным дебаунсом ──────────────────────────────
 
     private fun onTextChange() {
