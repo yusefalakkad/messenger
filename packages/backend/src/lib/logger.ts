@@ -14,16 +14,12 @@ const devFormat = combine(
 
 const prodFormat = combine(timestamp(), json());
 
+// В контейнере пишем только в stdout/stderr — их подхватывает `docker logs`
+// с ротацией через json-file driver (см. /etc/docker/daemon.json).
+// File-transport убран чтобы (а) не падать под non-root в /app, (б) не плодить
+// unbounded файлы внутри образа (audit M2).
 export const logger = winston.createLogger({
   level: config.isDev ? 'debug' : 'info',
   format: config.isDev ? devFormat : prodFormat,
-  transports: [
-    new winston.transports.Console(),
-    ...(!config.isDev
-      ? [
-          new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-          new winston.transports.File({ filename: 'logs/combined.log' }),
-        ]
-      : []),
-  ],
+  transports: [new winston.transports.Console()],
 });
