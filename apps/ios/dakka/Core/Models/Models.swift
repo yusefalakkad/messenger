@@ -23,6 +23,7 @@ struct ChatMember: Codable, Hashable {
     let userId: String
     let user: User
     let role: String?
+    let mutedUntil: Date?
 }
 
 struct LastMessage: Codable, Hashable {
@@ -151,6 +152,14 @@ struct Chat: Codable, Identifiable, Hashable {
               let other = members.first(where: { $0.userId != currentUserId })
         else { return false }
         return other.user.status == "online"
+    }
+
+    /// Заглушён ли чат для текущего юзера.
+    func isMuted(currentUserId: String?) -> Bool {
+        guard let me = members.first(where: { $0.userId == currentUserId }),
+              let until = me.mutedUntil
+        else { return false }
+        return until > Date()
     }
 }
 

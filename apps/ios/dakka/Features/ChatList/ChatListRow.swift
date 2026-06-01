@@ -50,6 +50,11 @@ struct ChatListRow: View {
                         .font(Typo.bodyB)
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                    if chat.isMuted(currentUserId: currentUserId) {
+                        Image(systemName: "bell.slash.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
                     Spacer(minLength: 6)
                     if let date = chat.lastMessage?.createdAt {
                         Text(Self.relFmt.localizedString(for: date, relativeTo: Date()))

@@ -6,7 +6,22 @@ struct ProfilePanel: View {
     let currentUserId: String?
     let onStartAudioCall: () -> Void
     let onStartVideoCall: () -> Void
+    let onChatCleared: () -> Void
+
     @Environment(\.dismiss) private var dismiss
+    @State private var isMuted: Bool
+    @State private var processingMute = false
+    @State private var confirmClear = false
+
+    init(chat: Chat, currentUserId: String?, onStartAudioCall: @escaping () -> Void,
+         onStartVideoCall: @escaping () -> Void, onChatCleared: @escaping () -> Void) {
+        self.chat = chat
+        self.currentUserId = currentUserId
+        self.onStartAudioCall = onStartAudioCall
+        self.onStartVideoCall = onStartVideoCall
+        self.onChatCleared = onChatCleared
+        _isMuted = State(initialValue: chat.isMuted(currentUserId: currentUserId))
+    }
 
     private var otherMember: ChatMember? {
         chat.members.first(where: { $0.userId != currentUserId })
@@ -25,6 +40,7 @@ struct ProfilePanel: View {
                     } else {
                         groupInfo
                     }
+                    chatActions
                     Spacer(minLength: 40)
                 }
             }
@@ -135,6 +151,94 @@ struct ProfilePanel: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(PressDownStyle())
+    }
+
+    // MARK: - Chat actions (mute / clear)
+
+    private var chatActions: some View {
+        VStack(spacing: 8) {
+            Toggle(isOn: $isMuted) {
+                HStack(spacing: 10) {
+                    Image(systemName: isMuted ? "bell.slash.fill" : "bell.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.brandViolet)
+                        .frame(width: 28, height: 28)
+                        .background(Color.brandViolet.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Заглушить уведомления")
+                            .font(Typo.body)
+                            .foregroundStyle(.white.opacity(0.95))
+                        if isMuted {
+                            Text("Push не приходят")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.white.opacity(0.45))
+                        }
+                    }
+                }
+            }
+            .tint(.brandViolet)
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(Color.white.opacity(0.03))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onChange(of: isMuted) { _, newValue in toggleMute(newValue) }
+
+            Button(role: .destructive) { confirmClear = true } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0xFCA5A5))
+                        .frame(width: 28, height: 28)
+                        .background(Color(hex: 0xF43F5E).opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Text("Очистить историю")
+                        .font(Typo.body)
+                        .foregroundStyle(Color(hex: 0xFCA5A5))
+                    Spacer()
+                }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .background(Color(hex: 0xF43F5E).opacity(0.08))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: 0xF43F5E).opacity(0.2), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(PressDownStyle())
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .alert("Очистить всю историю?", isPresented: $confirmClear) {
+            Button("Отмена", role: .cancel) { }
+            Button("Очистить", role: .destructive) { clearHistory() }
+        } message: {
+            Text("Сообщения будут удалены навсегда. Эта операция необратима.")
+        }
+    }
+
+    private func toggleMute(_ on: Bool) {
+        guard !processingMute else { return }
+        processingMute = true
+        Task {
+            defer { processingMute = false }
+            // Заглушаем на 100 лет (бессрочно), либо снимаем (nil)
+            let until: Date? = on ? Date(timeIntervalSinceNow: 60 * 60 * 24 * 365 * 100) : nil
+            do {
+                _ = try await ChatActions.setMute(chatId: chat.id, mutedUntil: until)
+            } catch {
+                // Откатываем тогл при ошибке
+                isMuted.toggle()
+            }
+        }
+    }
+
+    private func clearHistory() {
+        Task {
+            do {
+                if try await ChatActions.clearMessages(chatId: chat.id) {
+                    onChatCleared()
+                    dismiss()
+                }
+            } catch { /* TODO: error toast */ }
+        }
     }
 
     // MARK: - Group info

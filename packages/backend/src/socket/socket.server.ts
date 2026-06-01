@@ -383,10 +383,13 @@ async function notifyOfflineMembers(
   try {
     const members = await prisma.chatMember.findMany({
       where: { chatId, userId: { not: senderId }, leftAt: null },
-      select: { userId: true },
+      select: { userId: true, mutedUntil: true },
     });
 
+    const now = new Date();
     await Promise.all(members.map(async (m) => {
+      // Чат заглушён — не шлём push
+      if (m.mutedUntil && m.mutedUntil > now) return;
       if (await isUserOnline(m.userId)) return;
       const payload = { title: 'Новое сообщение', body: '', chatId };
       // Параллельно: web-push (VAPID) + native (APNs/FCM)

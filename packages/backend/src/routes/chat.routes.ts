@@ -207,6 +207,43 @@ router.get('/:chatId/messages',
   },
 );
 
+// GET /chats/:chatId/messages/search?q=... — поиск (только по нешифрованному тексту)
+// Для E2E сообщений поиск идёт на клиенте после расшифровки.
+router.get('/:chatId/messages/search',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    query('q').trim().isLength({ min: 1, max: 100 }),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const q = (req.query.q as string).trim();
+
+      const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
+      if (!member) throw new AppError(403, 'FORBIDDEN', 'You are not a member of this chat');
+
+      const messages = await prisma.message.findMany({
+        where: {
+          chatId,
+          deletedAt: null,
+          encrypted: false,
+          content: { contains: q, mode: 'insensitive' },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        include: {
+          sender: { select: { id: true, username: true, displayName: true, avatar: true } },
+          media:  true,
+        },
+      });
+
+      sendSuccess(res, messages);
+    } catch (err) { next(err); }
+  },
+);
+
 // DELETE /chats/:chatId/messages — clear all messages in chat
 router.delete('/:chatId/messages',
   requireAuth,
@@ -225,6 +262,32 @@ router.delete('/:chatId/messages',
       });
 
       sendSuccess(res, { cleared: true });
+    } catch (err) { next(err); }
+  },
+);
+
+// POST /chats/:chatId/mute — toggle mute, until=null отключает mute
+router.post('/:chatId/mute',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    body('mutedUntil').optional({ nullable: true }).isISO8601(),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId } = req.params;
+      const { mutedUntil } = req.body as { mutedUntil?: string | null };
+
+      const member = await prisma.chatMember.findUnique({ where: { chatId_userId: { chatId, userId } } });
+      if (!member) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+
+      const result = await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId } },
+        data: { mutedUntil: mutedUntil ? new Date(mutedUntil) : null },
+        select: { mutedUntil: true },
+      });
+      sendSuccess(res, { mutedUntil: result.mutedUntil });
     } catch (err) { next(err); }
   },
 );

@@ -7,6 +7,8 @@ struct ChatView: View {
     @State private var forwardingMessage: Message?
     @State private var showingCircleRecorder = false
     @State private var showingProfile = false
+    @State private var showingSearch = false
+    @State private var scrollToMessageId: String?
 
     init(chat: Chat, currentUserId: String, privateKey: String?) {
         _vm = StateObject(wrappedValue: ChatViewModel(
@@ -64,6 +66,13 @@ struct ChatView: View {
             .presentationDetents([.large])
             .presentationBackground(.ultraThinMaterial)
         }
+        .sheet(isPresented: $showingSearch) {
+            ChatSearchView(chatId: vm.chat.id, onPickMessage: { msg in
+                scrollToMessageId = msg.id
+            })
+            .presentationDetents([.large])
+            .presentationBackground(.ultraThinMaterial)
+        }
         .fullScreenCover(isPresented: $showingCircleRecorder) {
             CircleRecorderView(
                 onRecorded: { url, dur in
@@ -86,6 +95,9 @@ struct ChatView: View {
                     if let other = vm.otherMember {
                         CallManager.shared.startCall(to: other, in: vm.chat, type: .video)
                     }
+                },
+                onChatCleared: {
+                    vm.messages.removeAll()
                 }
             )
             .presentationDetents([.large])
@@ -151,9 +163,12 @@ struct ChatView: View {
 
             Spacer()
 
-            // Кнопки звонка — direct-чат, есть другой участник
-            if vm.chat.type == .direct, let other = vm.otherMember {
-                HStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Button { showingSearch = true } label: { headerIcon("magnifyingglass") }
+                    .buttonStyle(PressDownStyle())
+
+                // Кнопки звонка — direct-чат, есть другой участник
+                if vm.chat.type == .direct, let other = vm.otherMember {
                     Button {
                         CallManager.shared.startCall(to: other, in: vm.chat, type: .audio)
                     } label: { headerIcon("phone.fill") }
@@ -260,6 +275,13 @@ struct ChatView: View {
                     withAnimation(.easeOut(duration: 0.25)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
+                }
+                .onChange(of: scrollToMessageId) { _, id in
+                    guard let id else { return }
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
+                    scrollToMessageId = nil
                 }
             }
         }
