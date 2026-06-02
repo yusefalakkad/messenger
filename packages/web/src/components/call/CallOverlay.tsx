@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, MonitorUp, MonitorOff } from 'lucide-react';
 import { useCallStore } from '@/stores/call.store';
+import { useChatStore } from '@/stores/chat.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { acceptCall, rejectCall, endCall, sendCallSignal } from '@/lib/socket';
 import { getIceServers } from '@/lib/iceServers';
 import Avatar from '@/components/ui/Avatar';
@@ -12,6 +14,28 @@ export default function CallOverlay() {
   const outgoing  = useCallStore((s) => s.outgoing);
   const clearCall = useCallStore((s) => s.clearCall);
   const setActive = useCallStore((s) => s.setActive);
+
+  // Имя и аватар собеседника. Для входящего — берём из payload (бэк прислал
+  // callerName/callerAvatar). Для исходящего/активного — находим peer в chat-store
+  // (callStore хранит только id, без name/avatar).
+  const chats = useChatStore((s) => s.chats);
+  const myUserId = useAuthStore((s) => s.user?.id);
+  let peerName  = 'Звонок';
+  let peerAvatar: string | null | undefined;
+  if (incoming) {
+    peerName   = incoming.callerName ?? 'Звонок';
+    peerAvatar = incoming.callerAvatar;
+  } else {
+    const chatId = outgoing?.chatId ?? active?.chatId;
+    if (chatId) {
+      const chat = chats.find((c) => c.id === chatId);
+      const other = chat?.members.find((m) => m.userId !== myUserId);
+      if (other) {
+        peerName   = other.user.displayName ?? other.user.username ?? 'Собеседник';
+        peerAvatar = other.user.avatar;
+      }
+    }
+  }
 
   const pcRef          = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -324,13 +348,13 @@ export default function CallOverlay() {
               {!(isVideo && active) && (
                 <>
                   <div className="relative">
-                    <Avatar src={incoming?.callerAvatar} name={incoming?.callerName ?? 'Звонок'} size="xl" />
+                    <Avatar src={peerAvatar} name={peerName} size="xl" />
                     {(outgoing || active) && (
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
                     )}
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-semibold">{incoming?.callerName ?? 'Звонок'}</p>
+                    <p className="text-lg font-semibold">{peerName}</p>
                     <p className="text-sm text-white/50">
                       {incoming && 'Входящий звонок...'}
                       {outgoing && 'Звоним...'}

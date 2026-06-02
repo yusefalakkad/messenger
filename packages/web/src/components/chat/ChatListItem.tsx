@@ -41,7 +41,9 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
     ? draft
     : lastMsg
     ? lastMsg.type === 'text'
-      ? lastMsg.content ?? ''
+      // E2E-сообщения не расшифровываем здесь (нужны асинхронные операции,
+      // chatStore не подходит для блокирующего decrypt). Просто маркируем.
+      ? (lastMsg.encrypted ? '🔒 Зашифрованное сообщение' : (lastMsg.content ?? ''))
       : lastMsg.type === 'voice'
       ? '🎤 Голосовое'
       : lastMsg.type === 'circle'
