@@ -167,15 +167,17 @@ router.post('/direct',
         },
       });
 
-      // Уведомляем обоих участников о новом чате через их личные комнаты
+      // Уведомляем обоих участников о новом чате через их личные комнаты.
+      // ВАЖНО: сначала socketsJoin (await), потом emit('chat:new'). Иначе
+      // первое сообщение из этого чата может уйти в room, в которой ещё нет
+      // получателя — message:new потеряется.
       const io = req.app.get('io') as SocketServer;
       if (io) {
         const chatWithMeta = { ...chat, unreadCount: 0, lastMessage: null };
-        [userId, targetUserId].forEach((uid) => {
+        await Promise.all([userId, targetUserId].map(async (uid) => {
+          await io.in(`user:${uid}`).socketsJoin(`chat:${chat.id}`);
           io.to(`user:${uid}`).emit('chat:new', chatWithMeta);
-          // Добавляем участников в комнату чата
-          io.in(`user:${uid}`).socketsJoin(`chat:${chat.id}`);
-        });
+        }));
       }
 
       sendSuccess(res, chat, 201);
@@ -215,14 +217,16 @@ router.post('/group',
         },
       });
 
-      // Уведомляем всех участников о новом групповом чате
+      // Уведомляем всех участников о новом групповом чате.
+      // socketsJoin сначала (await), потом emit — иначе первое сообщение из этого
+      // чата уйдёт в room, где ещё нет получателей.
       const io = req.app.get('io') as SocketServer;
       if (io) {
         const chatWithMeta = { ...chat, unreadCount: 0, lastMessage: null };
-        allIds.forEach((uid) => {
+        await Promise.all(allIds.map(async (uid) => {
+          await io.in(`user:${uid}`).socketsJoin(`chat:${chat.id}`);
           io.to(`user:${uid}`).emit('chat:new', chatWithMeta);
-          io.in(`user:${uid}`).socketsJoin(`chat:${chat.id}`);
-        });
+        }));
       }
 
       sendSuccess(res, chat, 201);

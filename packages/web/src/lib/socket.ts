@@ -4,6 +4,9 @@ import { useChatStore } from '@/stores/chat.store';
 import { useCallStore } from '@/stores/call.store';
 import { playNotificationSound } from '@/lib/notificationSound';
 import { SOCKET_URL } from '@/lib/config';
+import { api } from '@/lib/api';
+import { clearKeyCache } from '@/lib/e2e';
+import { toast } from '@/lib/toast';
 import type { Message, WSServerEvents, Chat, SendMessagePayload, CallType } from '@messenger/shared';
 
 let socket: Socket | null = null;
@@ -37,16 +40,24 @@ export function initSocket(): Socket {
 
   const getChatStore = () => useChatStore.getState();
 
+  // Флаг — был ли уже initial connect (отличает первый коннект от reconnect)
+  let hadInitialConnect = false;
+
   socket.on('connect', () => {
-    console.log('[Socket] Connected:', socket?.id);
+    if (hadInitialConnect) {
+      // Это RECONNECT после disconnect — у нас потенциально пропущены сообщения.
+      // Пересинхронизируем активный чат и список чатов.
+      void resyncAfterReconnect();
+    } else {
+      hadInitialConnect = true;
+    }
   });
 
-  socket.on('disconnect', (reason) => {
-    console.log('[Socket] Disconnected:', reason);
-  });
+  socket.on('disconnect', () => { /* socket.io сам ретраит */ });
 
-  socket.on('connect_error', (err) => {
-    console.error('[Socket] Error:', err.message);
+  // Сервер обнаружил критическую ошибку (rate-limit, forbidden, validation)
+  socket.on('error', (data: { code?: string; message?: string }) => {
+    if (data?.message) toast.error(data.message);
   });
 
   // Новый чат создан — добавляем в список и присоединяемся к комнате
@@ -55,9 +66,13 @@ export function initSocket(): Socket {
   });
 
   // Новое сообщение
-  socket.on('message:new', (message: Message) => {
+  socket.on('message:new', (message: Message & { clientMsgId?: string }) => {
     const { activeChatId } = useChatStore.getState();
     const myUserId = useAuthStore.getState().user?.id;
+    // Если это наш собственный echo — снимаем pending-ack.
+    if (message.clientMsgId && message.senderId === myUserId) {
+      ackMessage(message.clientMsgId);
+    }
     getChatStore().addMessage(message.chatId, message);
 
     // Звук + системное уведомление для входящих сообщений
@@ -156,6 +171,20 @@ export function initSocket(): Socket {
     getChatStore().updateChat(payload.chatId, update);
   });
 
+  // E2E public-key одного из собеседников сменился (он перелогинился на новом
+  // устройстве). Чистим shared-key cache + патчим публичный ключ в чатах.
+  socket.on('user:key-changed', ({ userId, publicKey }: { userId: string; publicKey: string }) => {
+    useChatStore.setState((s) => ({
+      chats: s.chats.map((chat) => ({
+        ...chat,
+        members: chat.members.map((m) =>
+          m.userId === userId ? { ...m, user: { ...m.user, publicKey } } : m,
+        ),
+      })),
+    }));
+    clearKeyCache();
+  });
+
   socket.on('user:status', ({ userId, status }: WSServerEvents['user:status']) => {
     useChatStore.setState((s) => ({
       chats: s.chats.map((chat) => ({
@@ -178,8 +207,72 @@ export function disconnectSocket(): void {
   }
 }
 
-export function sendMessage(payload: SendMessagePayload): void {
-  socket?.emit('message:send', payload);
+/**
+ * Отправка сообщения с idempotency-id и ack-таймаутом.
+ *  • Генерим clientMsgId — бэк по нему дедупает повторы при reconnect.
+ *  • Если за 8 сек не пришло `message:new` с тем же clientMsgId — считаем
+ *    "недоставленным" и показываем тост. Сама очередь socket.io пробует
+ *    переотправить автоматически после reconnect, но без ack уверенности нет.
+ */
+export function sendMessage(payload: SendMessagePayload & { clientMsgId?: string }): string {
+  const clientMsgId = payload.clientMsgId ?? crypto.randomUUID();
+  const final = { ...payload, clientMsgId };
+
+  if (!socket?.connected) {
+    // Бэк недоступен — кладём в outbox; при reconnect-resync переотправим
+    pendingOutbox.set(clientMsgId, final);
+    toast.error('Нет соединения. Сообщение отправится при восстановлении.');
+    return clientMsgId;
+  }
+
+  pendingAcks.set(clientMsgId, setTimeout(() => {
+    if (pendingAcks.has(clientMsgId)) {
+      pendingAcks.delete(clientMsgId);
+      pendingOutbox.set(clientMsgId, final);
+      toast.error('Сообщение не доставлено. Повторим при восстановлении.');
+    }
+  }, 8000));
+
+  socket.emit('message:send', final);
+  return clientMsgId;
+}
+
+// Outbox для сообщений отправленных до коннекта / при таймауте ack.
+const pendingOutbox = new Map<string, SendMessagePayload & { clientMsgId: string }>();
+const pendingAcks = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Помечаем сообщение как доставленное (вызывается из message:new handler). */
+function ackMessage(clientMsgId: string): void {
+  const t = pendingAcks.get(clientMsgId);
+  if (t) clearTimeout(t);
+  pendingAcks.delete(clientMsgId);
+  pendingOutbox.delete(clientMsgId);
+}
+
+/** Полный resync после reconnect:
+ *  • перезагружает список чатов (новые/удалённые/изменения)
+ *  • перезагружает сообщения активного чата (то что пропустили)
+ *  • переотправляет outbox-сообщения */
+async function resyncAfterReconnect(): Promise<void> {
+  try {
+    const chatsRes = await api.get<{ success: boolean; data: Chat[] }>('/chats');
+    useChatStore.setState({ chats: chatsRes.data.data });
+  } catch { /* offline-ok */ }
+
+  const { activeChatId } = useChatStore.getState();
+  if (activeChatId) {
+    try {
+      const msgsRes = await api.get<{ success: boolean; data: Message[] }>(`/chats/${activeChatId}/messages`);
+      useChatStore.getState().setMessages(activeChatId, msgsRes.data.data);
+    } catch { /* offline-ok */ }
+  }
+
+  // Переотправляем outbox-сообщения
+  if (pendingOutbox.size > 0 && socket?.connected) {
+    for (const msg of pendingOutbox.values()) {
+      socket.emit('message:send', msg);
+    }
+  }
 }
 
 export function sendTyping(chatId: string, isTyping: boolean): void {

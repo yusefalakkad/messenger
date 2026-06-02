@@ -73,7 +73,8 @@
       "Bash(curl -s http://localhost:5173/)",
       "Bash(echo \"BACKEND_PID=$!\")",
       "Bash(tail -30 /tmp/dakka-backend.log 2>&1)",
-      "Bash(kill 67119)"
+      "Bash(kill 67119)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

@@ -47,7 +47,11 @@ export async function register(req: Request, res: Response, next: NextFunction):
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: !config.isDev,
-      sameSite: 'strict',
+      // 'lax' (а не 'strict') чтобы <img src="...api/media/...">, открытие deep-link
+// из push-уведомления и навигация с лендинга на /chat не теряли cookie.
+// CSRF-риски минимизированы благодаря CSP frame-ancestors + sameSite=Lax (=POST
+// с другого origin cookie не пошлёт).
+sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
@@ -74,7 +78,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: !config.isDev,
-      sameSite: 'strict',
+      // 'lax' (а не 'strict') чтобы <img src="...api/media/...">, открытие deep-link
+// из push-уведомления и навигация с лендинга на /chat не теряли cookie.
+// CSRF-риски минимизированы благодаря CSP frame-ancestors + sameSite=Lax (=POST
+// с другого origin cookie не пошлёт).
+sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
@@ -104,7 +112,11 @@ export async function loginTwoFactor(req: Request, res: Response, next: NextFunc
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: !config.isDev,
-      sameSite: 'strict',
+      // 'lax' (а не 'strict') чтобы <img src="...api/media/...">, открытие deep-link
+// из push-уведомления и навигация с лендинга на /chat не теряли cookie.
+// CSRF-риски минимизированы благодаря CSP frame-ancestors + sameSite=Lax (=POST
+// с другого origin cookie не пошлёт).
+sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
@@ -227,7 +239,11 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: !config.isDev,
-      sameSite: 'strict',
+      // 'lax' (а не 'strict') чтобы <img src="...api/media/...">, открытие deep-link
+// из push-уведомления и навигация с лендинга на /chat не теряли cookie.
+// CSRF-риски минимизированы благодаря CSP frame-ancestors + sameSite=Lax (=POST
+// с другого origin cookie не пошлёт).
+sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });

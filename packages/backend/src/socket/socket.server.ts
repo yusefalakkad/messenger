@@ -378,6 +378,23 @@ async function handleSendMessage(
     return;
   }
 
+  // Idempotency: клиент шлёт clientMsgId (UUID), чтобы при auto-reconnect socket.io
+  // переотправил тот же payload, мы не создали дубль. TTL 5 мин в Redis — для
+  // окна возможных ретраев. Без этого ключа дедупа нет.
+  const rawId = (payload as unknown as { clientMsgId?: unknown }).clientMsgId;
+  const clientMsgId = typeof rawId === 'string' ? rawId.slice(0, 64) : null;
+  if (clientMsgId) {
+    const dedupKey = `msg:dedup:${userId}:${clientMsgId}`;
+    // SET NX EX — атомарно: если ключ существовал, set вернёт null → дубль.
+    const set = await redis.set(dedupKey, '1', 'EX', 300, 'NX');
+    if (!set) {
+      // Повтор. Если оригинальное сообщение уже создано, можно вернуть его
+      // (поиском по hash content+ts), но проще — игнор: клиент уже получил
+      // message:new echo с тем же clientMsgId. Безопасно.
+      return;
+    }
+  }
+
   // Verify membership (АКТИВНОЕ — кикнутые/leftAt не имеют права слать).
   const member = await prisma.chatMember.findUnique({
     where: { chatId_userId: { chatId: payload.chatId, userId } },
@@ -476,7 +493,9 @@ async function handleSendMessage(
     data: { updatedAt: new Date() },
   });
 
-  io.to(`chat:${payload.chatId}`).emit('message:new', message);
+  // Включаем clientMsgId в emit чтобы отправитель мог снять pending-ack.
+  // Получатели clientMsgId игнорируют.
+  io.to(`chat:${payload.chatId}`).emit('message:new', { ...message, clientMsgId });
 
   // Push офлайн-членам чата (кроме отправителя)
   void notifyOfflineMembers(payload.chatId, userId, message);

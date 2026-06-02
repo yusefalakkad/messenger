@@ -23,12 +23,22 @@ export async function initPush(): Promise<void> {
   }
 
   if (!pub || !priv) {
+    // Авто-генерация только в dev — в проде ОБЯЗАТЕЛЬНО задать через env,
+    // иначе при FLUSHALL / переезде Redis ключи теряются и все push-подписки
+    // у клиентов становятся невалидны (бывший публичный ключ не совпадёт).
+    if (process.env.NODE_ENV === 'production') {
+      logger.warn(
+        'VAPID keys not set in env. Web Push DISABLED in production. ' +
+        'Generate via `npx web-push generate-vapid-keys` and add VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY to .env.',
+      );
+      return; // ready остаётся false, sendPushToUser будет молча no-op
+    }
     const keys = webpush.generateVAPIDKeys();
     pub  = keys.publicKey;
     priv = keys.privateKey;
     await redis.set('vapid:public',  pub);
     await redis.set('vapid:private', priv);
-    logger.info('Generated new VAPID keys (persisted to Redis)');
+    logger.info('Generated new VAPID keys (dev mode, persisted to Redis)');
   }
 
   webpush.setVapidDetails(VAPID_SUBJECT, pub, priv);
