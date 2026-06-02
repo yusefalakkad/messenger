@@ -6,6 +6,7 @@ import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { acceptCall, rejectCall, endCall, sendCallSignal } from '@/lib/socket';
 import { getIceServers } from '@/lib/iceServers';
+import { toast } from '@/lib/toast';
 import Avatar from '@/components/ui/Avatar';
 
 export default function CallOverlay() {
@@ -98,14 +99,32 @@ export default function CallOverlay() {
     const pc = new RTCPeerConnection({ iceServers });
     pcRef.current = pc;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: callType === 'video',
-    }).catch(() => null);
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: callType === 'video',
+      });
+    } catch (err) {
+      // Микро/камера недоступны — пользователь должен это видеть, а не залипший экран.
+      const name = (err as DOMException)?.name;
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        toast.error(callType === 'video'
+          ? 'Доступ к камере и микрофону запрещён. Разрешите в настройках браузера.'
+          : 'Доступ к микрофону запрещён. Разрешите в настройках браузера.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        toast.error('Микрофон или камера не найдены');
+      } else {
+        toast.error('Не удалось получить доступ к устройствам ввода');
+      }
+      try { endCall(callId); } catch { /* ignore */ }
+      clearCall();
+      return;
+    }
 
     if (stream) {
       localStreamRef.current = stream;
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream!));
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     }
 
@@ -128,7 +147,7 @@ export default function CallOverlay() {
     }
 
     timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
-  }, []);
+  }, [clearCall]);
 
   useEffect(() => {
     const handler = async (e: Event) => {
@@ -175,6 +194,35 @@ export default function CallOverlay() {
   useEffect(() => {
     if (active) startPeer(active.callId, active.callType, active.isInitiator);
   }, [active?.callId]);
+
+  // Ring-timeout: если за 30s никто не ответил на исходящий — авто-end.
+  // Без этого outgoing висит навсегда, юзер не понимает что собеседник недоступен.
+  useEffect(() => {
+    if (!outgoing) return;
+    const t = setTimeout(() => {
+      if (useCallStore.getState().outgoing?.callId === outgoing.callId &&
+          !useCallStore.getState().active) {
+        try { endCall(outgoing.callId); } catch { /* ignore */ }
+        clearCall();
+      }
+    }, 30_000);
+    return () => clearTimeout(t);
+  }, [outgoing?.callId, clearCall]);
+
+  // ICE failed → auto-end. Если TURN не помог — экран висит без видео и аудио.
+  useEffect(() => {
+    const pc = pcRef.current;
+    if (!pc || !active) return;
+    const handler = () => {
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+        try { endCall(active.callId); } catch { /* ignore */ }
+        tearDown();
+        clearCall();
+      }
+    };
+    pc.addEventListener('iceconnectionstatechange', handler);
+    return () => pc.removeEventListener('iceconnectionstatechange', handler);
+  }, [active?.callId, tearDown, clearCall]);
 
   const handleAccept = useCallback(async () => {
     if (!incoming) return;
@@ -322,7 +370,7 @@ export default function CallOverlay() {
           <div className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-2xl ${
             isVideo && active
               ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg'
-              : 'w-80 bg-dark-card border border-dark-border'
+              : 'w-[calc(100vw-2rem)] max-w-sm bg-dark-card border border-dark-border'
           }`}>
 
             {isVideo && active && (
@@ -330,7 +378,7 @@ export default function CallOverlay() {
                 <video ref={remoteVideoRef} autoPlay playsInline
                   className="absolute inset-0 w-full h-full object-cover" />
                 <video ref={localVideoRef} autoPlay playsInline muted
-                  className={`absolute bottom-20 right-4 w-28 h-40 rounded-2xl object-cover border-2 border-white/20 z-10 ${camOff && !sharingScreen ? 'hidden' : ''}`} />
+                  className={`absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 rounded-2xl object-cover border-2 border-white/20 z-10 ${camOff && !sharingScreen ? 'hidden' : ''}`} />
                 {sharingScreen && (
                   <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-medium backdrop-blur-md">
                     <MonitorUp size={14} />
@@ -353,8 +401,8 @@ export default function CallOverlay() {
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
                     )}
                   </div>
-                  <div className="text-center">
-                    <p className="text-lg font-semibold">{peerName}</p>
+                  <div className="text-center max-w-[260px]">
+                    <p className="text-lg font-semibold truncate">{peerName}</p>
                     <p className="text-sm text-white/50">
                       {incoming && 'Входящий звонок...'}
                       {outgoing && 'Звоним...'}

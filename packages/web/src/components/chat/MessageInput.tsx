@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { haptic } from '@/lib/native';
 import { toast } from '@/lib/toast';
 import { encryptText, isChatE2E, getRecipientPublicKey } from '@/lib/e2e';
+import { formatReplyPreview } from '@/lib/messagePreview';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { editMessage as socketEditMsg } from '@/lib/socket';
@@ -586,8 +587,10 @@ export default function MessageInput({ chatId }: Props) {
               className="flex items-center gap-3 bg-dark-hover rounded-xl px-3 py-2 mb-2 border-l-2 border-primary-500 overflow-hidden"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-primary-400 font-medium">↩ {replyingTo.sender?.displayName ?? 'Ответить'}</p>
-                <p className="text-xs text-white/50 truncate">{replyingTo.content ?? '📎 Медиафайл'}</p>
+                <p className="text-xs text-primary-400 font-medium truncate">↩ {replyingTo.sender?.displayName ?? 'Ответить'}</p>
+                <p className="text-xs text-white/50 truncate">
+                  {formatReplyPreview(replyingTo as any) || '📎 Медиафайл'}
+                </p>
               </div>
               <button onClick={() => setReplyingTo(null)} className="text-white/40 hover:text-white flex-shrink-0">
                 <X size={16} />

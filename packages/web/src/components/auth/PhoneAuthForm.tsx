@@ -131,17 +131,29 @@ export default function PhoneAuthForm() {
         // Новое устройство / очистка storage → регенерим, шлём новый publicKey
         // отдельным запросом (verify-flow одноразовый, OTP уже консумирован).
         const { publicKey, privateKey } = await generateKeyPair();
-        // Кладём токен В STORE сразу, чтобы PATCH ушёл с Authorization.
         cachePlaintext(t.user.id, privateKey);
+
+        // КРИТИЧНО: PATCH публичного ключа ДО initSocket. Иначе между шагами
+        // setAuth/initSocket и PATCH собеседник может отправить нам сообщение,
+        // зашифрованное под СТАРЫЙ pubKey → расшифровать не получится никогда.
+        // Шлём axios напрямую с accessToken через header (минуя store/interceptor,
+        // т.к. setAuth ещё не вызван — interceptor токен не найдёт).
+        const patchOk = await api.patch(
+          '/users/me/public-key',
+          { publicKey },
+          { headers: { Authorization: `Bearer ${t.accessToken}` } },
+        ).then(() => true).catch(() => false);
+
+        if (!patchOk) {
+          // Без PATCH — все входящие = "Не удалось расшифровать". Прерываем,
+          // даём юзеру попробовать ещё раз через переotправку кода.
+          throw new Error('Не удалось обновить ключ шифрования. Попробуйте ещё раз.');
+        }
+
+        // Теперь безопасно — на сервере новый pubKey, входящие будут зашифрованы
+        // под него, мы дешифруем приватным ключом.
         setAuth({ ...t.user, publicKey } as any, t.accessToken, privateKey);
         initSocket();
-        // Обновляем publicKey на сервере (без него собеседники не могут писать нам).
-        await api.patch('/users/me/public-key', { publicKey }).catch(() => {
-          // Если не получилось — приват уже сохранён, новые исходящие будут зашифрованы
-          // для нашего НОВОГО publicKey, но входящие → бэк держит старый → fail.
-          // Логируем, но не блокируем — юзер дальше зайдёт.
-          console.warn('[phone-auth] failed to rotate publicKey on server');
-        });
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message;
@@ -313,7 +325,7 @@ export default function PhoneAuthForm() {
               Мы отправили 6-значный код на <span className="text-white/80">{phone}</span>
             </p>
 
-            {devOtpHint && (
+            {devOtpHint && ((import.meta as any).env?.DEV) && (
               <div className="text-amber-300/80 text-xs bg-amber-400/[0.06] border border-amber-400/[0.18] rounded-lg px-3 py-2">
                 Dev-режим: код <span className="font-mono">{devOtpHint}</span>
               </div>

@@ -31,7 +31,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 8 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-dark-card border border-dark-border rounded-3xl shadow-2xl shadow-black/60 w-[28rem] max-h-[85vh] flex flex-col overflow-hidden"
+            className="bg-dark-card border border-dark-border rounded-3xl shadow-2xl shadow-black/60 w-full max-w-md mx-4 max-h-[85vh] flex flex-col overflow-hidden"
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border/60">
               <h3 className="font-semibold text-base">Настройки</h3>

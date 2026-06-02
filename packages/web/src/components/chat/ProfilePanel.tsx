@@ -52,7 +52,7 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="absolute inset-y-0 right-0 w-80 bg-dark-surface border-l border-dark-border flex flex-col z-30 shadow-2xl"
+        className="absolute inset-y-0 right-0 w-full sm:w-80 bg-dark-surface border-l border-dark-border flex flex-col z-30 shadow-2xl"
       >
         {/* Шапка */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border flex-shrink-0">

@@ -7,7 +7,8 @@ import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import { isChatE2E } from '@/lib/e2e';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, MessageSquareOff } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function ChatWindow() {
   const { chatId } = useParams<{ chatId: string }>();
@@ -27,7 +28,31 @@ export default function ChatWindow() {
     return () => setActiveChat(null);
   }, [chatId, setActiveChat, setMessages]);
 
-  if (!chatId || !chat) return null;
+  if (!chatId) return null;
+
+  // Если чаты ещё грузятся (chats === []) — показываем skeleton.
+  // Если уже загрузились но chat не найден — empty-state.
+  if (!chat) {
+    const stillLoading = chats.length === 0;
+    return (
+      <div className="flex flex-col h-full relative items-center justify-center text-center px-6">
+        {stillLoading ? (
+          <div className="flex flex-col items-center gap-3 text-white/40">
+            <div className="w-10 h-10 rounded-full border-2 border-primary-500/40 border-t-primary-500 animate-spin" />
+            <p className="text-sm">Загружаем чат...</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 text-white/50 max-w-xs">
+            <MessageSquareOff size={32} className="text-white/40" />
+            <p className="text-sm">Чат не найден или вас исключили из него.</p>
+            <Link to="/chat" className="text-primary-400 hover:text-primary-300 text-sm font-medium">
+              ← К списку чатов
+            </Link>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const otherMember = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== user?.id)

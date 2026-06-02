@@ -4,7 +4,7 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
-import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight } from 'lucide-react';
+import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight, FileText, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import Avatar from '@/components/ui/Avatar';
 import ImageViewer from '@/components/media/ImageViewer';
@@ -13,6 +13,7 @@ import { decryptMessage } from '@/lib/e2e';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { deleteMessage, editMessage as socketEditMessage, reactToMessage } from '@/lib/socket';
+import { formatReplyPreview } from '@/lib/messagePreview';
 import ForwardDialog from './ForwardDialog';
 import type { Message } from '@messenger/shared';
 
@@ -86,6 +87,17 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
   // Видео без подписи — аналогично
   const isPureVideo = message.type === 'video' && !message.content;
 
+  // Системные сообщения — отдельный layout, без аватара/контекст-меню
+  if (message.type === 'system') {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="text-[11px] text-white/45 bg-white/[0.04] px-3 py-1 rounded-full">
+          {message.content ?? ''}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className={clsx('flex items-end gap-2 mb-1', isOwn ? 'flex-row-reverse' : 'flex-row')}>
@@ -117,14 +129,21 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
           {/* Превью цитаты */}
           {message.replyTo && (
             <div className={clsx(
-              'flex items-start gap-2 px-3 py-2 rounded-xl mb-1 border-l-2 border-primary-500',
-              isOwn ? 'bg-primary-700/50' : 'bg-dark-hover',
+              'flex items-start gap-2 px-3 py-2 rounded-xl mb-1 border-l-2',
+              // Нейтральный фон + полупрозрачный border — читаемо на любом градиенте
+              isOwn ? 'bg-white/15 border-white/60 backdrop-blur-sm' : 'bg-dark-hover border-primary-500',
             )}>
               <div className="min-w-0">
-                <p className="text-xs text-primary-400 font-medium truncate">
+                <p className={clsx(
+                  'text-xs font-medium truncate',
+                  isOwn ? 'text-white/90' : 'text-primary-400',
+                )}>
                   {(message.replyTo as any).sender?.displayName}
                 </p>
-                <p className="text-xs text-white/60 truncate">{message.replyTo.content}</p>
+                <p className={clsx('text-xs truncate', isOwn ? 'text-white/75' : 'text-white/60')}>
+                  {/* Зашифрованные сообщения в reply показываем как 🔒, а не как base64-мусор */}
+                  {formatReplyPreview(message.replyTo as any) || message.replyTo.content}
+                </p>
               </div>
             </div>
           )}
@@ -194,6 +213,11 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
               {/* Голосовое */}
               {message.type === 'voice' && message.media && (
                 <VoiceMessage media={message.media} isOwn={isOwn} />
+              )}
+
+              {/* Файл (документ) */}
+              {message.type === 'file' && message.media && (
+                <FileMessage media={message.media} isOwn={isOwn} />
               )}
 
               {/* Время + статус */}
@@ -495,8 +519,21 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
   const [plaintext, setPlaintext] = useState<string | null>(null);
   const [failed,    setFailed]    = useState(false);
 
+  // КРИТИЧНО: подписываемся на publicKey собеседника. Когда сервер шлёт user:key-changed,
+  // chat.members[*].user.publicKey обновляется → effect перезапускается → decrypt с новым ключом.
+  // Без этого закэшированный failed=true остаётся навсегда после ротации ключей.
+  const senderPubKey = useChatStore((s) => {
+    const c = s.chats.find((c) => c.id === chatId);
+    if (!c) return null;
+    const m = c.members.find((m) => m.userId === message.senderId);
+    return m?.user.publicKey ?? null;
+  });
+
   useEffect(() => {
     let cancelled = false;
+    // Сброс failed при изменении ключа — даём попытку расшифровать заново
+    setFailed(false);
+    setPlaintext(null);
 
     (async () => {
       try {
@@ -512,7 +549,7 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
     })();
 
     return () => { cancelled = true; };
-  }, [message.id, chatId]);
+  }, [message.id, chatId, senderPubKey]);
 
   if (failed) {
     return (
@@ -536,6 +573,53 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
       {renderRichText(plaintext)}
     </p>
   );
+}
+
+// ─── Файл (документ) ─────────────────────────────────────────────────────────
+
+function FileMessage({
+  media, isOwn,
+}: {
+  media: NonNullable<Message['media']>;
+  isOwn: boolean;
+}) {
+  const name = (media as any).filename ?? media.url.split('/').pop() ?? 'файл';
+  const sizeStr = (media as any).size ? formatFileSize((media as any).size) : '';
+
+  return (
+    <a
+      href={media.url}
+      download={name}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 min-w-[200px] max-w-[280px] py-1"
+    >
+      <div className={clsx(
+        'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+        isOwn ? 'bg-white/20' : 'bg-primary-600',
+      )}>
+        <FileText size={20} className="text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={clsx('text-sm font-medium truncate', isOwn ? 'text-white' : 'text-white/95')}>
+          {name}
+        </p>
+        {sizeStr && (
+          <p className={clsx('text-xs', isOwn ? 'text-white/70' : 'text-white/45')}>
+            {sizeStr}
+          </p>
+        )}
+      </div>
+      <Download size={16} className={isOwn ? 'text-white/80' : 'text-white/50'} />
+    </a>
+  );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
 }
 
 // ─── Утилиты ──────────────────────────────────────────────────────────────────

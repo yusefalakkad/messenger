@@ -30,17 +30,20 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
 
   const progress = (time / MAX_DURATION) * CIRCUMFERENCE;
 
-  // Инициализация камеры
+  // Инициализация камеры — повышаем разрешение, добавляем aspectRatio чтобы лицо не растягивалось
   useEffect(() => {
     let cancelled = false;
     navigator.mediaDevices
-      .getUserMedia({ video: { width: 400, height: 400, facingMode: 'user' }, audio: true })
+      .getUserMedia({
+        video: { width: 480, height: 480, aspectRatio: 1, facingMode: 'user' },
+        audio: true,
+      })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          videoRef.current.play().catch(() => { /* iOS autoplay quirks — ok */ });
         }
         setReady(true);
       })
@@ -113,33 +116,42 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-6"
+      className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center gap-8 px-6"
     >
+      {/* Кнопка закрытия — в углу, не теснит запись */}
+      <button
+        onClick={onCancel}
+        aria-label="Отменить"
+        className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/70 hover:text-white transition-colors"
+      >
+        <X size={20} />
+      </button>
+
       {/* Круговой превью */}
-      <div className="relative" style={{ width: 260, height: 260 }}>
+      <div className="relative" style={{ width: 280, height: 280 }}>
         {/* Прогресс-кольцо */}
         <svg
-          className="absolute inset-0 -rotate-90"
-          width="260" height="260"
-          viewBox="0 0 260 260"
+          className="absolute inset-0 -rotate-90 pointer-events-none"
+          width="280" height="280"
+          viewBox="0 0 280 280"
         >
-          <circle cx="130" cy="130" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+          <circle cx="140" cy="140" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
           {recording && (
             <circle
-              cx="130" cy="130" r={RADIUS}
+              cx="140" cy="140" r={RADIUS}
               fill="none"
               stroke="#ef4444"
-              strokeWidth="4"
+              strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
               strokeDashoffset={CIRCUMFERENCE - progress}
-              style={{ transition: 'stroke-dashoffset 1s linear' }}
+              style={{ transition: 'stroke-dashoffset 1s linear', filter: 'drop-shadow(0 0 8px rgba(239,68,68,0.6))' }}
             />
           )}
         </svg>
 
         {/* Видео в круге */}
-        <div className="absolute inset-3 rounded-full overflow-hidden bg-dark-bg">
+        <div className="absolute inset-3 rounded-full overflow-hidden bg-dark-bg ring-1 ring-white/10">
           <video
             ref={videoRef}
             muted
@@ -148,59 +160,59 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
             style={{ transform: 'scaleX(-1)' }}
           />
           {!ready && (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-dark-bg/60">
               <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           )}
+          {/* Pulse-индикатор записи */}
+          {recording && (
+            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[10px] text-white font-medium tabular-nums">REC</span>
+            </div>
+          )}
         </div>
-
-        {/* Таймер */}
-        {recording && (
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-            {fmt(time)}
-          </div>
-        )}
       </div>
 
       {/* Скрытый canvas для превью */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Подсказка */}
-      <p className="text-white/40 text-sm">
-        {!ready
-          ? 'Запрашиваем камеру...'
-          : recording
-          ? 'Нажмите ⏹ для отправки'
-          : 'Нажмите ● для записи'}
-      </p>
+      {/* Таймер + подсказка над кнопкой */}
+      <div className="flex flex-col items-center gap-2">
+        <div className={
+          recording
+            ? 'text-2xl font-bold text-white tabular-nums'
+            : 'text-2xl font-bold text-white/40 tabular-nums'
+        }>
+          {fmt(time)} <span className="text-sm text-white/35 font-normal">/ {fmt(MAX_DURATION)}</span>
+        </div>
+        <p className="text-white/70 text-sm">
+          {!ready
+            ? 'Запрашиваем камеру...'
+            : recording
+            ? 'Идёт запись. Нажмите ⏹ чтобы отправить'
+            : 'Нажмите ● чтобы начать запись'}
+        </p>
+      </div>
 
-      {/* Управление */}
-      <div className="flex items-center gap-8">
-        <button
-          onClick={onCancel}
-          className="w-14 h-14 rounded-full bg-dark-card hover:bg-dark-hover flex items-center justify-center text-white/60 hover:text-white transition-colors"
-        >
-          <X size={22} />
-        </button>
-
-        {/* Кнопка записи */}
+      {/* Управление — большая центральная кнопка, без пустых блоков */}
+      <div className="flex items-center justify-center">
         <button
           onClick={recording ? stopRecording : startRecording}
           disabled={!ready}
-          className="relative w-20 h-20 rounded-full flex items-center justify-center transition-all disabled:opacity-40"
+          aria-label={recording ? 'Остановить и отправить' : 'Начать запись'}
+          className="relative w-24 h-24 rounded-full flex items-center justify-center transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {recording ? (
-            <div className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center shadow-xl shadow-red-500/40">
-              <div className="w-7 h-7 rounded-md bg-white" />
+            <div className="w-24 h-24 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center shadow-2xl shadow-red-500/50 ring-4 ring-red-500/20">
+              <Send size={28} className="text-white -translate-x-0.5" />
             </div>
           ) : (
-            <div className="w-20 h-20 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-xl">
-              <div className="w-14 h-14 rounded-full bg-red-500" />
+            <div className="w-24 h-24 rounded-full bg-white hover:bg-white/95 flex items-center justify-center shadow-2xl ring-4 ring-white/10">
+              <div className="w-16 h-16 rounded-full bg-red-500" />
             </div>
           )}
         </button>
-
-        <div className="w-14 h-14" /> {/* Пустое место для симметрии */}
       </div>
     </motion.div>
   );

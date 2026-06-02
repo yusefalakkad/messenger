@@ -68,7 +68,15 @@ export default function MediaPreview({ media, onSend, onCancel }: Props) {
           placeholder="Добавить подпись..."
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onSend(caption)}
+          onKeyDown={(e) => {
+            // IME-композиция (китайский/японский/русский с переключением) — Enter подтверждает кандидата,
+            // не должен отправлять сообщение.
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              onSend(caption);
+            }
+          }}
         />
         <button
           onClick={() => onSend(caption || undefined)}

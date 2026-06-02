@@ -191,7 +191,16 @@ export default function NewGroupModal({ onClose }: Props) {
           </div>
 
           {/* Создать */}
-          <div className="p-4 border-t border-white/[0.05]">
+          <div className="p-4 border-t border-white/[0.05] space-y-2">
+            {(!name.trim() || selected.length === 0) && (
+              <p className="text-[11px] text-white/45 text-center">
+                {!name.trim() && selected.length === 0
+                  ? 'Введите название группы и выберите хотя бы одного участника'
+                  : !name.trim()
+                  ? 'Введите название группы'
+                  : 'Выберите хотя бы одного участника'}
+              </p>
+            )}
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={create}

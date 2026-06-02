@@ -7,6 +7,7 @@ import { clsx } from 'clsx';
 import { Pin, BellOff } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/auth.store';
+import { formatMessagePreview } from '@/lib/messagePreview';
 import type { Chat } from '@messenger/shared';
 import ChatItemContextMenu from './ChatItemContextMenu';
 
@@ -36,24 +37,9 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const draft = typeof window !== 'undefined' ? localStorage.getItem(`draft:${chat.id}`) : null;
   const lastMsg = chat.lastMessage;
 
-  // Если есть черновик — показываем его вместо последнего сообщения
-  const previewText = draft
-    ? draft
-    : lastMsg
-    ? lastMsg.type === 'text'
-      // E2E-сообщения не расшифровываем здесь (нужны асинхронные операции,
-      // chatStore не подходит для блокирующего decrypt). Просто маркируем.
-      ? (lastMsg.encrypted ? '🔒 Зашифрованное сообщение' : (lastMsg.content ?? ''))
-      : lastMsg.type === 'voice'
-      ? '🎤 Голосовое'
-      : lastMsg.type === 'circle'
-      ? '⭕ Видео-кружок'
-      : lastMsg.type === 'image'
-      ? '📷 Фото'
-      : lastMsg.type === 'video'
-      ? '🎬 Видео'
-      : '📎 Файл'
-    : '';
+  // Если есть черновик — показываем его вместо последнего сообщения.
+  // E2E-сообщения не расшифровываем синхронно — formatMessagePreview маркирует 🔒.
+  const previewText = draft ? draft : formatMessagePreview(lastMsg);
 
   const timeStr = lastMsg
     ? formatDistanceToNowStrict(new Date(lastMsg.createdAt), { locale: ru, addSuffix: false })

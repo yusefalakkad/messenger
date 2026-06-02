@@ -11,6 +11,11 @@ import type { Message, WSServerEvents, Chat, SendMessagePayload, CallType } from
 
 let socket: Socket | null = null;
 
+// Флаг — был ли уже хотя бы один успешный коннект В ЖИЗНЕННОМ ЦИКЛЕ СЕССИИ.
+// КРИТИЧНО: на уровне модуля, не в closure initSocket() — иначе любой повторный
+// initSocket (rotate token, reconnect handler) сбрасывает флаг в false и resync не запускается.
+let hadInitialConnectEver = false;
+
 export function getSocket(): Socket | null {
   return socket;
 }
@@ -40,16 +45,13 @@ export function initSocket(): Socket {
 
   const getChatStore = () => useChatStore.getState();
 
-  // Флаг — был ли уже initial connect (отличает первый коннект от reconnect)
-  let hadInitialConnect = false;
-
   socket.on('connect', () => {
-    if (hadInitialConnect) {
+    if (hadInitialConnectEver) {
       // Это RECONNECT после disconnect — у нас потенциально пропущены сообщения.
       // Пересинхронизируем активный чат и список чатов.
       void resyncAfterReconnect();
     } else {
-      hadInitialConnect = true;
+      hadInitialConnectEver = true;
     }
   });
 
@@ -225,16 +227,25 @@ export function sendMessage(payload: SendMessagePayload & { clientMsgId?: string
     return clientMsgId;
   }
 
+  pendingOutbox.set(clientMsgId, final);
+  scheduleAckTimeout(clientMsgId);
+  socket.emit('message:send', final);
+  return clientMsgId;
+}
+
+/** Перезапускает ack-таймер для сообщения. Без этого outbox-resend на reconnect
+ *  отправляет сообщение, но не контролирует время доставки — юзер не узнает,
+ *  если повтор тоже зафейлился. */
+function scheduleAckTimeout(clientMsgId: string): void {
+  const prev = pendingAcks.get(clientMsgId);
+  if (prev) clearTimeout(prev);
   pendingAcks.set(clientMsgId, setTimeout(() => {
     if (pendingAcks.has(clientMsgId)) {
       pendingAcks.delete(clientMsgId);
-      pendingOutbox.set(clientMsgId, final);
+      // Сообщение остаётся в outbox — следующий reconnect переотправит.
       toast.error('Сообщение не доставлено. Повторим при восстановлении.');
     }
   }, 8000));
-
-  socket.emit('message:send', final);
-  return clientMsgId;
 }
 
 // Outbox для сообщений отправленных до коннекта / при таймауте ack.
@@ -259,18 +270,30 @@ async function resyncAfterReconnect(): Promise<void> {
     useChatStore.setState({ chats: chatsRes.data.data });
   } catch { /* offline-ok */ }
 
-  const { activeChatId } = useChatStore.getState();
+  // Префетч сообщений активного чата СРАЗУ (юзер смотрит туда).
+  const { activeChatId, messages, setMessages } = useChatStore.getState();
   if (activeChatId) {
     try {
       const msgsRes = await api.get<{ success: boolean; data: Message[] }>(`/chats/${activeChatId}/messages`);
-      useChatStore.getState().setMessages(activeChatId, msgsRes.data.data);
+      setMessages(activeChatId, msgsRes.data.data);
     } catch { /* offline-ok */ }
   }
 
-  // Переотправляем outbox-сообщения
+  // Все остальные загруженные ранее чаты — refetch в фоне, без блокировки.
+  // Без этого, если юзер уходил из чата X в чат Y во время offline,
+  // в X останутся stale-сообщения и gap-indicator не покажется.
+  const loadedChatIds = Object.keys(messages).filter((id) => id !== activeChatId);
+  for (const chatId of loadedChatIds) {
+    api.get<{ success: boolean; data: Message[] }>(`/chats/${chatId}/messages`)
+      .then(({ data }) => setMessages(chatId, data.data ?? []))
+      .catch(() => { /* offline-ok */ });
+  }
+
+  // Переотправляем outbox-сообщения с восстановлением ack-таймера.
   if (pendingOutbox.size > 0 && socket?.connected) {
-    for (const msg of pendingOutbox.values()) {
+    for (const [clientMsgId, msg] of pendingOutbox.entries()) {
       socket.emit('message:send', msg);
+      scheduleAckTimeout(clientMsgId);
     }
   }
 }

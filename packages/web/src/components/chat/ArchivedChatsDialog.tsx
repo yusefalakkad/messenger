@@ -10,6 +10,7 @@ import { X, ArchiveRestore, Inbox } from 'lucide-react';
 import type { Chat } from '@messenger/shared';
 import { useAuthStore } from '@/stores/auth.store';
 import { archiveChat, fetchArchivedChats } from '@/lib/chats';
+import { formatMessagePreview } from '@/lib/messagePreview';
 import { toast } from '@/lib/toast';
 import Avatar from '@/components/ui/Avatar';
 import IconBtn from '@/components/ui/IconBtn';
@@ -89,11 +90,7 @@ export default function ArchivedChatsDialog({ open, onClose }: Props) {
                         ? chat.name
                         : other?.user.displayName ?? 'Без имени';
                       const avatar = chat.type === 'group' ? chat.avatar : other?.user.avatar;
-                      const preview = chat.lastMessage?.type === 'text'
-                        ? chat.lastMessage.content ?? ''
-                        : chat.lastMessage
-                        ? '[медиа]'
-                        : '';
+                      const preview = formatMessagePreview(chat.lastMessage);
                       return (
                         <motion.li
                           key={chat.id}
