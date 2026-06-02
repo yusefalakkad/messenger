@@ -61,8 +61,10 @@ export function useAppInit(): boolean {
 
     init();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Реагируем на login/logout — после phone-auth isAuthenticated меняется, нужно
+  // переподключить socket. Без этого PhoneAuthForm должен сам звать initSocket
+  // (страховка дублирует — initSocket safe to call дважды, есть guard на connected).
+  }, [isAuthenticated]);
 
   return ready;
 }

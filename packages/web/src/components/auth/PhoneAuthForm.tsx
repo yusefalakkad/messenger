@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { generateKeyPair } from '@/lib/crypto';
 import { cachePlaintext, getCached as getCachedPrivKey } from '@/lib/keyVault';
+import { initSocket } from '@/lib/socket';
 
 type Step = 'phone' | 'link-bot' | 'code' | 'profile';
 
@@ -125,6 +126,7 @@ export default function PhoneAuthForm() {
       if (cached) {
         // Reload вкладки — ключ ещё в sessionStorage. Используем как есть.
         setAuth(t.user as any, t.accessToken, cached);
+        initSocket();
       } else {
         // Новое устройство / очистка storage → регенерим, шлём новый publicKey
         // отдельным запросом (verify-flow одноразовый, OTP уже консумирован).
@@ -132,6 +134,7 @@ export default function PhoneAuthForm() {
         // Кладём токен В STORE сразу, чтобы PATCH ушёл с Authorization.
         cachePlaintext(t.user.id, privateKey);
         setAuth({ ...t.user, publicKey } as any, t.accessToken, privateKey);
+        initSocket();
         // Обновляем publicKey на сервере (без него собеседники не могут писать нам).
         await api.patch('/users/me/public-key', { publicKey }).catch(() => {
           // Если не получилось — приват уже сохранён, новые исходящие будут зашифрованы
@@ -176,6 +179,7 @@ export default function PhoneAuthForm() {
       // E2E-чаты ломаются ("приватный ключ недоступен. Перелогиньтесь").
       cachePlaintext(data.data.user.id, privateKey);
       setAuth(data.data.user as any, data.data.tokens.accessToken, privateKey);
+      initSocket();
     } catch (err: any) {
       setError(err?.response?.data?.error?.message ?? 'Не удалось завершить регистрацию');
     } finally {
