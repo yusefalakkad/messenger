@@ -48,12 +48,26 @@ function createUpload(type: MediaType) {
     storage: multer.memoryStorage(),
     limits: { fileSize: limits[type] },
     fileFilter: (_req, file, cb) => {
-      const mime = file.mimetype.split(';')[0].trim();
-      if (type === 'circle' && mime.startsWith('video/')) { cb(null, true); return; }
-      if (type === 'file') { cb(null, true); return; }
-      const list = allowed[type];
-      if (list && list.includes(mime)) cb(null, true);
-      else cb(new Error(`Invalid file type for ${type}`));
+      const mime = (file.mimetype || '').split(';')[0].trim().toLowerCase();
+      // Liberal MIME matching — браузеры дают разные строки (video/webm;codecs=vp9,
+      // video/mp4, video/quicktime, video/x-matroska). Принимаем любой video/*
+      // для circle/video, audio/* для voice. Strict-whitelist оставлен для image.
+      let ok = false;
+      if (type === 'file') ok = true;
+      else if (type === 'circle' && mime.startsWith('video/')) ok = true;
+      else if (type === 'video'  && mime.startsWith('video/')) ok = true;
+      else if (type === 'voice'  && mime.startsWith('audio/')) ok = true;
+      else if (type === 'image'  && mime.startsWith('image/')) ok = true;
+      else if (allowed[type]?.includes(mime)) ok = true;
+
+      if (ok) cb(null, true);
+      else {
+        // Маркируем ошибку, чтобы handler-обёртка вернула 400 BAD_FILE_TYPE,
+        // а не пробросилось как unhandled 500.
+        (cb as (err: Error | null, accept?: boolean) => void)(
+          Object.assign(new Error(`Invalid file type for ${type}: ${mime}`), { code: 'BAD_FILE_TYPE' }),
+        );
+      }
     },
   });
 }
@@ -66,7 +80,16 @@ router.post('/upload/:type',
     if (!MEDIA_TYPES.includes(type)) {
       throw new AppError(400, 'INVALID_TYPE', 'Invalid media type');
     }
-    createUpload(type).single('file')(req, res, next);
+    // Оборачиваем multer чтобы fileFilter/limit ошибки превращались в 400, а не 500.
+    createUpload(type).single('file')(req, res, (err) => {
+      if (err) {
+        const code = (err as { code?: string }).code || 'UPLOAD_FAILED';
+        // Multer's own LIMIT_FILE_SIZE / Custom BAD_FILE_TYPE / etc — всё в 400
+        const status = code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+        return next(new AppError(status, code, (err as Error).message || 'Upload failed'));
+      }
+      next();
+    });
   },
   async (req: Request, res: Response, next: NextFunction) => {
     try {
