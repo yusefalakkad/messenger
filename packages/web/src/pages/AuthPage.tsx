@@ -25,7 +25,7 @@ export default function AuthPage() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
         className="relative w-full max-w-md"
@@ -33,7 +33,7 @@ export default function AuthPage() {
         {/* Логотип */}
         <div className="text-center mb-8">
           <motion.div
-            initial={{ scale: 0.6, opacity: 0 }}
+            initial={false}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 18 }}
             className="relative inline-block mb-5"
@@ -47,7 +47,7 @@ export default function AuthPage() {
           </motion.div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className="text-3xl font-bold tracking-tight"
@@ -55,7 +55,7 @@ export default function AuthPage() {
             <span className="text-gradient">Dakka</span>
           </motion.h1>
           <motion.p
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35 }}
             className="text-white/45 text-sm mt-2"
@@ -63,7 +63,7 @@ export default function AuthPage() {
             Общение, которое чувствуешь
           </motion.p>
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={false}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.45 }}
             className="chip-brand mt-4"
@@ -75,7 +75,7 @@ export default function AuthPage() {
 
         {/* Карточка */}
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
           className="glass-card p-6 relative"
