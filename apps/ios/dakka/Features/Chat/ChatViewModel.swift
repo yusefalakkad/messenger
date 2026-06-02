@@ -96,24 +96,37 @@ final class ChatViewModel: ObservableObject {
     func sendDraft() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        draft = ""
         stopTypingImmediate()
 
         // ── Режим редактирования ──
         if let editing = editingMessage {
             sendEdit(messageId: editing.id, newText: text)
-            editingMessage = nil
             return
         }
 
         let replyToId = replyingTo?.id
-        replyingTo = nil
 
         let payload: SendMessagePayload
-        if isE2E,
-           let myPriv = privateKey,
-           let theirPub = otherMember?.user.publicKey,
-           let enc = try? E2E.encryptText(text, recipientPublicKeyB64: theirPub, senderPrivateKeyB64: myPriv) {
+        if isE2E {
+            // SECURITY: при E2E-чате отправка ОБЯЗАНА быть зашифрованной.
+            // Никакого silent plaintext fallback.
+            guard let myPriv = privateKey else {
+                error ="Не удалось отправить: приватный ключ недоступен. Перелогиньтесь."
+                return
+            }
+            guard let theirPub = otherMember?.user.publicKey else {
+                error ="У получателя нет ключа шифрования."
+                return
+            }
+            let enc: E2E.Encrypted
+            do {
+                enc = try E2E.encryptText(text, recipientPublicKeyB64: theirPub, senderPrivateKeyB64: myPriv)
+            } catch {
+                error ="Ошибка шифрования. Сообщение не отправлено."
+                return
+            }
+            draft = ""
+            replyingTo = nil
             payload = SendMessagePayload(
                 chatId: chat.id,
                 type: MessageType.text.rawValue,
@@ -125,6 +138,8 @@ final class ChatViewModel: ObservableObject {
                 forwardedFromId: nil
             )
         } else {
+            draft = ""
+            replyingTo = nil
             payload = SendMessagePayload(
                 chatId: chat.id,
                 type: MessageType.text.rawValue,

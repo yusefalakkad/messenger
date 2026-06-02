@@ -85,49 +85,67 @@ class ChatViewModel(
     fun sendDraft() {
         val t = _draft.value.trim()
         if (t.isEmpty()) return
-        _draft.value = ""
         SocketClient.setTyping(chat.id, false)
 
         // Edit mode: отправляем message:edit вместо нового сообщения
         val editingMsg = _editing.value
         if (editingMsg != null) {
-            _editing.value = null
-            val recipient = chat.otherMember(currentUserId)
-            val recipientPub = recipient?.user?.publicKey
-            if (isE2E && privateKey != null && !recipientPub.isNullOrBlank()) {
-                runCatching {
-                    val enc = E2E.encryptText(t, recipientPub, privateKey)
-                    SocketClient.editMessage(editingMsg.id, chat.id, enc.ciphertextB64, enc.nonceB64, true)
-                }.onFailure {
-                    SocketClient.editMessage(editingMsg.id, chat.id, t, null, false)
+            if (isE2E) {
+                // SECURITY: при E2E-чате edit ОБЯЗАН быть зашифрован. Никакого
+                // silent plaintext fallback.
+                val recipient = chat.otherMember(currentUserId)
+                val recipientPub = recipient?.user?.publicKey
+                if (privateKey.isNullOrBlank() || recipientPub.isNullOrBlank()) {
+                    _error.value = "Не удалось зашифровать: ключ недоступен. Перелогиньтесь."
+                    return
                 }
+                val enc = try {
+                    E2E.encryptText(t, recipientPub, privateKey)
+                } catch (e: Exception) {
+                    _error.value = "Ошибка шифрования. Сообщение не изменено."
+                    return
+                }
+                _editing.value = null
+                _draft.value = ""
+                SocketClient.editMessage(editingMsg.id, chat.id, enc.ciphertextB64, enc.nonceB64, true)
             } else {
+                _editing.value = null
+                _draft.value = ""
                 SocketClient.editMessage(editingMsg.id, chat.id, t, null, false)
             }
             return
         }
 
         val replyId = _replyingTo.value?.id
-        _replyingTo.value = null
-
         val recipient = chat.otherMember(currentUserId)
         val recipientPub = recipient?.user?.publicKey
-        val payload: SendMessagePayload = if (isE2E && privateKey != null && !recipientPub.isNullOrBlank()) {
-            try {
-                val enc = E2E.encryptText(t, recipientPub, privateKey)
-                SendMessagePayload(
-                    chatId = chat.id,
-                    type = "text",
-                    content = enc.ciphertextB64,
-                    nonce = enc.nonceB64,
-                    encrypted = true,
-                    replyToId = replyId,
-                )
-            } catch (e: Exception) {
-                SendMessagePayload(chatId = chat.id, type = "text", content = t,
-                    encrypted = false, replyToId = replyId)
+
+        val payload: SendMessagePayload = if (isE2E) {
+            // SECURITY: E2E-чат ОБЯЗАН быть зашифрован. Никакого silent plaintext.
+            if (privateKey.isNullOrBlank()) {
+                _error.value = "Не удалось отправить: приватный ключ недоступен. Перелогиньтесь."
+                return
             }
+            if (recipientPub.isNullOrBlank()) {
+                _error.value = "У получателя нет ключа шифрования."
+                return
+            }
+            val enc = try {
+                E2E.encryptText(t, recipientPub, privateKey)
+            } catch (e: Exception) {
+                _error.value = "Ошибка шифрования. Сообщение не отправлено."
+                return
+            }
+            _draft.value = ""
+            _replyingTo.value = null
+            SendMessagePayload(
+                chatId = chat.id, type = "text",
+                content = enc.ciphertextB64, nonce = enc.nonceB64,
+                encrypted = true, replyToId = replyId,
+            )
         } else {
+            _draft.value = ""
+            _replyingTo.value = null
             SendMessagePayload(chatId = chat.id, type = "text", content = t,
                 encrypted = false, replyToId = replyId)
         }

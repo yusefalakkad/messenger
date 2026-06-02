@@ -183,10 +183,4 @@ enum E2E {
         cacheLock.lock(); defer { cacheLock.unlock() }
         sharedKeyCache.removeAll()
     }
-
-    /// Полная очистка кэша — вызывать при logout.
-    static func clearCache() {
-        cacheLock.lock(); defer { cacheLock.unlock() }
-        sharedKeyCache.removeAll()
-    }
 }

@@ -99,6 +99,43 @@ router.patch('/me',
   },
 );
 
+// PATCH /users/me/public-key — обновить E2E publicKey (новое устройство / regen).
+// Принимает свежий base64-SPKI P-256 ключ от клиента (124 символа стандартно).
+// После rotation старые входящие сообщения становятся не расшифровываемыми —
+// это by design phone-auth.
+router.patch('/me/public-key',
+  requireAuth,
+  validate([
+    body('publicKey').isString()
+      .isLength({ min: 100, max: 256 })
+      .matches(/^[A-Za-z0-9+/=]+$/).withMessage('publicKey must be base64'),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { publicKey } = req.body;
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { publicKey },
+        select: { id: true, publicKey: true },
+      });
+      // Сообщаем активным сокетам других участников всех чатов юзера, что ключ
+      // сменился. Они должны re-fetch /chats чтобы взять свежий публичный ключ.
+      const io = req.app.get('io') as import('socket.io').Server | undefined;
+      if (io) {
+        const memberships = await prisma.chatMember.findMany({
+          where: { userId, leftAt: null },
+          select: { chatId: true, chat: { select: { members: { where: { leftAt: null }, select: { userId: true } } } } },
+        });
+        const peerIds = new Set<string>();
+        memberships.forEach((m) => m.chat.members.forEach((p) => { if (p.userId !== userId) peerIds.add(p.userId); }));
+        peerIds.forEach((pid) => io.to(`user:${pid}`).emit('user:key-changed', { userId, publicKey }));
+      }
+      sendSuccess(res, user);
+    } catch (err) { next(err); }
+  },
+);
+
 // POST /users/:id/block — заблокировать юзера
 router.post('/:id/block',
   requireAuth,

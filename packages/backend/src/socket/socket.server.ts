@@ -378,11 +378,11 @@ async function handleSendMessage(
     return;
   }
 
-  // Verify membership
+  // Verify membership (АКТИВНОЕ — кикнутые/leftAt не имеют права слать).
   const member = await prisma.chatMember.findUnique({
     where: { chatId_userId: { chatId: payload.chatId, userId } },
   });
-  if (!member) throw new Error('Not a member');
+  if (!member || member.leftAt) throw new Error('Not a member');
 
   // SECURITY: replyToId должен указывать на сообщение из того же чата
   if (payload.replyToId) {

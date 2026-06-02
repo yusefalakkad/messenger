@@ -119,20 +119,28 @@ router.post('/direct',
 
       if (userId === targetUserId) throw new AppError(400, 'SAME_USER', 'Cannot create chat with yourself');
 
-      // Check if direct chat already exists
+      // Check if direct chat already exists. БУДЬ ОСТОРОЖЕН: `every` в Prisma
+      // считает chat с 0 active members как match — вернёт «осиротевший» чат.
+      // Делаем явно: оба участника АКТИВНЫ.
       const existing = await prisma.chat.findFirst({
         where: {
           type: 'direct',
-          members: { every: { userId: { in: [userId, targetUserId] }, leftAt: null } },
+          AND: [
+            { members: { some: { userId, leftAt: null } } },
+            { members: { some: { userId: targetUserId, leftAt: null } } },
+          ],
         },
         include: {
           members: {
-            include: { user: { select: { id: true, username: true, displayName: true, avatar: true } } },
+            where: { leftAt: null },
+            include: { user: { select: { id: true, username: true, displayName: true, avatar: true, publicKey: true } } },
           },
         },
       });
 
-      if (existing) { sendSuccess(res, existing); return; }
+      // Дополнительная гарантия: ровно 2 активных members. Если меньше — это
+      // осиротевший чат, не используем.
+      if (existing && existing.members.length === 2) { sendSuccess(res, existing); return; }
 
       // Verify target user exists
       const targetUser = await prisma.user.findUnique({

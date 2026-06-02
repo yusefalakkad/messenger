@@ -4,6 +4,7 @@ import { ArrowRight, Phone, KeyRound, User as UserIcon, Loader2, Send } from 'lu
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { generateKeyPair } from '@/lib/crypto';
+import { cachePlaintext, getCached as getCachedPrivKey } from '@/lib/keyVault';
 
 type Step = 'phone' | 'link-bot' | 'code' | 'profile';
 
@@ -104,28 +105,51 @@ export default function PhoneAuthForm() {
     setError(null);
     setLoading(true);
     try {
-      // ВСЕГДА генерим свежую пару E2E-ключей при login. Если юзер существует —
-      // бэк заменит его publicKey на этот, и приватный останется только у нас.
-      // Старые сообщения становятся нерасшифровываемыми (приватный был на старом
-      // устройстве) — это by design phone-auth.
-      const { publicKey, privateKey } = await generateKeyPair();
-      const { data } = await api.post<{ success: boolean; data: VerifyResp }>(
+      // Verify без publicKey — бэк ничего не меняет в user.publicKey.
+      const r = await api.post<{ success: boolean; data: VerifyResp }>(
         '/auth/phone/verify',
-        { phone, code, publicKey },
+        { phone, code },
       );
-      const v = data.data;
+      const v = r.data.data;
+
       if (v.isNewUser) {
-        // Для нового юзера publicKey всё равно установится через complete-profile —
-        // там мы регенерим пару ещё раз. (Не критично, просто чище.)
         setVerifyToken(v.verifyToken!);
         setStep('profile');
+        return;
+      }
+
+      const t = v.tokens!;
+      // Есть ли у нас сохранённый приватный ключ для этого юзера?
+      const cached = getCachedPrivKey(t.user.id);
+
+      if (cached) {
+        // Reload вкладки — ключ ещё в sessionStorage. Используем как есть.
+        setAuth(t.user as any, t.accessToken, cached);
       } else {
-        // Существующий юзер — заходим, сохраняем свежий приватный ключ.
-        const t = v.tokens!;
-        setAuth(t.user as any, t.accessToken, privateKey);
+        // Новое устройство / очистка storage → регенерим, шлём новый publicKey
+        // отдельным запросом (verify-flow одноразовый, OTP уже консумирован).
+        const { publicKey, privateKey } = await generateKeyPair();
+        // Кладём токен В STORE сразу, чтобы PATCH ушёл с Authorization.
+        cachePlaintext(t.user.id, privateKey);
+        setAuth({ ...t.user, publicKey } as any, t.accessToken, privateKey);
+        // Обновляем publicKey на сервере (без него собеседники не могут писать нам).
+        await api.patch('/users/me/public-key', { publicKey }).catch(() => {
+          // Если не получилось — приват уже сохранён, новые исходящие будут зашифрованы
+          // для нашего НОВОГО publicKey, но входящие → бэк держит старый → fail.
+          // Логируем, но не блокируем — юзер дальше зайдёт.
+          console.warn('[phone-auth] failed to rotate publicKey on server');
+        });
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error?.message ?? 'Неверный код');
+      const msg = err?.response?.data?.error?.message;
+      const code = err?.response?.data?.error?.code;
+      if (code === 'OTP_EXPIRED') {
+        setError('Срок действия кода истёк. Запросите новый.');
+      } else if (code === 'OTP_LOCKED') {
+        setError('Слишком много неверных попыток. Запросите новый код.');
+      } else {
+        setError(msg ?? 'Неверный код');
+      }
     } finally {
       setLoading(false);
     }
@@ -147,6 +171,10 @@ export default function PhoneAuthForm() {
           publicKey,
         },
       );
+      // КРИТИЧНО: сохранить приватный ключ в sessionStorage чтобы он пережил
+      // reload вкладки. Без этого после F5 у юзера privateKey=null и все
+      // E2E-чаты ломаются ("приватный ключ недоступен. Перелогиньтесь").
+      cachePlaintext(data.data.user.id, privateKey);
       setAuth(data.data.user as any, data.data.tokens.accessToken, privateKey);
     } catch (err: any) {
       setError(err?.response?.data?.error?.message ?? 'Не удалось завершить регистрацию');

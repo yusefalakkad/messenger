@@ -20,8 +20,15 @@ api.interceptors.request.use((config) => {
 let isRefreshing = false;
 let refreshQueue: Array<(token: string) => void> = [];
 
-// Эти пути не требуют авто-обновления токена
-const AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/refresh'];
+// Эти пути возвращают 401 как ЛОГИЧЕСКУЮ ошибку (wrong code / invalid token),
+// а не "истёкший access token". Они НЕ должны триггерить auto-refresh +
+// logout-каскад — иначе юзер на каждый неверный код вылетает обратно на /auth
+// с подменой "Wrong code" → "Session expired".
+const AUTH_PATHS = [
+  '/auth/login', '/auth/register', '/auth/refresh',
+  '/auth/phone/request', '/auth/phone/verify', '/auth/phone/complete-profile',
+  '/auth/login/2fa',
+];
 
 api.interceptors.response.use(
   (res) => res,

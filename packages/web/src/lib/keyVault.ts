@@ -124,6 +124,15 @@ export async function decryptAndCache(userId: string, password: string): Promise
   }
 }
 
+/** Положить приватный ключ в sessionStorage без пароля (phone-auth flow).
+ *  После reload вкладки auth.store onRehydrateStorage подхватит его через getCached.
+ *  ВАЖНО: ключ всё ещё легко читается из sessionStorage скриптами на той же origin —
+ *  единственная защита это `script-src 'self'` CSP. Закрытие вкладки → ключ потерян,
+ *  юзер должен пере-логиниться (это by design phone-auth). */
+export function cachePlaintext(userId: string, privateKey: string): void {
+  safeSet(sessionStorage, memKey(userId), privateKey);
+}
+
 /** Получить плейнтекст из sessionStorage. Возвращает null если сессия новая. */
 export function getCached(userId: string): string | null {
   return safeGet(sessionStorage, memKey(userId));
