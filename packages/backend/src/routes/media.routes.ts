@@ -36,39 +36,13 @@ function createUpload(type: MediaType) {
     circle: config.upload.maxVideoSize,
     file:  config.upload.maxFileSize,
   };
-  const allowed: Record<MediaType, readonly string[] | null> = {
-    image: config.upload.allowedImageTypes,
-    video: config.upload.allowedVideoTypes,
-    voice: config.upload.allowedVoiceTypes,
-    circle: config.upload.allowedVideoTypes,
-    file:  null, // file = любой MIME (юзер прикрепляет произвольный документ)
-  };
-
   return multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: limits[type] },
-    fileFilter: (_req, file, cb) => {
-      const mime = (file.mimetype || '').split(';')[0].trim().toLowerCase();
-      // Liberal MIME matching — браузеры дают разные строки (video/webm;codecs=vp9,
-      // video/mp4, video/quicktime, video/x-matroska). Принимаем любой video/*
-      // для circle/video, audio/* для voice. Strict-whitelist оставлен для image.
-      let ok = false;
-      if (type === 'file') ok = true;
-      else if (type === 'circle' && mime.startsWith('video/')) ok = true;
-      else if (type === 'video'  && mime.startsWith('video/')) ok = true;
-      else if (type === 'voice'  && mime.startsWith('audio/')) ok = true;
-      else if (type === 'image'  && mime.startsWith('image/')) ok = true;
-      else if (allowed[type]?.includes(mime)) ok = true;
-
-      if (ok) cb(null, true);
-      else {
-        // Маркируем ошибку, чтобы handler-обёртка вернула 400 BAD_FILE_TYPE,
-        // а не пробросилось как unhandled 500.
-        (cb as (err: Error | null, accept?: boolean) => void)(
-          Object.assign(new Error(`Invalid file type for ${type}: ${mime}`), { code: 'BAD_FILE_TYPE' }),
-        );
-      }
-    },
+    // НЕТ fileFilter — multer не отвергает по MIME. Размер контролирует limits.
+    // Браузеры/SDK дают непредсказуемые MIME-строки (codecs, charsets, octet-stream
+    // при empty blob.type), MIME-whitelist гарантированно ловит false positives.
+    // Если нужно ограничить — лучше проверка magic-bytes (file-type) в handler.
   });
 }
 

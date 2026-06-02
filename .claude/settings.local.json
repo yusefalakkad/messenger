@@ -76,7 +76,8 @@
       "Bash(kill 67119)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(echo \"PID=$!\")",
-      "Bash(kill 69981)"
+      "Bash(kill 69981)",
+      "Bash(grep -A3 \"location /api/media\" packages/web/../../nginx/nginx.conf 2>/dev/null || grep -A3 \"location /api/media\" nginx/nginx.conf | head -20)"
     ]
   }
 }
