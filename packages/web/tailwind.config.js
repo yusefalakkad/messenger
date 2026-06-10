@@ -26,22 +26,59 @@ export default {
           orange: '#ff8a3d',
           violet: '#7c4dff',
         },
-        // Глубокий тёмно-фиолетовый ночник — не чисто чёрный, со слегка фиолетовым подтоном
+        // Мягкий «приподнятый» dark — НЕ чёрный. Тон ~245° H, низкая S, слабо-фиолетовый
+        // подмес. Между Linear и iOS dark mode по светлоте. 6 ступеней иерархии:
+        // чем выше элемент, тем светлее тон.
         dark: {
-          bg:      '#0b0a14',
-          surface: '#13111f',
-          card:    '#1b1828',
-          border:  '#2a2638',
-          hover:   '#221f30',
-          input:   '#14121e',
+          bg:      '#17151e',  // основной фон — мягкая темнота, не black
+          surface: '#1f1d2a',  // sidebar, header
+          card:    '#28253a',  // bubble-in, карточки, ячейки
+          border:  '#352f4a',  // разделители — чуть видимей
+          hover:   '#2c2940',  // hover/active
+          input:   '#1d1b29',  // input bg
         },
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Roboto', 'sans-serif'],
       },
+      // ─── Дизайн-система ────────────────────────────────────────────────────
+      // 4/8px-сетка отступов. Радиусы 6/10/14/18/24/9999. Hit-target ≥ 44px.
+      // Типографика — 5 ступеней + line-height + tracking.
+      spacing: {
+        // помимо tailwind-дефолтов 4/8/12/16/20/24 (1/2/3/4/5/6),
+        // полезные «межсредние» для плотной messenger-вёрстки.
+        '4.5':  '1.125rem',  // 18
+        '13':   '3.25rem',   // 52  — стандартная ячейка списка
+        '15':   '3.75rem',   // 60  — chat-header высота
+        '18':   '4.5rem',    // 72
+      },
+      minHeight:  { 'tap': '44px' },  // hit-target по WCAG
+      minWidth:   { 'tap': '44px' },
       borderRadius: {
-        'msg': '20px',
-        'msg-sm': '8px',
+        // Token-набор. Используй ТОЛЬКО эти значения по системе.
+        'xs':     '6px',
+        'sm':     '8px',
+        'md':     '10px',
+        'lg':     '14px',
+        'xl':     '18px',
+        '2xl':    '22px',
+        '3xl':    '28px',
+        // legacy aliases для уже написанных пузырей.
+        'msg':    '18px',
+        'msg-sm': '6px',
+      },
+      fontSize: {
+        // 5-ступенчатая шкала по messenger-конвенции.
+        // [size, { lineHeight, letterSpacing, fontWeight? }]
+        'caption':  ['11px', { lineHeight: '14px', letterSpacing: '0.01em' }],     // time stamps
+        'micro':    ['12px', { lineHeight: '16px', letterSpacing: '0.01em' }],     // metadata
+        'body-sm':  ['13px', { lineHeight: '18px' }],                              // sidebar preview
+        'body':     ['15px', { lineHeight: '20px' }],                              // основной
+        'body-lg':  ['16px', { lineHeight: '22px' }],
+        'title-sm': ['17px', { lineHeight: '22px', letterSpacing: '-0.01em', fontWeight: '600' }], // chat-header
+        'title':    ['20px', { lineHeight: '26px', letterSpacing: '-0.015em', fontWeight: '600' }], // section
+        'h2':       ['24px', { lineHeight: '30px', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'h1':       ['32px', { lineHeight: '38px', letterSpacing: '-0.025em', fontWeight: '700' }],
       },
       backgroundImage: {
         'brand-gradient': 'linear-gradient(135deg, #7c4dff 0%, #d946ef 50%, #ff8a3d 100%)',
@@ -49,8 +86,14 @@ export default {
         'brand-radial': 'radial-gradient(circle at 30% 20%, rgba(124,77,255,0.25), transparent 50%), radial-gradient(circle at 70% 80%, rgba(255,77,141,0.18), transparent 55%)',
       },
       boxShadow: {
-        'glow-violet': '0 10px 40px -10px rgba(124,77,255,0.55)',
-        'glow-pink':   '0 10px 40px -10px rgba(255,77,141,0.45)',
+        // Дизайн-система: 4 ступени высоты + 2 brand-glow.
+        // e1 — кнопки в покое; e2 — карточки; e3 — модалки; e4 — оверлеи/popover.
+        'e1': '0 1px 2px rgba(0,0,0,0.25), 0 1px 1px rgba(0,0,0,0.15)',
+        'e2': '0 4px 12px -2px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.2)',
+        'e3': '0 12px 32px -8px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.25)',
+        'e4': '0 24px 64px -12px rgba(0,0,0,0.7), 0 8px 16px rgba(0,0,0,0.3)',
+        'glow-violet': '0 8px 28px -10px rgba(138,82,255,0.55)',
+        'glow-pink':   '0 8px 28px -10px rgba(255,90,143,0.45)',
         'glow-soft':   '0 8px 32px -12px rgba(0,0,0,0.6)',
       },
       animation: {

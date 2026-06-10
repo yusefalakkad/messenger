@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate.middleware';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 import { prisma } from '../lib/prisma';
 import { sendSuccess, AppError } from '../utils/response';
+import { signMediaUrlsDeep } from '../lib/mediaUrl';
 
 const router = Router();
 
@@ -173,7 +174,7 @@ router.post('/direct',
       // получателя — message:new потеряется.
       const io = req.app.get('io') as SocketServer;
       if (io) {
-        const chatWithMeta = { ...chat, unreadCount: 0, lastMessage: null };
+        const chatWithMeta = signMediaUrlsDeep({ ...chat, unreadCount: 0, lastMessage: null });
         await Promise.all([userId, targetUserId].map(async (uid) => {
           await io.in(`user:${uid}`).socketsJoin(`chat:${chat.id}`);
           io.to(`user:${uid}`).emit('chat:new', chatWithMeta);
@@ -222,7 +223,7 @@ router.post('/group',
       // чата уйдёт в room, где ещё нет получателей.
       const io = req.app.get('io') as SocketServer;
       if (io) {
-        const chatWithMeta = { ...chat, unreadCount: 0, lastMessage: null };
+        const chatWithMeta = signMediaUrlsDeep({ ...chat, unreadCount: 0, lastMessage: null });
         await Promise.all(allIds.map(async (uid) => {
           await io.in(`user:${uid}`).socketsJoin(`chat:${chat.id}`);
           io.to(`user:${uid}`).emit('chat:new', chatWithMeta);
@@ -263,8 +264,15 @@ router.get('/:chatId/messages',
           reads:     { select: { userId: true, readAt: true } },
           reactions: { select: { userId: true, emoji: true } },
           replyTo: {
-            select: { id: true, type: true, content: true, senderId: true,
-              sender: { select: { displayName: true } } },
+            // encrypted+nonce обязательны для корректного reply-preview шифрованных сообщений
+            // (без них клиент рендерит base64 ciphertext вместо «🔒 Зашифрованное сообщение»).
+            // media — для превью медиа-reply'ев.
+            select: {
+              id: true, type: true, content: true, senderId: true,
+              encrypted: true, nonce: true,
+              sender: { select: { displayName: true } },
+              media: { select: { url: true, thumbnailUrl: true, mimeType: true } },
+            },
           },
         },
       });
@@ -376,7 +384,7 @@ router.patch('/:chatId',
 
       // Broadcast обновление всем участникам через комнату чата
       const io = req.app.get('io') as SocketServer | undefined;
-      io?.to(`chat:${chatId}`).emit('chat:updated', { chatId, name: updated.name, avatar: updated.avatar });
+      io?.to(`chat:${chatId}`).emit('chat:updated', signMediaUrlsDeep({ chatId, name: updated.name, avatar: updated.avatar }));
 
       sendSuccess(res, updated);
     } catch (err) { next(err); }
@@ -434,11 +442,12 @@ router.post('/:chatId/members',
 
       const io = req.app.get('io') as SocketServer | undefined;
       if (io && updatedChat) {
+        const signedChat = signMediaUrlsDeep({ ...updatedChat });
         // Существующим — chat:updated
-        io.to(`chat:${chatId}`).emit('chat:updated', { chatId, members: updatedChat.members });
+        io.to(`chat:${chatId}`).emit('chat:updated', { chatId, members: signedChat.members });
         // Новым — chat:new + join в комнату
         toAdd.forEach((uid) => {
-          io.to(`user:${uid}`).emit('chat:new', { ...updatedChat, unreadCount: 0, lastMessage: null });
+          io.to(`user:${uid}`).emit('chat:new', { ...signedChat, unreadCount: 0, lastMessage: null });
           io.in(`user:${uid}`).socketsJoin(`chat:${chatId}`);
         });
       }

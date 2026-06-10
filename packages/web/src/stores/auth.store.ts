@@ -52,6 +52,10 @@ export const useAuthStore = create<AuthState>()(
         clearVaultCache();
         // Инвалидируем ICE-кэш (TURN credentials могли быть user-bound)
         import('@/lib/iceServers').then(({ clearIceServersCache }) => clearIceServersCache());
+        // Полный сброс stores / socket / outbox / drafts / queryClient — иначе
+        // данные предыдущего юзера утекают новому в той же вкладке, а pending
+        // outbox-сообщения улетают под чужой сессией (P1-10 + P1-17).
+        import('@/lib/resetAppState').then(({ resetAppState }) => resetAppState());
         set({ user: null, accessToken: null, privateKey: null, isAuthenticated: false });
       },
     }),

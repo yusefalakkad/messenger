@@ -23,6 +23,18 @@ export default defineConfig({
       // Позволяет корректно собирать смешанные CJS/ESM модули
       include: [/libsodium-wrappers/, /node_modules/],
     },
+    // P1-19: явные чанки. livekit-client (~700KB) и framer-motion (~150KB)
+    // не должны лежать в общем index.js — они нужны только в чате/звонках.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          livekit:  ['livekit-client'],
+          motion:   ['framer-motion'],
+          icons:    ['lucide-react'],
+          'date-utils': ['date-fns'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,

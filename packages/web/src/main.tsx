@@ -1,18 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { initNative } from './lib/native';
+import { queryClient } from './lib/queryClient';
 import './index.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
-  },
-});
 
 // Инициализируем нативные плагины как можно раньше — до первого рендера.
 // На web этот вызов — no-op.

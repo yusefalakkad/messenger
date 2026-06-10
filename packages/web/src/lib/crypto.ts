@@ -63,7 +63,7 @@ export async function encryptMessage(
 ): Promise<EncryptedMessage> {
   const recipientPublicKey = await crypto.subtle.importKey(
     'spki',
-    fromBase64(recipientPublicKeyB64),
+    fromBase64(recipientPublicKeyB64) as BufferSource,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
     [],
@@ -71,7 +71,7 @@ export async function encryptMessage(
 
   const senderPrivateKey = await crypto.subtle.importKey(
     'pkcs8',
-    fromBase64(senderPrivateKeyB64),
+    fromBase64(senderPrivateKeyB64) as BufferSource,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
     ['deriveKey', 'deriveBits'],
@@ -106,7 +106,7 @@ export async function decryptMessage(
 ): Promise<string> {
   const senderPublicKey = await crypto.subtle.importKey(
     'spki',
-    fromBase64(senderPublicKeyB64),
+    fromBase64(senderPublicKeyB64) as BufferSource,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
     [],
@@ -114,7 +114,7 @@ export async function decryptMessage(
 
   const recipientPrivateKey = await crypto.subtle.importKey(
     'pkcs8',
-    fromBase64(recipientPrivateKeyB64),
+    fromBase64(recipientPrivateKeyB64) as BufferSource,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
     ['deriveKey', 'deriveBits'],
@@ -130,7 +130,7 @@ export async function decryptMessage(
 
   const nonce = fromBase64(encrypted.nonce);
   const ciphertext = fromBase64(encrypted.ciphertext);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, sharedKey, ciphertext);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce as BufferSource }, sharedKey, ciphertext as BufferSource);
 
   return new TextDecoder().decode(decrypted);
 }

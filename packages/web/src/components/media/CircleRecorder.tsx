@@ -3,8 +3,8 @@
  * Показывает живой превью в круге с прогресс-кольцом.
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { X, Send } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Send, Trash2, Play, Pause, Square } from 'lucide-react';
 
 interface Props {
   onRecorded: (blob: Blob, duration: number, thumbnailUrl: string) => void;
@@ -27,8 +27,15 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
   const [ready, setReady]       = useState(false);
   const [recording, setRecording] = useState(false);
   const [time, setTime]         = useState(0);
+  // Превью отснятого: после stop сохраняем blob+thumb и показываем playback;
+  // отправка — отдельным жестом. Можно «перезаписать» сбросив preview.
+  const [preview, setPreview]   = useState<{ blob: Blob; url: string; thumb: string; duration: number } | null>(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const progress = (time / MAX_DURATION) * CIRCUMFERENCE;
+  // Предупреждение цветом: за 10 сек до лимита таймер становится оранжевым/красным.
+  const nearLimit = recording && time >= MAX_DURATION - 10;
 
   // Инициализация камеры — повышаем разрешение, добавляем aspectRatio чтобы лицо не растягивалось
   useEffect(() => {
@@ -56,17 +63,17 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
     };
   }, []);
 
-  // Захват стоп-кадра для превью
+  // Захват стоп-кадра для превью.
+  // P2-5: НЕ зеркалим thumbnail. Превью в чате показывается БЕЗ scaleX(-1)
+  // (video-pause UI рендерит как есть), а сама запись тоже без зеркала.
+  // Если зеркалить превью — получаем «прыжок» картинки при play (preview vs video).
   const captureThumb = useCallback((): string => {
     const canvas = canvasRef.current!;
     const video  = videoRef.current!;
     canvas.width  = 400;
     canvas.height = 400;
     const ctx = canvas.getContext('2d')!;
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -400, 0, 400, 400);
-    ctx.restore();
+    ctx.drawImage(video, 0, 0, 400, 400);
     return canvas.toDataURL('image/jpeg', 0.7);
   }, []);
 
@@ -93,21 +100,64 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
     }, 1000);
   }, [recording]);
 
+  // Stop recording → переходим в preview-state (НЕ авто-отправка). Юзер сам жмёт Send.
   const stopRecording = useCallback(() => {
     const rec = recorderRef.current;
     if (!rec || rec.state === 'inactive') return;
-    clearInterval(timerRef.current!);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
     const thumb = captureThumb();
+    const finishedDuration = time; // фиксируем — позже time=0 после сброса state
     rec.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'video/webm' });
-      onRecorded(blob, time, thumb);
+      const url = URL.createObjectURL(blob);
+      setPreview({ blob, url, thumb, duration: Math.max(1, finishedDuration) });
     };
     rec.stop();
     setRecording(false);
-  }, [time, captureThumb, onRecorded]);
+  }, [time, captureThumb]);
+
+  // Сбросить отснятое и начать заново.
+  const discardPreview = useCallback(() => {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+    setPreviewPlaying(false);
+    setTime(0);
+  }, [preview]);
+
+  // Отправить отснятое.
+  const sendPreview = useCallback(() => {
+    if (!preview) return;
+    onRecorded(preview.blob, preview.duration, preview.thumb);
+    URL.revokeObjectURL(preview.url);
+  }, [preview, onRecorded]);
+
+  // Отмена recording mid-take — выкидываем chunks без сохранения.
+  const cancelRecording = useCallback(() => {
+    const rec = recorderRef.current;
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (rec && rec.state !== 'inactive') {
+      rec.onstop = null; // не вызываем callback
+      try { rec.stop(); } catch { /* ignore */ }
+    }
+    chunksRef.current = [];
+    setRecording(false);
+    setTime(0);
+  }, []);
 
   useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
+
+  // Cleanup blob URL при unmount.
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview.url);
+  }, [preview]);
+
+  const togglePreviewPlay = useCallback(() => {
+    const v = previewVideoRef.current;
+    if (!v) return;
+    if (previewPlaying) { v.pause(); setPreviewPlaying(false); }
+    else { v.play().then(() => setPreviewPlaying(true)).catch(() => {}); }
+  }, [previewPlaying]);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -118,16 +168,17 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center gap-8 px-6"
     >
-      {/* Кнопка закрытия — в углу, не теснит запись */}
+      {/* Кнопка закрытия — в углу, не теснит запись.
+          Во время recording → confirm; в preview → discard. */}
       <button
-        onClick={onCancel}
+        onClick={recording ? cancelRecording : (preview ? discardPreview : onCancel)}
         aria-label="Отменить"
-        className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        className="absolute top-6 right-6 w-11 h-11 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white/75 hover:text-white transition-colors backdrop-blur-md"
       >
         <X size={20} />
       </button>
 
-      {/* Круговой превью */}
+      {/* Круговой превью / playback */}
       <div className="relative" style={{ width: 280, height: 280 }}>
         {/* Прогресс-кольцо */}
         <svg
@@ -140,79 +191,178 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
             <circle
               cx="140" cy="140" r={RADIUS}
               fill="none"
-              stroke="#ef4444"
+              stroke={nearLimit ? '#f97316' : '#ef4444'}
               strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
               strokeDashoffset={CIRCUMFERENCE - progress}
-              style={{ transition: 'stroke-dashoffset 1s linear', filter: 'drop-shadow(0 0 8px rgba(239,68,68,0.6))' }}
+              style={{
+                transition: 'stroke-dashoffset 1s linear, stroke 0.3s',
+                filter: `drop-shadow(0 0 10px ${nearLimit ? 'rgba(249,115,22,0.7)' : 'rgba(239,68,68,0.6)'})`,
+              }}
             />
           )}
         </svg>
 
-        {/* Видео в круге */}
+        {/* Видео в круге: live preview ИЛИ playback отснятого */}
         <div className="absolute inset-3 rounded-full overflow-hidden bg-dark-bg ring-1 ring-white/10">
-          <video
-            ref={videoRef}
-            muted
-            playsInline
-            className="w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-          />
-          {!ready && (
+          {preview ? (
+            // PREVIEW: видео-плеер отснятого
+            <video
+              ref={previewVideoRef}
+              src={preview.url}
+              playsInline
+              onEnded={() => setPreviewPlaying(false)}
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={togglePreviewPlay}
+              style={{ transform: 'scaleX(-1)' }}
+            />
+          ) : (
+            // LIVE: камера
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+            />
+          )}
+
+          {!ready && !preview && (
             <div className="absolute inset-0 flex items-center justify-center bg-dark-bg/60">
               <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           )}
-          {/* Pulse-индикатор записи */}
+
+          {/* REC-индикатор только при активной записи */}
           {recording && (
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
+            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/65 backdrop-blur-sm rounded-full px-2.5 py-1 z-10">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[10px] text-white font-medium tabular-nums">REC</span>
+              <span className="text-[11px] text-white font-semibold tracking-wide">REC</span>
             </div>
+          )}
+
+          {/* Play-overlay в preview-mode */}
+          {preview && !previewPlaying && (
+            <button
+              onClick={togglePreviewPlay}
+              className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors z-10"
+              aria-label="Воспроизвести"
+            >
+              <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-2xl">
+                <Play size={28} className="text-dark-bg translate-x-0.5" fill="currentColor" />
+              </span>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Скрытый canvas для превью */}
+      {/* Скрытый canvas для превью-кадра */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Таймер + подсказка над кнопкой */}
+      {/* Таймер + подсказка */}
       <div className="flex flex-col items-center gap-2">
-        <div className={
-          recording
-            ? 'text-2xl font-bold text-white tabular-nums'
-            : 'text-2xl font-bold text-white/40 tabular-nums'
-        }>
-          {fmt(time)} <span className="text-sm text-white/35 font-normal">/ {fmt(MAX_DURATION)}</span>
+        <div className={`text-3xl font-bold tabular-nums transition-colors ${
+          nearLimit ? 'text-orange-400' : recording ? 'text-white' : preview ? 'text-white' : 'text-white/40'
+        }`}>
+          {fmt(preview ? preview.duration : time)}
+          <span className="text-base text-white/35 font-normal ml-1">/ {fmt(MAX_DURATION)}</span>
         </div>
-        <p className="text-white/70 text-sm">
+        <p className="text-white/65 text-[14px] leading-5">
           {!ready
-            ? 'Запрашиваем камеру...'
+            ? 'Запрашиваем доступ к камере…'
+            : preview
+            ? 'Готово. Отправить или переснять?'
             : recording
-            ? 'Идёт запись. Нажмите ⏹ чтобы отправить'
-            : 'Нажмите ● чтобы начать запись'}
+            ? (nearLimit ? `Осталось ${MAX_DURATION - time} сек` : 'Запись идёт — нажмите ■ чтобы закончить')
+            : 'Нажмите кружок, чтобы начать запись'}
         </p>
       </div>
 
-      {/* Управление — большая центральная кнопка, без пустых блоков */}
-      <div className="flex items-center justify-center">
-        <button
-          onClick={recording ? stopRecording : startRecording}
-          disabled={!ready}
-          aria-label={recording ? 'Остановить и отправить' : 'Начать запись'}
-          className="relative w-24 h-24 rounded-full flex items-center justify-center transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {recording ? (
-            <div className="w-24 h-24 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center shadow-2xl shadow-red-500/50 ring-4 ring-red-500/20">
-              <Send size={28} className="text-white -translate-x-0.5" />
-            </div>
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-white hover:bg-white/95 flex items-center justify-center shadow-2xl ring-4 ring-white/10">
+      {/* Управление: разное в зависимости от состояния */}
+      <div className="flex items-center justify-center gap-8 min-h-[96px]">
+        <AnimatePresence mode="wait" initial={false}>
+          {/* IDLE: одна большая кнопка REC */}
+          {!recording && !preview && (
+            <motion.button
+              key="idle"
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1,   opacity: 1 }}
+              exit={{    scale: 0.7, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+              onClick={startRecording}
+              disabled={!ready}
+              aria-label="Начать запись"
+              className="w-24 h-24 rounded-full bg-white hover:bg-white/95 flex items-center justify-center shadow-2xl ring-4 ring-white/10 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <div className="w-16 h-16 rounded-full bg-red-500" />
-            </div>
+            </motion.button>
           )}
-        </button>
+
+          {/* RECORDING: cancel слева, stop по центру */}
+          {recording && !preview && (
+            <motion.div
+              key="rec"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{    opacity: 0, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="flex items-center gap-10"
+            >
+              <button
+                onClick={cancelRecording}
+                aria-label="Отменить запись"
+                title="Отменить запись"
+                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-all active:scale-95"
+              >
+                <Trash2 size={22} />
+              </button>
+              <button
+                onClick={stopRecording}
+                aria-label="Остановить запись"
+                className="w-24 h-24 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center shadow-2xl shadow-red-500/50 ring-4 ring-red-500/20 active:scale-95 transition-transform"
+              >
+                <Square size={28} className="text-white" fill="currentColor" />
+              </button>
+            </motion.div>
+          )}
+
+          {/* PREVIEW: discard (←) play/pause toggle, send (→) */}
+          {preview && (
+            <motion.div
+              key="preview"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{    opacity: 0, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="flex items-center gap-10"
+            >
+              <button
+                onClick={discardPreview}
+                aria-label="Переснять"
+                title="Переснять"
+                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-all active:scale-95"
+              >
+                <Trash2 size={22} />
+              </button>
+              <button
+                onClick={togglePreviewPlay}
+                aria-label={previewPlaying ? 'Пауза' : 'Воспроизвести'}
+                title={previewPlaying ? 'Пауза' : 'Воспроизвести'}
+                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-all active:scale-95"
+              >
+                {previewPlaying ? <Pause size={22} /> : <Play size={22} fill="currentColor" />}
+              </button>
+              <button
+                onClick={sendPreview}
+                aria-label="Отправить"
+                className="w-24 h-24 rounded-full bg-brand-gradient flex items-center justify-center shadow-2xl shadow-primary-500/40 active:scale-95 transition-transform"
+              >
+                <Send size={28} className="text-white -translate-x-0.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

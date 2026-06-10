@@ -47,7 +47,8 @@ targets:
         UIBackgroundModes:
           - audio          # держать звук во время звонка
           - voip           # CallKit/PushKit (на будущее)
-          - remote-notification
+          # remote-notification отключён — требует Push entitlement,
+          # бесплатный Apple ID его не поддерживает. Вернуть когда будет $99/год.
         NSMicrophoneUsageDescription: "Нужен микрофон для голосовых сообщений и звонков"
         NSCameraUsageDescription: "Нужна камера для фото, видео и видео-кружков"
         NSPhotoLibraryUsageDescription: "Доступ нужен для отправки фото и видео"

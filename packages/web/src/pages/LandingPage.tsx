@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import DakkaIcon from '@/components/ui/DakkaIcon';
 import {
   ShieldCheck, Phone, Mic, Video as VideoIcon, Smile, Lock, Globe,
   ArrowRight, Play, Apple, Smartphone, Sparkles,
@@ -88,11 +89,7 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
   return (
     <header className="relative z-10 px-6 lg:px-12 py-6 flex items-center justify-between max-w-[1480px] mx-auto">
       <div className="flex items-center gap-2.5">
-        <div className="relative w-10 h-10 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow-violet">
-          <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-            <path d="M4 8C4 6.9 4.9 6 6 6h20c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H18l-4 4-2-4H6c-1.1 0-2-.9-2-2V8z" fill="white"/>
-          </svg>
-        </div>
+        <DakkaIcon size={40} className="drop-shadow-[0_6px_18px_rgba(154,77,255,0.45)]" />
         <span className="text-xl font-semibold tracking-tight">Dakka</span>
       </div>
 

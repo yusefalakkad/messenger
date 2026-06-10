@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { ApiResponse } from '@messenger/shared';
+import { signMediaUrlsDeep } from '../lib/mediaUrl';
 
 export function sendSuccess<T>(
   res: Response,
@@ -7,6 +8,10 @@ export function sendSuccess<T>(
   statusCode = 200,
   meta?: ApiResponse<T>['meta'],
 ): Response {
+  // Подписываем media URL'ы перед сериализацией — мутирует data на месте.
+  // Безопасно: трогает только строки в полях url/thumbnailUrl/avatarUrl/avatar/previewUrl,
+  // и только те, которые матчат /api/media/...
+  if (data !== undefined) signMediaUrlsDeep(data);
   const body: ApiResponse<T> = { success: true, data, meta };
   return res.status(statusCode).json(body);
 }

@@ -107,13 +107,15 @@ export default function ChatHeader({ chat, otherMember }: Props) {
 
   return (
     <>
-      <header className="flex items-center gap-2 px-3 lg:px-4 pb-3 pt-[calc(var(--sat)+0.75rem)] border-b border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
-        <IconBtn onClick={() => navigate('/')} className="lg:hidden -ml-1" title="Назад">
+      {/* Высота 64px (h-16), padding x16/y0 — стандарт messenger-headers по 8-сетке.
+          На мобиле — h-15 (60) и компактный отступ от safe-area. */}
+      <header className="flex items-center gap-2 px-4 h-16 pt-[var(--sat)] border-b border-dark-border bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
+        <IconBtn onClick={() => navigate('/')} className="lg:hidden -ml-2" title="Назад">
           <ChevronLeft size={20} />
         </IconBtn>
 
         <button
-          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity h-full"
           onClick={() => setShowProfile(true)}
         >
           <Avatar
@@ -124,16 +126,16 @@ export default function ChatHeader({ chat, otherMember }: Props) {
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <h2 className="font-semibold text-base truncate leading-tight">{name}</h2>
+              <h4 className="truncate">{name}</h4>
               {e2e && <ShieldCheck size={13} className="text-primary-300 flex-shrink-0" />}
             </div>
-            <p className={`text-xs truncate mt-0.5 font-medium ${isOnline ? 'text-green-400' : 'text-white/40'}`}>
+            <p className={`text-[12px] leading-4 truncate mt-0.5 font-medium ${isOnline ? 'text-green-400' : 'text-white/45'}`}>
               {subtitle}
             </p>
           </div>
         </button>
 
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {peerId && (
             <IconBtn onClick={() => startCall('audio')} title="Аудиозвонок">
               <Phone size={18} />

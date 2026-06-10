@@ -7,7 +7,7 @@
  * • В фиксированном режиме: × отмена, ✓ отправить
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Paperclip, Mic, Send, Image as ImageIcon, Video, CircleDot, X, Lock, Smile } from 'lucide-react';
+import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { sendMessage, sendTyping } from '@/lib/socket';
@@ -104,19 +104,25 @@ export default function MessageInput({ chatId }: Props) {
 
   // ─── Черновики ──────────────────────────────────────────────────────────────
   // При входе в чат — подгружаем сохранённый текст; при выходе/смене — сохраняем.
+  // P1-16: ключ scoped per-user (`draft:<userId>:<chatId>`) чтобы при logout/login
+  // в одной вкладке черновики юзера A не утекали юзеру B. resetAppState() при
+  // logout всё равно чистит draft:* — это второй слой защиты.
+
+  const myUserIdForDraft = useAuthStore((s) => s.user?.id);
+  const draftKey = myUserIdForDraft ? `draft:${myUserIdForDraft}:${chatId}` : null;
 
   useEffect(() => {
-    if (editingMessage) return;
-    const draft = localStorage.getItem(`draft:${chatId}`);
+    if (editingMessage || !draftKey) return;
+    const draft = localStorage.getItem(draftKey);
     setText(draft ?? '');
-  }, [chatId]);
+  }, [chatId, draftKey]);
 
   useEffect(() => {
-    if (editingMessage) return;
+    if (editingMessage || !draftKey) return;
     const t = text.trim();
-    if (t) localStorage.setItem(`draft:${chatId}`, text);
-    else   localStorage.removeItem(`draft:${chatId}`);
-  }, [text, chatId, editingMessage]);
+    if (t) localStorage.setItem(draftKey, text);
+    else   localStorage.removeItem(draftKey);
+  }, [text, draftKey, editingMessage]);
 
   // ─── Очистка при смене чата ──────────────────────────────────────────────────
 
@@ -531,8 +537,70 @@ export default function MessageInput({ chatId }: Props) {
       form.append('file', file);
       const { data } = await api.post(`/media/upload/${type}`, form);
       const m = data.data;
-      sendMessage({ chatId, type: type as MessageType, content: caption || undefined,
-        mediaData: { url: m.url, mimeType: m.mimeType, size: m.size, width: m.width, height: m.height } });
+
+      // P1-6: для видео-файла генерим poster + извлекаем dimensions/duration.
+      // Без этого в пузырьке показывается серый плейсхолдер без длительности.
+      let videoThumbnailUrl: string | undefined;
+      let videoWidth: number | undefined;
+      let videoHeight: number | undefined;
+      let videoDuration: number | undefined;
+      if (type === 'video') {
+        try {
+          const meta = await extractVideoPoster(file);
+          videoWidth    = meta.width;
+          videoHeight   = meta.height;
+          videoDuration = meta.duration;
+          if (meta.posterBlob) {
+            const tf = new FormData();
+            tf.append('file', meta.posterBlob, 'poster.jpg');
+            const { data: td } = await api.post('/media/upload/image', tf);
+            videoThumbnailUrl = td.data.url;
+          }
+        } catch (err) {
+          console.warn('[Video] poster extraction failed, sending without', err);
+        }
+      }
+
+      // P1-15: caption в E2E-чате должен идти зашифрованным, иначе sidebar
+      // светит подпись в открытом виде, а сервер видит «секрет».
+      const chat = useChatStore.getState().chats.find((c) => c.id === chatId);
+      const { user, privateKey } = useAuthStore.getState();
+      let captionContent: string | undefined = caption || undefined;
+      let captionNonce:    string | undefined;
+      let captionEncrypted = false;
+
+      if (caption && chat && isChatE2E(chat) && user && privateKey) {
+        const recipientPub = getRecipientPublicKey(chat, user.id);
+        if (recipientPub) {
+          try {
+            const enc = await encryptText(chatId, caption, recipientPub, privateKey);
+            captionContent   = enc.ciphertext;
+            captionNonce     = enc.nonce;
+            captionEncrypted = true;
+          } catch (err) {
+            console.error('[E2E] Caption encrypt failed — sending without caption', err);
+            toast.error('Не удалось зашифровать подпись. Отправляем без неё.');
+            captionContent = undefined; // лучше без подписи, чем светить plaintext
+          }
+        }
+      }
+
+      sendMessage({
+        chatId,
+        type: type as MessageType,
+        content: captionContent,
+        nonce: captionNonce,
+        encrypted: captionEncrypted,
+        mediaData: {
+          url: m.url,
+          mimeType: m.mimeType,
+          size: m.size,
+          width:        videoWidth     ?? m.width,
+          height:       videoHeight    ?? m.height,
+          duration:     videoDuration,
+          thumbnailUrl: videoThumbnailUrl,
+        },
+      });
     } catch (err) { console.error('Media upload failed', err); }
     finally { setUploading(false); }
   }, [chatId, pendingMedia]);
@@ -541,6 +609,14 @@ export default function MessageInput({ chatId }: Props) {
     if (pendingMedia) URL.revokeObjectURL(pendingMedia.previewUrl);
     setPendingMedia(null);
   }, [pendingMedia]);
+
+  // P2-3: revoke pending blob URL при unmount / смене чата — иначе блоб 100MB
+  // видео висит в памяти браузера всё время сессии.
+  useEffect(() => {
+    return () => {
+      if (pendingMedia) URL.revokeObjectURL(pendingMedia.previewUrl);
+    };
+  }, [chatId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Вспомогалки ─────────────────────────────────────────────────────────────
 
@@ -572,11 +648,11 @@ export default function MessageInput({ chatId }: Props) {
       {/* Hidden file inputs */}
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => handleFileChange(e, 'image')} />
-      <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+      <input ref={videoInputRef} type="file" accept="video/*" className="hidden"
         onChange={(e) => handleFileChange(e, 'video')} />
 
-      {/* ─── Основная панель ─── */}
-      <div className="flex-shrink-0 border-t border-white/[0.05] bg-dark-surface/70 backdrop-blur-xl px-4 pt-3 pb-3 pb-input">
+      {/* ─── Основная панель (8-grid: px-16, py-12, border единый dark-border) ─── */}
+      <div className="flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-3 pb-input">
 
         {/* Планка «Ответить» */}
         <AnimatePresence>
@@ -654,23 +730,25 @@ export default function MessageInput({ chatId }: Props) {
                 open={showAttach}
                 onClose={() => setShowAttach(false)}
                 anchor="left"
-                className="!bottom-full !top-auto !mb-2 !mt-0"
+                className="!bottom-full !top-auto !mb-2 !mt-0 min-w-[200px]"
               >
+                {/* Группировка: запись с камеры → файлы из галереи. */}
                 <DropdownItem
-                  icon={<ImageIcon size={16} />} label="Фото"
-                  onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
-                />
-                <DropdownItem
-                  icon={<Video size={16} />} label="Снять видео"
+                  icon={<Camera size={16} />} label="Снять видео"
                   onClick={() => { setShowVideoRec(true); setShowAttach(false); }}
-                />
-                <DropdownItem
-                  icon={<Video size={16} />} label="Видео (файл)"
-                  onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}
                 />
                 <DropdownItem
                   icon={<CircleDot size={16} />} label="Видео-кружок"
                   onClick={() => { setShowCircle(true); setShowAttach(false); }}
+                />
+                <div className="my-1 mx-3 border-t border-dark-border" />
+                <DropdownItem
+                  icon={<ImageIcon size={16} />} label="Фото из галереи"
+                  onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
+                />
+                <DropdownItem
+                  icon={<Film size={16} />} label="Видео-файл"
+                  onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}
                 />
               </Dropdown>
             </div>
@@ -737,19 +815,31 @@ export default function MessageInput({ chatId }: Props) {
 
             {/* PTT: идёт запись (НЕ зафиксировано) */}
             {pttState === 'recording' && (
-              <div className="flex items-center gap-2 px-3 py-2.5 h-[46px]">
-                {/* Отмена при свайпе влево */}
-                <motion.span
-                  animate={{ opacity: showCancel ? 1 : 0.35, x: showCancel ? 0 : 4 }}
-                  className="text-xs text-white/50 flex-shrink-0 select-none whitespace-nowrap"
+              <div className="flex items-center gap-2 px-3 h-11">
+                {/* Свайп-индикатор отмены: иконка корзины + подпись, краснеют по мере drag */}
+                <motion.div
+                  animate={{
+                    opacity: showCancel ? 1 : 0.55,
+                    scale:   showCancel ? 1.08 : 1,
+                    x:       showCancel ? -4 : 0,
+                  }}
+                  transition={{ duration: 0.15 }}
+                  className={clsx(
+                    'flex items-center gap-1.5 flex-shrink-0 select-none whitespace-nowrap',
+                    showCancel ? 'text-red-400' : 'text-white/55',
+                  )}
                 >
-                  ← отмена
-                </motion.span>
+                  <Trash2 size={14} />
+                  <span className="text-[12px] font-medium">{showCancel ? 'отпусти' : '← отмена'}</span>
+                </motion.div>
 
                 {/* Waveform */}
-                <div className="flex-1 flex items-center gap-[2px] h-7">
+                <div className="flex-1 flex items-center gap-[2px] h-7 min-w-0">
                   {pttBars.map((h, i) => (
-                    <div key={i} className="flex-1 rounded-full bg-red-400 transition-all duration-75"
+                    <div key={i} className={clsx(
+                      'flex-1 rounded-full transition-all duration-75',
+                      showCancel ? 'bg-red-300/70' : 'bg-red-400',
+                    )}
                       style={{ height: `${Math.max(3, h * 24)}px`, opacity: 0.5 + h * 0.5 }} />
                   ))}
                 </div>
@@ -757,31 +847,33 @@ export default function MessageInput({ chatId }: Props) {
                 {/* Таймер */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs text-white/70 tabular-nums font-medium">{fmt(pttTime)}</span>
+                  <span className="text-[12px] text-white/75 tabular-nums font-medium">{fmt(pttTime)}</span>
                 </div>
 
                 {/* Замок — подсказка потянуть вверх */}
                 <motion.div
-                  animate={{ opacity: 0.3 + lockProgress * 0.7, scale: 0.9 + lockProgress * 0.2 }}
-                  className="flex flex-col items-center flex-shrink-0"
+                  animate={{ opacity: 0.4 + lockProgress * 0.6, scale: 0.9 + lockProgress * 0.25 }}
+                  className="flex flex-col items-center justify-center flex-shrink-0 w-6"
+                  title="Потяните вверх для фиксации"
                 >
-                  <Lock size={12} className={clsx('transition-colors', lockProgress > 0.5 ? 'text-primary-400' : 'text-white/40')} />
-                  <span className="text-[9px] text-white/30 leading-none">↑</span>
+                  <span className="text-[10px] leading-none text-white/40">↑</span>
+                  <Lock size={13} className={clsx('transition-colors mt-0.5', lockProgress > 0.5 ? 'text-primary-400' : 'text-white/45')} />
                 </motion.div>
               </div>
             )}
 
-            {/* PTT: зафиксировано */}
+            {/* PTT: зафиксировано — можно отпустить кнопку */}
             {pttState === 'locked' && (
-              <div className="flex items-center gap-2 px-3 py-2.5 h-[46px]">
-                {/* Отмена */}
+              <div className="flex items-center gap-2 px-3 h-11">
+                {/* Отмена 36×36 для hit-target ≥ 32 */}
                 <button onClick={() => stopVoicePTT(false)}
-                  className="w-7 h-7 rounded-full bg-dark-hover hover:bg-red-500/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                  <X size={14} className="text-white/60" />
+                  aria-label="Отменить запись"
+                  className="w-9 h-9 rounded-full bg-dark-hover hover:bg-red-500/20 flex items-center justify-center flex-shrink-0 text-white/70 hover:text-red-300 transition-colors">
+                  <Trash2 size={16} />
                 </button>
 
-                {/* Waveform */}
-                <div className="flex-1 flex items-center gap-[2px] h-7">
+                {/* Waveform — primary тон, фиксированная запись */}
+                <div className="flex-1 flex items-center gap-[2px] h-7 min-w-0">
                   {pttBars.map((h, i) => (
                     <div key={i} className="flex-1 rounded-full bg-primary-400 transition-all duration-75"
                       style={{ height: `${Math.max(3, h * 24)}px`, opacity: 0.5 + h * 0.5 }} />
@@ -791,7 +883,7 @@ export default function MessageInput({ chatId }: Props) {
                 {/* Таймер */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs text-primary-300 tabular-nums font-medium">{fmt(pttTime)}</span>
+                  <span className="text-[12px] text-primary-200 tabular-nums font-medium">{fmt(pttTime)}</span>
                 </div>
               </div>
             )}
@@ -857,4 +949,62 @@ export default function MessageInput({ chatId }: Props) {
       </div>
     </>
   );
+}
+
+/**
+ * Извлекает poster-кадр + dimensions + duration из видео-файла.
+ * Скрытый <video> в DOM не нужен — создаём оффскрин-элемент.
+ * Используется в handleMediaSend для type='video' (P1-6).
+ */
+function extractVideoPoster(file: File): Promise<{
+  posterBlob: Blob | null;
+  width: number;
+  height: number;
+  duration: number;
+}> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload  = 'metadata';
+    video.muted    = true;
+    video.playsInline = true;
+    video.src = url;
+
+    const cleanup = () => { URL.revokeObjectURL(url); video.src = ''; };
+
+    let metaLoaded = false;
+    video.onloadedmetadata = () => {
+      metaLoaded = true;
+      // Seek на ~1 секунду (или половину длительности у коротких видео) — обычно
+      // даёт более характерный кадр, чем первый чёрный фрейм.
+      const seekTo = Math.min(1, Math.max(0.1, video.duration / 2));
+      try { video.currentTime = seekTo; } catch { /* ignore */ }
+    };
+
+    video.onseeked = () => {
+      if (!metaLoaded) return;
+      try {
+        const w = video.videoWidth, h = video.videoHeight;
+        const canvas = document.createElement('canvas');
+        // Cap до 720p для разумного размера postera.
+        const scale = Math.min(1, 720 / Math.max(w, h, 1));
+        canvas.width  = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { cleanup(); resolve({ posterBlob: null, width: w, height: h, duration: video.duration }); return; }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          cleanup();
+          resolve({ posterBlob: blob, width: w, height: h, duration: video.duration });
+        }, 'image/jpeg', 0.8);
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+
+    video.onerror = () => { cleanup(); reject(new Error('Video load failed')); };
+    // Хард-timeout — если видео-codec не поддерживается, onerror не всегда срабатывает.
+    setTimeout(() => { if (!metaLoaded) { cleanup(); reject(new Error('Video metadata timeout')); } }, 10_000);
+  });
 }

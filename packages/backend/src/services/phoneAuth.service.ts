@@ -8,9 +8,37 @@ import { AppError } from '../utils/response';
 import { getSmsProvider, SmsDeliveryError } from './sms';
 import { otpStore } from './sms/otpStore';
 
-/** Нормализуем номер в E.164. Бросаем AppError если невалиден. */
+/** Нормализуем номер в E.164. Бросаем AppError если невалиден.
+ *  Принимаем удобные форматы:
+ *    8 (XXX) XXX-XX-XX → +7XXXXXXXXXX
+ *    8XXXXXXXXXX     → +7XXXXXXXXXX
+ *    7XXXXXXXXXX     → +7XXXXXXXXXX (без плюса)
+ *    +7XXX, +1XXX    → как есть (libphonenumber разберёт)
+ *    XXXXXXXXXX (10) → +7XXXXXXXXXX (домашний код)
+ *  Пробелы, скобки, дефисы — стрипятся.
+ */
 export function normalizePhone(raw: string): string {
-  const parsed = parsePhoneNumberFromString(raw);
+  // Оставляем только цифры и плюс
+  const cleaned = raw.replace(/[^\d+]/g, '');
+
+  let candidate = cleaned;
+  if (!candidate.startsWith('+')) {
+    if (candidate.length === 11 && candidate.startsWith('8')) {
+      // 8 (XXX) XXX-XX-XX → меняем 8 на +7
+      candidate = '+7' + candidate.slice(1);
+    } else if (candidate.length === 11 && candidate.startsWith('7')) {
+      // 7XXXXXXXXXX без плюса
+      candidate = '+' + candidate;
+    } else if (candidate.length === 10) {
+      // 10 цифр — предполагаем РФ (без кода страны)
+      candidate = '+7' + candidate;
+    } else {
+      // Другая длина / международный без плюса — добавим плюс и пусть libphonenumber решает
+      candidate = '+' + candidate;
+    }
+  }
+
+  const parsed = parsePhoneNumberFromString(candidate);
   if (!parsed || !parsed.isValid()) {
     throw new AppError(400, 'INVALID_PHONE', 'Phone number is invalid');
   }
@@ -173,7 +201,11 @@ export class PhoneAuthService {
     profile: { displayName: string; username?: string; publicKey: string },
     meta: { deviceId: string; deviceName?: string; ipAddress?: string; userAgent?: string },
   ) {
-    const phone = await otpStore.consumeVerifyToken(verifyToken);
+    // P1-11: peek-then-consume. Сначала проверяем что токен валидный И что все
+    // уникальности проходят. consumeVerifyToken только перед user.create —
+    // одношотовый токен НЕ сжигается, если username taken / phone taken,
+    // и юзер может попробовать ещё раз без перезапроса OTP.
+    const phone = await otpStore.peekVerifyToken(verifyToken);
     if (!phone) {
       throw new AppError(401, 'VERIFY_TOKEN_INVALID', 'Verify token expired or already used');
     }
@@ -190,6 +222,16 @@ export class PhoneAuthService {
       if (taken) {
         throw new AppError(409, 'USERNAME_TAKEN', 'Username already taken');
       }
+    }
+
+    // Все проверки прошли — атомарно списываем токен.
+    // Race-condition risk: между peek и consume другой запрос с тем же токеном
+    // мог проскочить — в этом случае consume вернёт null и мы здесь упадём.
+    // Поскольку verify token уникален per юзер per phone, в реальности это значит
+    // только double-click того же юзера — приемлемо.
+    const consumed = await otpStore.consumeVerifyToken(verifyToken);
+    if (!consumed) {
+      throw new AppError(401, 'VERIFY_TOKEN_INVALID', 'Verify token expired or already used');
     }
 
     const user = await prisma.user.create({

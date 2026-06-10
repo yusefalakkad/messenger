@@ -1,13 +1,23 @@
 /**
  * E2E шифрование — высокоуровневый слой поверх Web Crypto API.
  *
- * Алгоритм: ECDH P-256 для обмена ключами + AES-256-GCM для шифрования.
- * Симметрия ECDH: ECDH(alice_priv, bob_pub) === ECDH(bob_priv, alice_pub)
- * — поэтому оба участника независимо выводят одинаковый ключ.
+ * Алгоритм: ECDH P-256 → HKDF-SHA256 → AES-256-GCM.
  *
- * Безопасность: выше обычных чатов Telegram (там нет E2E).
+ * Версия v2 (HKDF):
+ *   • ECDH P-256 deriveBits → 256-bit shared secret
+ *   • HKDF-SHA256 с info = "messenger-e2e-v2:${chatId}" → derived AES-GCM ключ
+ *   • Domain separation по chatId: один и тот же shared secret → разные ключи в разных чатах
+ *
+ * Почему HKDF: raw ECDH output не предназначен для прямого использования как
+ * симметричный ключ (нет uniform distribution, нет domain separation). HKDF —
+ * правильный KDF из RFC 5869, обязательный шаг для PFS-протоколов (Signal, OPRF).
+ *
+ * BREAKING: v1 (raw ECDH → AES-GCM) сообщения этой версии расшифровать нельзя.
+ * Пользователь явно опт-инул на этот апгрейд (см. docs/WEB_AUDIT_2026-06-10.md, P3-3).
+ *
  * Приватный ключ НИКОГДА не покидает устройство пользователя.
  */
+const KEY_DERIVATION_INFO = 'messenger-e2e-v2';
 
 import type { Chat, Message } from '@messenger/shared';
 
@@ -50,13 +60,15 @@ async function getSharedKey(
   theirPublicKeyB64: string,
   myPrivateKeyB64: string,
 ): Promise<CryptoKey> {
-  const cacheKey = await computeCacheKey(chatId, theirPublicKeyB64);
+  // v2-namespaced cache key — чтобы не конфликтовать с возможным in-flight
+  // расшифровщиком v1 (если он где-то остался).
+  const cacheKey = 'v2:' + await computeCacheKey(chatId, theirPublicKeyB64);
   const cached = keyCache.get(cacheKey);
   if (cached) return cached;
 
   const theirPub = await window.crypto.subtle.importKey(
     'spki',
-    fromBase64(theirPublicKeyB64),
+    fromBase64(theirPublicKeyB64) as BufferSource,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
     [],
@@ -64,15 +76,37 @@ async function getSharedKey(
 
   const myPriv = await window.crypto.subtle.importKey(
     'pkcs8',
-    fromBase64(myPrivateKeyB64),
+    fromBase64(myPrivateKeyB64) as BufferSource,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
-    ['deriveKey', 'deriveBits'],
+    ['deriveBits'],
   );
 
-  const sharedKey = await window.crypto.subtle.deriveKey(
+  // Шаг 1: ECDH → 256-bit shared secret.
+  const sharedBits = await window.crypto.subtle.deriveBits(
     { name: 'ECDH', public: theirPub },
     myPriv,
+    256,
+  );
+
+  // Шаг 2: импортируем как HKDF-input key.
+  const hkdfInput = await window.crypto.subtle.importKey(
+    'raw',
+    sharedBits as BufferSource,
+    'HKDF',
+    false,
+    ['deriveKey'],
+  );
+
+  // Шаг 3: HKDF-SHA256 → AES-GCM 256 key. Info = domain separation per chat.
+  const sharedKey = await window.crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(0),
+      info: new TextEncoder().encode(`${KEY_DERIVATION_INFO}:${chatId}`),
+    },
+    hkdfInput,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt'],
@@ -154,9 +188,9 @@ export async function decryptMessage(
   const cipherBuf  = fromBase64(message.content);
 
   const decrypted = await window.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as BufferSource },
     sharedKey,
-    cipherBuf,
+    cipherBuf as BufferSource,
   );
 
   return new TextDecoder().decode(decrypted);

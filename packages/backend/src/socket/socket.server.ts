@@ -8,6 +8,7 @@ import { sendPushToUser } from '../lib/push';
 import { sendNativePushToUser, sendVoIPCallPush } from '../lib/push-native';
 import { logger } from '../lib/logger';
 import { extractObjectName } from '../lib/minio';
+import { signMediaUrlsDeep } from '../lib/mediaUrl';
 import type { WSClientEvents, WSServerEvents, SendMessagePayload } from '@messenger/shared';
 
 declare module 'socket.io' {
@@ -263,16 +264,22 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
       socket.join(`call:${callId}`);
 
+      // P1-2: пре-джойним callee в room звонка, чтобы он получил `call:ended`
+      // если caller отменит до accept. Без этого callee incoming-overlay висит
+      // навсегда (room эмитит только тем кто в неё вступил, а callee вступает
+      // только на accept).
+      try { await io.in(`user:${peerId}`).socketsJoin(`call:${callId}`); } catch { /* peer offline — push сделает работу */ }
+
       const caller = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, avatar: true } });
 
-      io.to(`user:${peerId}`).emit('call:incoming', {
+      io.to(`user:${peerId}`).emit('call:incoming', signMediaUrlsDeep({
         callId,
         callerId: userId,
         callerName: caller?.displayName ?? socket.username,
         callerAvatar: caller?.avatar ?? undefined,
         chatId,
         callType,
-      });
+      }));
 
       void sendVoIPCallPush(peerId, {
         callId,
@@ -483,7 +490,16 @@ async function handleSendMessage(
       media:     true,
       reads:     { select: { userId: true, readAt: true } },
       reactions: { select: { userId: true, emoji: true } },
-      replyTo: { select: { id: true, type: true, content: true, senderId: true, sender: { select: { displayName: true } } } },
+      // encrypted+nonce обязательны: без них клиент не отличит шифрованный reply-preview
+      // от обычного текста и рендерит base64 ciphertext (P1-13). media — для превью медиа-reply'ев.
+      replyTo: {
+        select: {
+          id: true, type: true, content: true, senderId: true,
+          encrypted: true, nonce: true,
+          sender: { select: { displayName: true } },
+          media: { select: { url: true, thumbnailUrl: true, mimeType: true } },
+        },
+      },
     },
   });
 
@@ -495,7 +511,8 @@ async function handleSendMessage(
 
   // Включаем clientMsgId в emit чтобы отправитель мог снять pending-ack.
   // Получатели clientMsgId игнорируют.
-  io.to(`chat:${payload.chatId}`).emit('message:new', { ...message, clientMsgId });
+  // signMediaUrlsDeep подписывает media URL'ы — для <img> в браузере / native.
+  io.to(`chat:${payload.chatId}`).emit('message:new', signMediaUrlsDeep({ ...message, clientMsgId }));
 
   // Push офлайн-членам чата (кроме отправителя)
   void notifyOfflineMembers(payload.chatId, userId, message);

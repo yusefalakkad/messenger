@@ -33,14 +33,25 @@
   body {
     @apply bg-dark-bg text-white antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-    /* Глубокий фиолетово-чёрный с ambient-засветками — не пустой "чисто чёрный" */
-    background-color: #0b0a14;
+    font-size: 15px;
+    line-height: 20px;
+    /* Мягкий dark с лёгкими ambient-засветками — НЕ пустой чёрный.
+       Засветки уменьшены чтобы не «забивать» интерфейс на новой светлой подложке. */
+    background-color: #17151e;
     background-image:
-      radial-gradient(1100px 700px at 10% -10%, rgba(124,77,255,0.18), transparent 60%),
-      radial-gradient(900px 700px at 110% 110%, rgba(255,77,141,0.12), transparent 60%),
-      radial-gradient(600px 400px at 80% 0%, rgba(255,138,61,0.06), transparent 60%);
+      radial-gradient(1200px 800px at 8% -12%, rgba(124,77,255,0.10), transparent 60%),
+      radial-gradient(1000px 800px at 112% 112%, rgba(255,77,141,0.07), transparent 60%);
     background-attachment: fixed;
   }
+
+  /* Типографическая иерархия (без @apply — JIT тут не успевает). */
+  h1 { font-size: 32px; line-height: 38px; letter-spacing: -0.025em; font-weight: 700; }
+  h2 { font-size: 24px; line-height: 30px; letter-spacing: -0.020em; font-weight: 700; }
+  h3 { font-size: 20px; line-height: 26px; letter-spacing: -0.015em; font-weight: 600; }
+  h4 { font-size: 17px; line-height: 22px; letter-spacing: -0.010em; font-weight: 600; }
+  /* Focus-ring единый для клавиатуры. */
+  :focus-visible { outline: 2px solid rgba(154,82,255,0.7); outline-offset: 2px; border-radius: inherit; }
+  button:focus, [role="button"]:focus, a:focus { outline: none; }
 
   /* Скроллбар тонкий, прозрачный */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -71,21 +82,22 @@
     animation: gradientShift 10s ease infinite;
   }
 
-  /* Стеклянная поверхность для оверлеев и панелей */
+  /* Стеклянная поверхность для оверлеев и панелей.
+     На новой светлой подложке поднимаем прозрачность чтобы стекло не «провисало». */
   .glass {
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    @apply bg-dark-surface/65 border border-white/[0.06];
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    @apply bg-dark-surface/75 border border-white/[0.08];
   }
 
   /* Карточка со стеклом + внутреннее свечение */
   .glass-card {
-    @apply rounded-2xl border border-white/[0.07] bg-white/[0.025];
-    backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.035];
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
     box-shadow:
-      0 1px 0 rgba(255,255,255,0.05) inset,
-      0 22px 60px -30px rgba(0,0,0,0.7);
+      0 1px 0 rgba(255,255,255,0.06) inset,
+      0 22px 60px -30px rgba(0,0,0,0.55);
   }
 
   /* Брендовый чип-пилюля с градиентной обводкой */
@@ -98,66 +110,124 @@
     -webkit-backdrop-filter: blur(8px);
   }
 
-  /* Message bubbles */
+  /* Message bubbles.
+     out: фирменный градиент, чуть мягче и теплее (ближе к мокапу dakka).
+     in:  solid лёгкий dark-card (не прозрачный) — на новой светлой подложке
+          rgba-полупрозрачные пузыри почти не видны; делаем плотный тон. */
   .bubble-out {
     @apply text-white rounded-msg rounded-br-msg-sm;
-    background: linear-gradient(135deg, #6a3df0 0%, #9a3dff 50%, #d946a8 100%);
-    box-shadow: 0 10px 30px -14px rgba(124,77,255,0.6);
+    background: linear-gradient(135deg, #8a52ff 0%, #b94de8 45%, #ff5a8f 100%);
+    box-shadow: 0 8px 24px -12px rgba(154,77,255,0.5);
   }
   .bubble-in {
-    @apply text-white rounded-msg rounded-bl-msg-sm border border-white/[0.06];
-    background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
-    box-shadow: 0 4px 18px -10px rgba(0,0,0,0.5);
+    @apply text-white rounded-msg rounded-bl-msg-sm;
+    background: #2a2738;
+    box-shadow: 0 4px 18px -12px rgba(0,0,0,0.5);
   }
 
-  /* Input base */
+  /* ─────────────────────────────────────────────
+     Input — единые размеры по системе.
+     base:  H=44px (≥hit-target), радиус lg, padding x16/y10
+     pill:  H=36px компактный (поиск), радиус full
+  ───────────────────────────────────────────── */
   .input-base {
-    @apply bg-dark-input border border-white/[0.07] rounded-xl px-4 py-3
+    @apply bg-dark-input border border-dark-border rounded-lg h-11 px-4
            text-white placeholder-white/30 outline-none
            focus:border-primary-500/70 focus:ring-2 focus:ring-primary-500/25
-           focus:bg-white/[0.04];
+           focus:bg-white/[0.04] transition;
+    font-size: 15px; line-height: 20px;
   }
-
-  /* Pill-shaped поисковый input */
   .input-pill {
-    @apply bg-white/[0.04] border border-white/[0.07] rounded-full pl-9 pr-4 py-2
-           text-sm placeholder-white/35 text-white outline-none
+    @apply bg-white/[0.04] border border-dark-border rounded-full h-9 pl-9 pr-4
+           placeholder-white/35 text-white outline-none
            focus:border-primary-500/60 focus:bg-white/[0.06]
-           focus:ring-2 focus:ring-primary-500/20;
+           focus:ring-2 focus:ring-primary-500/20 transition;
+    font-size: 13px; line-height: 18px;
   }
 
-  /* Брендовая кнопка — градиент + свечение */
-  .btn-primary {
-    @apply text-white font-medium rounded-xl px-6 py-3
+  /* ─────────────────────────────────────────────
+     Button — все варианты ОДИНАКОВОЙ высоты 44px.
+     primary:  градиент + glow
+     secondary: glass-fill, нейтральный
+     ghost:    прозрачная, hover-fill
+     danger:   rose-tone
+  ───────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 select-none
+           h-11 px-5 rounded-lg font-medium
            disabled:opacity-50 disabled:cursor-not-allowed
-           shadow-glow-violet active:scale-[0.97];
-    background: linear-gradient(135deg, #7c4dff 0%, #d946ef 60%, #ff8a3d 100%);
+           active:scale-[0.98] transition;
+    font-size: 15px; line-height: 20px;
+  }
+  .btn-sm     { @apply h-9 px-4 rounded-md; font-size: 13px; line-height: 18px; }
+  .btn-lg     { @apply h-12 px-6; font-size: 16px; line-height: 22px; }
+  .btn-block  { @apply w-full; }
+
+  .btn-primary {
+    @apply btn text-white shadow-glow-violet;
+    background: linear-gradient(135deg, #8a52ff 0%, #d04df0 60%, #ff5a8f 100%);
     background-size: 200% 200%;
   }
   .btn-primary:hover:not(:disabled) {
     background-position: 100% 0%;
-    filter: brightness(1.1);
-    transform: translateY(-1px);
-    box-shadow: 0 14px 44px -10px rgba(124,77,255,0.65);
+    filter: brightness(1.08);
+    box-shadow: 0 12px 36px -10px rgba(138,82,255,0.55);
   }
 
-  /* Призрачная кнопка-иконка */
-  .btn-icon {
-    @apply p-2 rounded-xl text-white/65 hover:text-white hover:bg-white/[0.07]
-           active:bg-white/[0.1] active:scale-95
-           disabled:opacity-40 disabled:cursor-not-allowed
-           inline-flex items-center justify-center;
+  .btn-secondary {
+    @apply btn bg-dark-card border border-dark-border text-white/85
+           hover:bg-dark-hover hover:border-white/[0.12];
   }
-  .btn-icon-sm { @apply p-1.5 rounded-lg; }
+  .btn-ghost {
+    @apply btn bg-transparent text-white/70 hover:text-white hover:bg-white/[0.06];
+  }
+  .btn-danger {
+    @apply btn bg-rose-500/12 border border-rose-500/30 text-rose-200
+           hover:bg-rose-500/20;
+  }
+
+  /* ─────────────────────────────────────────────
+     Icon button — квадратная hit-target.
+     Default 40px, sm 32px, lg 44px. ВСЕГДА центрирована.
+  ───────────────────────────────────────────── */
+  .btn-icon {
+    @apply inline-flex items-center justify-center
+           w-10 h-10 rounded-md text-white/65
+           hover:text-white hover:bg-white/[0.07]
+           active:bg-white/[0.1] active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed transition;
+  }
+  .btn-icon-sm { @apply w-8 h-8 rounded-sm; }
+  .btn-icon-lg { @apply w-11 h-11 rounded-lg; }
   .btn-icon-danger { @apply hover:text-rose-400 hover:bg-rose-500/10; }
 
-  /* Item в выпадающих меню */
+  /* ─────────────────────────────────────────────
+     List item — ячейка списка (sidebar, settings, members).
+     Высота ≥56px, паддинг x16/y8, gap=12px. Hit-target ОК.
+  ───────────────────────────────────────────── */
+  .list-item {
+    @apply flex items-center gap-3 px-4 py-2 min-h-[56px] rounded-lg
+           cursor-pointer transition
+           hover:bg-white/[0.04] active:bg-white/[0.06];
+  }
+  .list-item-active { @apply bg-white/[0.06]; }
+
+  /* Item в выпадающих меню — компактнее списка. */
   .menu-item {
-    @apply w-full flex items-center gap-3 px-4 py-2.5 text-sm
-           text-white/85 hover:bg-white/[0.06] hover:pl-5
-           active:bg-white/[0.09];
+    @apply w-full flex items-center gap-3 px-3 h-10
+           text-white/85 hover:bg-white/[0.06] active:bg-white/[0.09]
+           rounded-sm transition;
+    font-size: 13px; line-height: 18px;
   }
   .menu-item-danger { @apply text-rose-400 hover:bg-rose-500/10; }
+
+  /* ─────────────────────────────────────────────
+     Surface — иерархия фонов.
+     surface-1 — стандартная карточка
+     surface-2 — модалка / выделенная панель
+  ───────────────────────────────────────────── */
+  .surface-1 { @apply bg-dark-card border border-dark-border rounded-lg; }
+  .surface-2 { @apply bg-dark-surface border border-dark-border rounded-xl shadow-e3; }
 
   /* Кольцо-градиент вокруг аватара */
   .ring-gradient {

@@ -23,26 +23,41 @@ export default function MessageList({ chatId, messages }: Props) {
   // Показывать ли кнопку «вниз»
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [unreadBelow,   setUnreadBelow]   = useState(0);
+  // P2-18: до первой загрузки сообщений считаем юзера «на дне» — иначе фантомный
+  // unread-badge инкрементится на первом messages.length:0→N.
+  const initialLoadedRef = useRef(false);
 
   // ── Scroll to bottom on new message (если пользователь внизу) ───────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    const lastMsg = messages[messages.length - 1];
+    const isOwnLast = lastMsg && lastMsg.senderId === user?.id;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    // Авто-скролл только если близко к низу (< 120px)
-    if (distanceFromBottom < 120) {
+    // P2-18: первая партия сообщений после открытия чата — всегда «прокрутить
+    // к низу», без unread-badge.
+    if (!initialLoadedRef.current && messages.length > 0) {
+      initialLoadedRef.current = true;
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+      return;
+    }
+    // P2-10: собственные сообщения ВСЕГДА скроллим вниз. Если юзер их отправил
+    // прокрученный вверх по истории — он ждёт увидеть свой текст, а не бейдж.
+    if (isOwnLast || distanceFromBottom < 120) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     } else {
       setUnreadBelow((n) => n + 1);
     }
-  }, [messages.length]);
+  }, [messages.length, user?.id, messages]);
 
   useEffect(() => {
     if (isTyping) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [isTyping]);
 
-  // Начальная прокрутка вниз при открытии чата
+  // Начальная прокрутка вниз при открытии чата. Сбрасываем initialLoaded flag,
+  // чтобы следующий батч сообщений снова считался «первым» и не показал unread-badge.
   useEffect(() => {
+    initialLoadedRef.current = false;
     bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
     setShowScrollBtn(false);
     setUnreadBelow(0);
@@ -63,12 +78,16 @@ export default function MessageList({ chatId, messages }: Props) {
   };
 
   // ── Read tracking ────────────────────────────────────────────────────────────
+  // P2-11: добавляем `messages` в deps — без этого read-tracking запускался один
+  // раз на открытии чата, и сообщения, прилетевшие через resync/pagination,
+  // оставались неотмеченными. markRead идемпотентный на бэке, повторных хитов
+  // на одно и то же сообщение бояться не надо.
   useEffect(() => {
     const unread = messages.filter(
       (m) => m.senderId !== user?.id && !m.readBy?.some((r) => r.userId === user?.id),
     );
     unread.forEach((m) => markRead(m.id, chatId));
-  }, [chatId, user?.id]);
+  }, [chatId, user?.id, messages]);
 
   const lastMsg = messages[messages.length - 1];
   useEffect(() => {
@@ -76,7 +95,7 @@ export default function MessageList({ chatId, messages }: Props) {
     if (lastMsg.senderId !== user?.id && !lastMsg.readBy?.some((r) => r.userId === user?.id)) {
       markRead(lastMsg.id, chatId);
     }
-  }, [lastMsg?.id]);
+  }, [lastMsg?.id, chatId, user?.id]);
 
   const groups = groupByDate(messages.filter((m) => !m.deletedAt));
 

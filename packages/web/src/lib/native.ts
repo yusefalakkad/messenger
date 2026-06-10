@@ -23,7 +23,7 @@ export async function initNative(): Promise<void> {
   // Статусбар: dark-стиль, прозрачный, контент выезжает под него
   try {
     await StatusBar.setStyle({ style: Style.Dark });
-    await StatusBar.setBackgroundColor({ color: '#0b0a14' });
+    await StatusBar.setBackgroundColor({ color: '#17151e' });
     if (isIOS()) {
       await StatusBar.setOverlaysWebView({ overlay: true });
     }

@@ -4,6 +4,7 @@ import path from 'path';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 import { uploadFile, generateObjectName, getObjectStream, statObject } from '../lib/minio';
 import { verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
+import { verifyMediaToken } from '../lib/mediaToken';
 import { prisma } from '../lib/prisma';
 import { sendSuccess, AppError } from '../utils/response';
 import { config } from '../config';
@@ -97,31 +98,43 @@ router.post('/upload/:type',
 );
 
 // GET /media/*objectName — отдача медиа с проверкой прав.
-// Аватары — доступны любому авторизованному. Медиа в сообщениях — только участникам чата.
+//
+// Авторизация в порядке приоритета:
+//  1) `?t=<hmac>` query — HMAC-подпись от backend (для <img>/<video>, native).
+//     Подпись означает, что backend намеренно выдал доступ. Дополнительной
+//     проверки членства в чате не делаем (telegram-like модель: anyone-with-URL).
+//  2) Bearer header / refreshToken cookie — для axios-запросов и SSR.
+//     В этом случае проверяем членство в чате для не-аватарных файлов.
 router.get(/^\/(.+)$/, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = authenticateMediaRequest(req);
-    if (!userId) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
-
     const objectName = req.params[0];
     if (!objectName || objectName.includes('..') || objectName.startsWith('/')) {
       throw new AppError(400, 'BAD_PATH', 'Invalid object path');
     }
 
-    // Аватары всегда видимы залогиненным юзерам (имя файла = avatar/...).
-    // Для остального — проверка членства в чате.
-    if (!objectName.startsWith('avatar/')) {
-      const url = `/api/media/${objectName}`;
-      const media = await prisma.media.findFirst({
-        where: { OR: [{ url }, { thumbnailUrl: url }] },
-        select: { message: { select: { chatId: true } } },
-      });
-      if (!media) throw new AppError(404, 'NOT_FOUND', 'Media not found');
-      const member = await prisma.chatMember.findUnique({
-        where: { chatId_userId: { chatId: media.message.chatId, userId } },
-        select: { id: true },
-      });
-      if (!member) throw new AppError(403, 'FORBIDDEN', 'Not a chat member');
+    const queryToken = typeof req.query.t === 'string' ? req.query.t : null;
+    const tokenValid = queryToken ? verifyMediaToken(queryToken, objectName) : false;
+
+    if (!tokenValid) {
+      // Fallback: классическая авторизация для случаев, когда клиент тянет
+      // медиа через axios (например, скачивание файла) и подпись ещё не успели
+      // подставить, или для старых клиентов.
+      const userId = authenticateMediaRequest(req);
+      if (!userId) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+
+      if (!objectName.startsWith('avatar/')) {
+        const url = `/api/media/${objectName}`;
+        const media = await prisma.media.findFirst({
+          where: { OR: [{ url }, { thumbnailUrl: url }] },
+          select: { message: { select: { chatId: true } } },
+        });
+        if (!media) throw new AppError(404, 'NOT_FOUND', 'Media not found');
+        const member = await prisma.chatMember.findUnique({
+          where: { chatId_userId: { chatId: media.message.chatId, userId } },
+          select: { id: true },
+        });
+        if (!member) throw new AppError(403, 'FORBIDDEN', 'Not a chat member');
+      }
     }
 
     const stat = await statObject(objectName).catch(() => null);

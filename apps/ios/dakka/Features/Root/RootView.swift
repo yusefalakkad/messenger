@@ -11,13 +11,15 @@ struct RootView: View {
             Group {
                 if auth.isAuthenticated {
                     ChatListView()
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        // Используем только opacity — move-transition оставлял
+                        // постоянный horizontal offset из-за бага SwiftUI с GeometryReader.
+                        .transition(.opacity)
                 } else {
                     AuthView()
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
+                        .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.35), value: auth.isAuthenticated)
+            .animation(.easeInOut(duration: 0.25), value: auth.isAuthenticated)
 
             callOverlay
 

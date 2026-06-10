@@ -34,7 +34,10 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const avatar = chat.type === 'group' ? chat.avatar : otherMember?.user.avatar;
   const isOnline = otherMember?.user.status === 'online';
 
-  const draft = typeof window !== 'undefined' ? localStorage.getItem(`draft:${chat.id}`) : null;
+  // P1-16: draft scoped per-user; согласовано с MessageInput.tsx.
+  const draft = typeof window !== 'undefined' && user?.id
+    ? localStorage.getItem(`draft:${user.id}:${chat.id}`)
+    : null;
   const lastMsg = chat.lastMessage;
 
   // Если есть черновик — показываем его вместо последнего сообщения.
@@ -96,14 +99,14 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         onTouchMove={cancelLongPress}
         onTouchCancel={cancelLongPress}
         className={clsx(
-          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl text-left group',
-          'active:scale-[0.985] hover:translate-x-0.5',
+          'relative w-full flex items-center gap-3 px-3 py-3 mx-2 rounded-md text-left group transition',
+          'active:scale-[0.985]',
           active
-            ? 'bg-white/[0.07] shadow-inner'
+            ? 'bg-white/[0.07]'
             : 'hover:bg-white/[0.045]',
           isPinned && !active && 'bg-accent-violet/[0.04]',
         )}
-        style={{ width: 'calc(100% - 0.5rem)' }}
+        style={{ width: 'calc(100% - 1rem)' }}
       >
         {active && (
           <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient animate-pulse-glow" />
@@ -116,18 +119,18 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-sm truncate text-white/95 flex items-center gap-1.5">
+            <span className="font-semibold text-[15px] leading-5 truncate text-white/95 flex items-center gap-1.5">
               {name}
             </span>
-            <span className="text-white/30 text-[11px] flex-shrink-0 font-medium flex items-center gap-1">
-              {isMuted && <BellOff size={11} className="text-white/35 opacity-70" />}
+            <span className="text-white/40 text-[12px] leading-4 flex-shrink-0 font-medium flex items-center gap-1">
+              {isMuted && <BellOff size={11} className="text-white/40 opacity-70" />}
               {timeStr}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-2 mt-0.5">
-            <span className="text-xs truncate flex items-center gap-1">
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <span className="text-[13px] leading-[18px] truncate flex items-center gap-1">
               {draft && <span className="text-red-400/90 font-medium">Черновик:</span>}
-              <span className={clsx('truncate', draft ? 'text-white/55' : 'text-white/50')}>
+              <span className={clsx('truncate', draft ? 'text-white/60' : 'text-white/55')}>
                 {previewText}
               </span>
             </span>
@@ -137,7 +140,7 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
               )}
               {(chat.unreadCount ?? 0) > 0 && (
                 <span className={clsx(
-                  'text-white text-[11px] rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-semibold',
+                  'text-white text-[12px] rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5 font-semibold',
                   isMuted
                     ? 'bg-white/15 text-white/70'
                     : 'bg-brand-gradient shadow-glow-violet',

@@ -9,12 +9,17 @@ import MessageInput from './MessageInput';
 import { isChatE2E } from '@/lib/e2e';
 import { ShieldCheck, MessageSquareOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import type { Message } from '@messenger/shared';
+
+// P2-22: стабильная ссылка на пустой массив — иначе селектор возвращает свежий
+// [] каждый рендер и компонент перерендеривается на любую store-мутацию.
+const EMPTY_MESSAGES: Message[] = [];
 
 export default function ChatWindow() {
   const { chatId } = useParams<{ chatId: string }>();
   const setActiveChat = useChatStore((s) => s.setActiveChat);
-  const setMessages = useChatStore((s) => s.setMessages);
-  const messages = useChatStore((s) => chatId ? s.messages[chatId] ?? [] : []);
+  const mergeMessages = useChatStore((s) => s.mergeMessages);
+  const messages = useChatStore((s) => chatId ? s.messages[chatId] ?? EMPTY_MESSAGES : EMPTY_MESSAGES);
   const chats = useChatStore((s) => s.chats);
   const user = useAuthStore((s) => s.user);
   const chat = chats.find((c) => c.id === chatId);
@@ -22,11 +27,13 @@ export default function ChatWindow() {
   useEffect(() => {
     if (!chatId) return;
     setActiveChat(chatId);
+    // P1-12: mergeMessages вместо setMessages — пока летел GET, через сокет
+    // могли прилететь live-сообщения. setMessages их затирал.
     api.get(`/chats/${chatId}/messages`).then(({ data }) => {
-      setMessages(chatId, data.data ?? []);
+      mergeMessages(chatId, data.data ?? []);
     });
     return () => setActiveChat(null);
-  }, [chatId, setActiveChat, setMessages]);
+  }, [chatId, setActiveChat, mergeMessages]);
 
   if (!chatId) return null;
 

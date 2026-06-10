@@ -116,6 +116,15 @@ export class OtpStore {
   }
 
   /**
+   * Прочитать verify-token БЕЗ списания. Возвращает phone или null.
+   * Используется для предварительных проверок (уникальность username/phone)
+   * перед атомарным `consumeVerifyToken` (см. P1-11).
+   */
+  async peekVerifyToken(token: string): Promise<string | null> {
+    return redis.get(KEYS.verifyToken(token));
+  }
+
+  /**
    * Проверить и СПИСАТЬ verify-token (одноразовый).
    * Возвращает phone или null.
    */

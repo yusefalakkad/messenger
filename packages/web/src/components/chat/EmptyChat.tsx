@@ -1,4 +1,5 @@
 import { ShieldCheck } from 'lucide-react';
+import DakkaIcon from '@/components/ui/DakkaIcon';
 
 export default function EmptyChat() {
   return (
@@ -8,20 +9,11 @@ export default function EmptyChat() {
       <div className="absolute -bottom-32 -right-24 w-[480px] h-[480px] bg-spot-pink blur-3xl opacity-50 pointer-events-none" />
 
       <div className="relative flex flex-col items-center max-w-md">
-        {/* Логотип-карточка со стеклом и брендовым градиентом */}
+        {/* Логотип — сама форма пузыря-бабла, без квадратной подложки. */}
         <div className="relative mb-8 animate-float">
-          <div className="absolute inset-0 bg-brand-gradient blur-2xl opacity-40 rounded-3xl" />
-          <div className="relative w-24 h-24 rounded-3xl bg-brand-gradient flex items-center justify-center shadow-glow-violet">
-            <svg width="44" height="44" viewBox="0 0 48 48" fill="none" className="text-white">
-              <path
-                d="M8 14C8 10.7 10.7 8 14 8H34C37.3 8 40 10.7 40 14V28C40 31.3 37.3 34 34 34H24L18 40V34H14C10.7 34 8 31.3 8 28V14Z"
-                fill="currentColor" fillOpacity="0.18"
-              />
-              <path
-                d="M8 14C8 10.7 10.7 8 14 8H34C37.3 8 40 10.7 40 14V28C40 31.3 37.3 34 34 34H24L18 40V34H14C10.7 34 8 31.3 8 28V14Z"
-                stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"
-              />
-            </svg>
+          <div className="absolute inset-0 bg-brand-gradient blur-2xl opacity-40" style={{ borderRadius: '40%' }} />
+          <div className="relative drop-shadow-[0_10px_30px_rgba(154,77,255,0.4)]">
+            <DakkaIcon size={100} />
           </div>
         </div>
 

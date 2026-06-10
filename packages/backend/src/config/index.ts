@@ -112,4 +112,13 @@ export const config = {
     allowedVideoTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
     allowedVoiceTypes: ['audio/ogg', 'audio/mpeg', 'audio/webm', 'audio/wav', 'audio/mp4'],
   },
+
+  // HMAC-подписанные media URL: `<PUBLIC_BASE_URL>/api/media/...?t=<hmac>`
+  // publicBaseUrl: абсолютный origin (https://akkdmsg.online) для native-сборки,
+  // или пустая строка для web (тогда URL остаётся относительным).
+  // signedUrlTtlSeconds: 24 часа достаточно — клиент при перерендере истории получит свежие URL.
+  media: {
+    publicBaseUrl: optional('PUBLIC_BASE_URL', ''),
+    signedUrlTtlSeconds: parseInt(optional('MEDIA_URL_TTL_SECONDS', '86400'), 10),
+  },
 } as const;

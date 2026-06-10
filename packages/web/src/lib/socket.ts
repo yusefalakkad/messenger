@@ -52,6 +52,10 @@ export function initSocket(): Socket {
       void resyncAfterReconnect();
     } else {
       hadInitialConnectEver = true;
+      // P1-18: outbox-сообщения, набранные ДО первого коннекта (offline-launch),
+      // должны улететь как только сокет встал. Раньше drain был только внутри
+      // resyncAfterReconnect, который на первом connect не вызывается.
+      drainOutbox();
     }
   });
 
@@ -121,7 +125,20 @@ export function initSocket(): Socket {
   // ── Calls ─────────────────────────────────────────────────────────────────
 
   socket.on('call:incoming', (data: WSServerEvents['call:incoming']) => {
-    useCallStore.getState().setIncoming(data);
+    const cs = useCallStore.getState();
+    // P1-4: busy. Если уже есть активный/исходящий/входящий звонок — автоматически
+    // отшиваем второй, чтобы UI не показывал две панели и случайный accept не ломал
+    // первый звонок.
+    if (cs.active || cs.outgoing || cs.incoming) {
+      try { rejectCall(data.callId); } catch { /* ignore */ }
+      toast.error(`Пропущенный звонок от ${data.callerName ?? 'неизвестно'}`);
+      return;
+    }
+    cs.setIncoming(data);
+    // P1-5: рингтон. playNotificationSound — короткий beep, нам нужен loop пока
+    // звонок не принят/отклонён. Запускаем в CallOverlay через CustomEvent —
+    // оверлей подпишется и запустит <audio loop> + поднимет system Notification.
+    window.dispatchEvent(new CustomEvent('call:ring-start', { detail: data }));
   });
 
   socket.on('call:accepted', ({ callId, peerId }: WSServerEvents['call:accepted']) => {
@@ -146,8 +163,9 @@ export function initSocket(): Socket {
       outgoing?.callId === callId
     ) {
       useCallStore.getState().clearCall();
-      // Trigger global event so CallOverlay can tear down WebRTC
+      // Trigger global event so CallOverlay can tear down WebRTC + stop ringing.
       window.dispatchEvent(new CustomEvent('call:ended', { detail: { callId, reason } }));
+      window.dispatchEvent(new CustomEvent('call:ring-stop'));
     }
   });
 
@@ -198,15 +216,52 @@ export function initSocket(): Socket {
     }));
   });
 
+  subscribeLifecycle();
   return socket;
 }
 
+/**
+ * P2-16: Capacitor/PWA — при возврате из background сокет может быть в
+ * disconnected состоянии (iOS «убил» webSocket чтобы сэкономить батарею).
+ * Подписываемся на app:foreground/app:network и явно реконнектимся.
+ * Idempotent через флаг.
+ */
+let lifecycleSubscribed = false;
+function subscribeLifecycle(): void {
+  if (lifecycleSubscribed) return;
+  lifecycleSubscribed = true;
+  const tryReconnect = () => {
+    if (socket && !socket.connected) {
+      try { socket.connect(); } catch { /* ignore */ }
+    }
+  };
+  window.addEventListener('app:foreground', tryReconnect);
+  window.addEventListener('app:network', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { connected?: boolean } | undefined;
+    if (detail?.connected) tryReconnect();
+  });
+}
+
+/**
+ * Полностью отключает сокет И очищает все state'ы, которые могут утечь
+ * между сессиями: outbox-сообщения, ack-таймеры, флаг initial-connect.
+ * Должен вызываться из ВСЕХ путей logout'а (P1-17 в WEB_AUDIT_2026-06-10.md).
+ */
 export function disconnectSocket(): void {
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
   }
+  // Снимаем висящие ack-таймауты, чтобы они не сработали уже под новым юзером.
+  for (const t of pendingAcks.values()) clearTimeout(t);
+  pendingAcks.clear();
+  // Outbox: при resync новой сессии мы бы переотправили эти сообщения от
+  // имени НОВОГО юзера — это утечка данных предыдущего юзера. Чистим.
+  pendingOutbox.clear();
+  // Сбрасываем флаг — следующий connect для новой сессии не должен запускать
+  // resync со стейтом предыдущей.
+  hadInitialConnectEver = false;
 }
 
 /**
@@ -271,11 +326,13 @@ async function resyncAfterReconnect(): Promise<void> {
   } catch { /* offline-ok */ }
 
   // Префетч сообщений активного чата СРАЗУ (юзер смотрит туда).
-  const { activeChatId, messages, setMessages } = useChatStore.getState();
+  // P1-12: mergeMessages вместо setMessages — пока летел запрос, через сокет
+  // могли прийти live-сообщения. setMessages их затирал.
+  const { activeChatId, messages, mergeMessages } = useChatStore.getState();
   if (activeChatId) {
     try {
       const msgsRes = await api.get<{ success: boolean; data: Message[] }>(`/chats/${activeChatId}/messages`);
-      setMessages(activeChatId, msgsRes.data.data);
+      mergeMessages(activeChatId, msgsRes.data.data);
     } catch { /* offline-ok */ }
   }
 
@@ -285,16 +342,20 @@ async function resyncAfterReconnect(): Promise<void> {
   const loadedChatIds = Object.keys(messages).filter((id) => id !== activeChatId);
   for (const chatId of loadedChatIds) {
     api.get<{ success: boolean; data: Message[] }>(`/chats/${chatId}/messages`)
-      .then(({ data }) => setMessages(chatId, data.data ?? []))
+      .then(({ data }) => mergeMessages(chatId, data.data ?? []))
       .catch(() => { /* offline-ok */ });
   }
 
   // Переотправляем outbox-сообщения с восстановлением ack-таймера.
-  if (pendingOutbox.size > 0 && socket?.connected) {
-    for (const [clientMsgId, msg] of pendingOutbox.entries()) {
-      socket.emit('message:send', msg);
-      scheduleAckTimeout(clientMsgId);
-    }
+  drainOutbox();
+}
+
+/** Шлёт все outbox-сообщения в текущий сокет с восстановлением ack-таймера. */
+function drainOutbox(): void {
+  if (!socket?.connected || pendingOutbox.size === 0) return;
+  for (const [clientMsgId, msg] of pendingOutbox.entries()) {
+    socket.emit('message:send', msg);
+    scheduleAckTimeout(clientMsgId);
   }
 }
 

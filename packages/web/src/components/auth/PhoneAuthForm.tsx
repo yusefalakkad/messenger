@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Phone, KeyRound, User as UserIcon, Loader2, Send } from 'lucide-react';
+import { ArrowRight, KeyRound, User as UserIcon, Loader2, Send } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { generateKeyPair } from '@/lib/crypto';
 import { cachePlaintext, getCached as getCachedPrivKey } from '@/lib/keyVault';
 import { initSocket } from '@/lib/socket';
+import CountryPicker, { DEFAULT_COUNTRY, parsePhoneInput, type Country } from './CountryPicker';
+
+// P1-9: persist deviceId per-browser. Без этого бэк фоллбэчит на новый uuidv4
+// при каждом /verify и /complete-profile, и таблица Session растёт бесконтрольно —
+// «активные устройства» врёт, старые refresh tokens живут до истечения.
+function getOrCreateDeviceId(): string {
+  try {
+    let id = localStorage.getItem('deviceId');
+    if (!id) { id = uuidv4(); localStorage.setItem('deviceId', id); }
+    return id;
+  } catch {
+    return uuidv4();
+  }
+}
+const DEVICE_NAME = typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 64) : 'web';
 
 type Step = 'phone' | 'link-bot' | 'code' | 'profile';
 
@@ -50,8 +66,23 @@ export default function PhoneAuthForm() {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [step, setStep] = useState<Step>('phone');
+  // phone хранит ЛОКАЛЬНУЮ часть (без dial-кода). К нему конкатенируется country.dialCode.
+  // localStorage: запоминаем выбор страны для повторных входов.
+  const [country, setCountry] = useState<Country>(() => {
+    try {
+      const saved = localStorage.getItem('auth:country');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Country;
+        if (parsed?.code && parsed?.dialCode) return parsed;
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_COUNTRY;
+  });
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
+
+  // Собранный E.164-номер для отправки на бэк (бэкенд нормализует через libphonenumber).
+  const fullPhone = `${country.dialCode}${phone.replace(/\D/g, '')}`;
   const [verifyToken, setVerifyToken] = useState<string | null>(null);
 
   const [displayName, setDisplayName] = useState('');
@@ -81,9 +112,11 @@ export default function PhoneAuthForm() {
     setError(null);
     setLoading(true);
     try {
+      // Запоминаем выбранную страну для следующих сессий.
+      try { localStorage.setItem('auth:country', JSON.stringify(country)); } catch { /* ignore */ }
       const { data } = await api.post<{ success: boolean; data: RequestCodeResp }>(
         '/auth/phone/request',
-        { phone },
+        { phone: fullPhone },
       );
       setResendIn(data.data.cooldownSec);
       setDevOtpHint(data.data.devOtp ?? null);
@@ -107,9 +140,10 @@ export default function PhoneAuthForm() {
     setLoading(true);
     try {
       // Verify без publicKey — бэк ничего не меняет в user.publicKey.
+      // P1-9: deviceId + deviceName — иначе каждый /verify = orphan-сессия.
       const r = await api.post<{ success: boolean; data: VerifyResp }>(
         '/auth/phone/verify',
-        { phone, code },
+        { phone: fullPhone, code, deviceId: getOrCreateDeviceId(), deviceName: DEVICE_NAME },
       );
       const v = r.data.data;
 
@@ -184,6 +218,8 @@ export default function PhoneAuthForm() {
           displayName: displayName.trim(),
           username: username.trim() || undefined,
           publicKey,
+          deviceId: getOrCreateDeviceId(),
+          deviceName: DEVICE_NAME,
         },
       );
       // КРИТИЧНО: сохранить приватный ключ в sessionStorage чтобы он пережил
@@ -206,7 +242,7 @@ export default function PhoneAuthForm() {
     try {
       const { data } = await api.post<{ success: boolean; data: RequestCodeResp }>(
         '/auth/phone/request',
-        { phone },
+        { phone: fullPhone },
       );
       setResendIn(data.data.cooldownSec);
       setDevOtpHint(data.data.devOtp ?? null);
@@ -242,22 +278,28 @@ export default function PhoneAuthForm() {
 
             <label className="block">
               <div className="text-white/55 text-xs mb-1.5">Номер телефона</div>
-              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl px-4 py-3.5 transition">
-                <Phone size={16} className="text-white/40" />
+              <div className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl pl-2 pr-4 h-14 transition">
+                <CountryPicker value={country} onChange={setCountry} />
+                <span className="w-px h-6 bg-white/10" aria-hidden />
                 <input
                   autoFocus
                   inputMode="tel"
-                  placeholder="+7 999 123-45-67"
+                  placeholder="999 123 45 67"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="flex-1 bg-transparent outline-none text-white placeholder:text-white/30"
+                  onChange={(e) => {
+                    // Умный парсер: +код → автоопределение страны, 8 → strip для RU.
+                    const { country: c, local } = parsePhoneInput(e.target.value, country);
+                    if (c.code !== country.code) setCountry(c);
+                    setPhone(local);
+                  }}
+                  className="flex-1 min-w-0 bg-transparent outline-none text-white text-[15px] placeholder:text-white/30 tabular-nums"
                 />
               </div>
             </label>
 
             {error && <FieldError message={error} />}
 
-            <BrandSubmit loading={loading} disabled={phone.trim().length < 5}>
+            <BrandSubmit loading={loading} disabled={phone.replace(/\D/g, '').length < 6}>
               Отправить код <ArrowRight size={16} />
             </BrandSubmit>
           </form>
@@ -322,7 +364,7 @@ export default function PhoneAuthForm() {
               Введите код
             </h2>
             <p className="text-white/50 text-sm">
-              Мы отправили 6-значный код на <span className="text-white/80">{phone}</span>
+              Мы отправили 6-значный код на <span className="text-white/80">{fullPhone}</span>
             </p>
 
             {devOtpHint && ((import.meta as any).env?.DEV) && (
@@ -417,13 +459,7 @@ function BrandSubmit({
   children, loading, disabled,
 }: { children: React.ReactNode; loading: boolean; disabled?: boolean }) {
   return (
-    <button
-      type="submit"
-      disabled={loading || disabled}
-      className="w-full bg-brand-gradient text-white font-medium py-3.5 rounded-xl shadow-glow-violet
-                 transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-                 flex items-center justify-center gap-2"
-    >
+    <button type="submit" disabled={loading || disabled} className="btn-primary btn-block">
       {loading ? <Loader2 size={16} className="animate-spin" /> : children}
     </button>
   );

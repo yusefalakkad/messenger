@@ -1,3 +1,4 @@
+import { KeyboardResize, KeyboardStyle } from '@capacitor/keyboard';
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
@@ -9,17 +10,22 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'always',
     scrollEnabled: true,
-    backgroundColor: '#0b0a14',
-    limitsNavigationsToAppBoundDomains: false,
+    backgroundColor: '#17151e',
+    // P2-24: ABD=true ограничивает навигацию доменами из Info.plist
+    // WKAppBoundDomains. Без этого + wildcard `*.akkdmsg.online` в allowNavigation =
+    // potential subdomain takeover → native compromise. Если боевые сабдомены
+    // (api, livekit) добавлены в WKAppBoundDomains — приложение работает; если что-то
+    // отвалится, проверьте Info.plist.
+    limitsNavigationsToAppBoundDomains: true,
   },
 
   android: {
-    backgroundColor: '#0b0a14',
+    backgroundColor: '#17151e',
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    // Edge-to-edge — фон тянется под status/navigation bar, safe-area inset из CSS
-    adjustMarginsForEdgeToEdge: 'auto',
+    // Edge-to-edge — фон тянется под status/navigation bar, safe-area inset из CSS.
+    // Свойство было в Capacitor 5, в v6 удалено — оставляем коммент для истории.
     // Минимальная версия — Android 7.0 / API 24 (примерно 99% устройств)
     // (фактически устанавливается в android/variables.gradle при ios:init)
     buildOptions: {
@@ -44,7 +50,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 1200,
       launchAutoHide: true,
-      backgroundColor: '#0b0a14',
+      backgroundColor: '#17151e',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
       iosSpinnerStyle: 'small',
@@ -52,12 +58,12 @@ const config: CapacitorConfig = {
     },
     StatusBar: {
       style: 'DARK',
-      backgroundColor: '#0b0a14',
+      backgroundColor: '#17151e',
       overlaysWebView: true,
     },
     Keyboard: {
-      resize: 'native',
-      style: 'DARK',
+      resize: KeyboardResize.Native,
+      style: KeyboardStyle.Dark,
       resizeOnFullScreen: true,
     },
     PushNotifications: {

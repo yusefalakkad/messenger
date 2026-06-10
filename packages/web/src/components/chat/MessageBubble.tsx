@@ -157,8 +157,8 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
           {!isCircle && (
             <div className={clsx(
               isOwn ? 'bubble-out' : 'bubble-in',
-              (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3 py-2',
-              'min-w-[80px]',
+              (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3.5 py-2',
+              'min-w-[88px]',
             )}>
 
               {/* Фото */}
@@ -553,8 +553,9 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
 
   if (failed) {
     return (
-      <p className="text-xs text-white/35 italic flex items-center gap-1">
-        <Lock size={11} />Не удалось расшифровать
+      <p className="text-xs text-white/35 italic flex items-center gap-1.5">
+        <Lock size={11} />
+        <span>Сообщение из прошлой сессии</span>
       </p>
     );
   }

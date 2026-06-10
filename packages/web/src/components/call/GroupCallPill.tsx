@@ -37,40 +37,41 @@ export default function GroupCallPill() {
     clearGroupCall();
   };
 
+  // Используем обёртку <div> вместо вложенных <button>. Левая зона раскрывает звонок,
+  // правая (PhoneOff) завершает — обе нативные <button> с hit-target ≥ 44px.
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
+      initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
+      exit={{ opacity: 0, y: -6 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className="mx-3 mt-1 mb-2"
+      className="mx-4 my-2"
     >
-      <button
-        onClick={handleExpand}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-primary-500/10 hover:bg-primary-500/15 border border-primary-500/40 hover:border-primary-500/60 transition-all group"
-      >
-        <span className="w-7 h-7 rounded-full bg-primary-500/30 flex items-center justify-center flex-shrink-0">
-          <Users size={14} className="text-primary-200" />
-        </span>
-        <span className="flex-1 min-w-0 text-left">
-          <span className="block text-xs font-semibold text-primary-100 truncate leading-tight">
-            В звонке
-          </span>
-          <span className="block text-[11px] text-primary-200/70 truncate mt-0.5">
-            {group.chatName} · {fmt(elapsed)}
-          </span>
-        </span>
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={handleEnd}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleEnd(e as any); }}
-          className="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white flex-shrink-0 transition-colors cursor-pointer"
-          title="Завершить звонок"
+      <div className="flex items-stretch h-12 rounded-lg bg-primary-500/12 border border-primary-500/40 hover:border-primary-500/55 overflow-hidden transition-colors">
+        <button
+          onClick={handleExpand}
+          className="flex-1 min-w-0 flex items-center gap-3 px-3 hover:bg-primary-500/8 transition-colors text-left"
+          aria-label="Развернуть групповой звонок"
         >
-          <PhoneOff size={13} />
-        </span>
-      </button>
+          <span className="w-8 h-8 rounded-md bg-primary-500/30 flex items-center justify-center flex-shrink-0 animate-pulse">
+            <Users size={15} className="text-primary-100" />
+          </span>
+          <span className="flex-1 min-w-0 flex flex-col">
+            <span className="text-[13px] font-semibold text-primary-50 truncate leading-tight">В звонке</span>
+            <span className="text-[12px] text-primary-200/75 truncate mt-0.5 leading-tight tabular-nums">
+              {group.chatName} · {fmt(elapsed)}
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={handleEnd}
+          className="w-12 flex items-center justify-center bg-red-500/15 hover:bg-red-500/25 text-red-300 hover:text-red-200 border-l border-primary-500/30 transition-colors flex-shrink-0"
+          title="Завершить звонок"
+          aria-label="Завершить звонок"
+        >
+          <PhoneOff size={16} />
+        </button>
+      </div>
     </motion.div>
   );
 }

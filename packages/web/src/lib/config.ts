@@ -25,5 +25,10 @@ export const API_URL: string =
 export const SOCKET_URL: string =
   envSocket ?? (isNative() ? PROD_HOST : '/');
 
-/** Хост для построения медиа-URL'ов (если бэк возвращает относительные пути). */
-export const MEDIA_HOST: string = isNative() ? PROD_HOST : '';
+/**
+ * @deprecated Backend теперь возвращает абсолютные HMAC-подписанные media URL'ы
+ * вида `<host>/api/media/...?t=<hmac>`. Никаких клиентских манипуляций с хостом
+ * не требуется — URL вставляется в `<img src>`/`<video src>` как есть.
+ * Оставлено пустой строкой для обратной совместимости со старыми импортами.
+ */
+export const MEDIA_HOST: string = '';

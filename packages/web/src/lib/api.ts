@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import { getSocket } from '@/lib/socket';
 import { API_URL } from './config';
 import { isNative } from './platform';
 
@@ -52,6 +53,14 @@ api.interceptors.response.use(
         const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: !isNative() });
         const newToken = data.data.accessToken;
         useAuthStore.getState().setAccessToken(newToken);
+        // P1-7: socket.io читает auth payload только в момент handshake. После
+        // тихого refresh подменяем auth в текущем сокете, чтобы следующая волна
+        // реконнектов прошла под новым access-токеном, а не отвалилась с auth_failed.
+        const s = getSocket();
+        if (s) {
+          s.auth = { token: newToken };
+          if (!s.connected) s.connect();
+        }
         refreshQueue.forEach((cb) => cb(newToken));
         refreshQueue = [];
         original.headers.Authorization = `Bearer ${newToken}`;

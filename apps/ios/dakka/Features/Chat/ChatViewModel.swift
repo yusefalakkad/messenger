@@ -111,18 +111,20 @@ final class ChatViewModel: ObservableObject {
             // SECURITY: при E2E-чате отправка ОБЯЗАНА быть зашифрованной.
             // Никакого silent plaintext fallback.
             guard let myPriv = privateKey else {
-                error ="Не удалось отправить: приватный ключ недоступен. Перелогиньтесь."
+                error = "Не удалось отправить: приватный ключ недоступен. Перелогиньтесь."
                 return
             }
             guard let theirPub = otherMember?.user.publicKey else {
-                error ="У получателя нет ключа шифрования."
+                error = "У получателя нет ключа шифрования."
                 return
             }
             let enc: E2E.Encrypted
             do {
                 enc = try E2E.encryptText(text, recipientPublicKeyB64: theirPub, senderPrivateKeyB64: myPriv)
             } catch {
-                error ="Ошибка шифрования. Сообщение не отправлено."
+                // В catch-блоке `error` — это пойманное исключение (immutable let).
+                // Чтобы записать в @Published свойство — явно через self.
+                self.error = "Ошибка шифрования. Сообщение не отправлено."
                 return
             }
             draft = ""

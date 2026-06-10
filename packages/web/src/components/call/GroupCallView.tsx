@@ -30,14 +30,23 @@ import {
   type Participant,
 } from 'livekit-client';
 import { useCallStore } from '@/stores/call.store';
+import { useChatStore } from '@/stores/chat.store';
+import Avatar from '@/components/ui/Avatar';
 
 // ─── Tile per-participant ─────────────────────────────────────────────────────
 interface TileProps {
   participant: Participant;
   isLocal:     boolean;
+  chatId:      string;
 }
 
-function ParticipantTile({ participant, isLocal }: TileProps) {
+function ParticipantTile({ participant, isLocal, chatId }: TileProps) {
+  // identity = userId (бэк подставляет userId как identity при выдаче LiveKit-токена).
+  // Через chat-store достаём реальную аватарку/имя.
+  const member = useChatStore((s) => {
+    const chat = s.chats.find((c) => c.id === chatId);
+    return chat?.members.find((m) => m.userId === participant.identity);
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [hasVideo,   setHasVideo]   = useState(false);
@@ -93,13 +102,13 @@ function ParticipantTile({ participant, isLocal }: TileProps) {
     };
   }, [participant, isLocal]);
 
-  const name = participant.name || participant.identity;
-  const initials = name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+  const name   = member?.user.displayName ?? participant.name ?? participant.identity;
+  const avatar = member?.user.avatar;
 
   return (
     <div
-      className={`relative aspect-video rounded-2xl overflow-hidden bg-dark-card border transition-all ${
-        isSpeaking ? 'border-primary-500 shadow-lg shadow-primary-500/30' : 'border-white/[0.06]'
+      className={`relative aspect-video rounded-xl overflow-hidden bg-dark-card border transition-all ${
+        isSpeaking ? 'border-primary-500 shadow-lg shadow-primary-500/30' : 'border-dark-border'
       }`}
     >
       {hasVideo ? (
@@ -111,24 +120,28 @@ function ParticipantTile({ participant, isLocal }: TileProps) {
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-dark-surface to-dark-bg">
-          <div className="w-16 h-16 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xl font-semibold">
-            {initials || '?'}
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-dark-surface via-dark-card to-dark-bg">
+          {/* Реальная аватарка пира (если есть в chat-store), иначе initials в брендовом круге.
+              Размер скейлится с тайлом — на узком 1-col экране ~80px, на 3-col ~48px. */}
+          <div className="w-[28%] aspect-square min-w-[44px] max-w-[88px]">
+            <Avatar src={avatar} name={name ?? '?'} size="xl" />
           </div>
         </div>
       )}
 
       {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
 
-      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5">
-        <span className="text-xs text-white font-medium bg-black/50 backdrop-blur-sm px-2 py-1 rounded-lg truncate">
-          {name}{isLocal && ' (вы)'}
-        </span>
+      {/* Подпись имени — gradient overlay снизу, не перекрывает контент.
+          flex-row-reverse → mute-индикатор слева от имени, видимая зона для truncate. */}
+      <div className="absolute bottom-0 inset-x-0 px-2 pt-6 pb-2 flex items-center gap-1.5 bg-gradient-to-t from-black/75 via-black/30 to-transparent pointer-events-none">
         {muted && (
-          <span className="w-6 h-6 rounded-full bg-red-500/80 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-            <MicOff size={12} className="text-white" />
+          <span className="w-5 h-5 rounded-full bg-red-500/85 flex items-center justify-center flex-shrink-0">
+            <MicOff size={11} className="text-white" />
           </span>
         )}
+        <span className="text-[12px] text-white font-medium truncate flex-1 min-w-0">
+          {name}{isLocal && ' (вы)'}
+        </span>
       </div>
     </div>
   );
@@ -244,11 +257,11 @@ export default function GroupCallView() {
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         className="fixed inset-0 z-[300] flex flex-col bg-dark-bg"
       >
-        {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-dark-surface/70 backdrop-blur-xl pt-[calc(var(--sat)+0.75rem)]">
+        {/* ── Header (h-16 по системе, единый dark-border, единая ChatHeader-структура) ── */}
+        <div className="flex items-center gap-3 px-4 h-16 pt-[var(--sat)] border-b border-dark-border bg-dark-surface/80 backdrop-blur-xl flex-shrink-0">
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-base truncate">{group.chatName}</h2>
-            <p className="text-xs text-white/50 mt-0.5">
+            <h4 className="truncate">{group.chatName}</h4>
+            <p className="text-[12px] leading-4 text-white/50 mt-0.5 truncate tabular-nums">
               {error ? (
                 <span className="text-red-400">{error}</span>
               ) : (
@@ -259,7 +272,8 @@ export default function GroupCallView() {
           <button
             onClick={handleMinimize}
             title="Свернуть"
-            className="w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center text-white/70 hover:text-white transition-all"
+            aria-label="Свернуть звонок"
+            className="w-10 h-10 rounded-md bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center text-white/70 hover:text-white transition-all flex-shrink-0"
           >
             <Minimize2 size={18} />
           </button>
@@ -280,21 +294,22 @@ export default function GroupCallView() {
               style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
             >
               {allTiles.map(({ p, isLocal }) => (
-                <ParticipantTile key={p.sid || p.identity} participant={p} isLocal={isLocal} />
+                <ParticipantTile key={p.sid || p.identity} participant={p} isLocal={isLocal} chatId={group.chatId} />
               ))}
             </div>
           )}
         </div>
 
-        {/* ── Controls ── */}
-        <div className="flex items-center justify-center gap-4 px-4 py-6 border-t border-white/[0.06] bg-dark-surface/70 backdrop-blur-xl pb-[calc(var(--sab)+1.5rem)]">
+        {/* ── Controls (mic/cam = 56px hit-target; leave = 64px primary action) ── */}
+        <div className="flex items-center justify-center gap-4 px-4 py-5 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl pb-[calc(var(--sab)+1.25rem)] flex-shrink-0">
           <button
             onClick={toggleMic}
             title={micOn ? 'Выключить микрофон' : 'Включить микрофон'}
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+            aria-label={micOn ? 'Выключить микрофон' : 'Включить микрофон'}
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 ${
               micOn
-                ? 'bg-dark-hover text-white/80 hover:text-white'
-                : 'bg-red-500/20 border border-red-500/50 text-red-400'
+                ? 'bg-dark-hover text-white/85 hover:text-white hover:bg-dark-card border border-dark-border'
+                : 'bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/25'
             }`}
           >
             {micOn ? <Mic size={20} /> : <MicOff size={20} />}
@@ -303,10 +318,11 @@ export default function GroupCallView() {
           <button
             onClick={toggleCam}
             title={camOn ? 'Выключить камеру' : 'Включить камеру'}
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+            aria-label={camOn ? 'Выключить камеру' : 'Включить камеру'}
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 ${
               camOn
-                ? 'bg-dark-hover text-white/80 hover:text-white'
-                : 'bg-red-500/20 border border-red-500/50 text-red-400'
+                ? 'bg-dark-hover text-white/85 hover:text-white hover:bg-dark-card border border-dark-border'
+                : 'bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/25'
             }`}
           >
             {camOn ? <Video size={20} /> : <VideoOff size={20} />}
@@ -315,7 +331,8 @@ export default function GroupCallView() {
           <button
             onClick={handleLeave}
             title="Завершить звонок"
-            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all"
+            aria-label="Завершить звонок"
+            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all active:scale-95"
           >
             <PhoneOff size={22} className="text-white" />
           </button>

@@ -1,12 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"  stop-color="#7c4dff"/>
-      <stop offset="55%" stop-color="#d946ef"/>
-      <stop offset="100%" stop-color="#ff8a3d"/>
+    <linearGradient id="g" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%"   stop-color="#8a52ff"/>
+      <stop offset="55%"  stop-color="#d04df0"/>
+      <stop offset="100%" stop-color="#ff5a8f"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="120" fill="url(#g)"/>
-  <path d="M128 192c0-26.5 21.5-48 48-48h160c26.5 0 48 21.5 48 48v96c0 26.5-21.5 48-48 48h-80l-64 64v-64h-16c-26.5 0-48-21.5-48-48v-96z"
-        fill="white" fill-opacity="0.95"/>
+  <!-- Спич-бабл с хвостиком слева-снизу. -->
+  <path
+    d="M16 6 H48 C53.5 6 58 10.5 58 16 V40 C58 45.5 53.5 50 48 50 H26
+       L13 60 C12 60.6 10.8 59.7 11 58.5 L13 50 H16
+       C10.5 50 6 45.5 6 40 V16 C6 10.5 10.5 6 16 6 Z"
+    fill="url(#g)"/>
+  <!-- Sound-wave / голос: 4 белых пилюли разной высоты. -->
+  <g fill="white">
+    <rect x="20" y="22" width="3.5" height="12" rx="1.75"/>
+    <rect x="27" y="17" width="3.5" height="22" rx="1.75"/>
+    <rect x="34" y="20" width="3.5" height="16" rx="1.75"/>
+    <rect x="41" y="24" width="3.5" height="8"  rx="1.75"/>
+  </g>
 </svg>

@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { ShieldCheck } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
+import DakkaIcon from '@/components/ui/DakkaIcon';
 
 export default function AuthPage() {
   return (
@@ -38,11 +39,9 @@ export default function AuthPage() {
             transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 18 }}
             className="relative inline-block mb-5"
           >
-            <div className="absolute inset-0 bg-brand-gradient blur-2xl opacity-60 rounded-3xl" />
-            <div className="relative w-20 h-20 rounded-3xl bg-brand-gradient flex items-center justify-center shadow-glow-violet animate-float">
-              <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
-                <path d="M4 8C4 6.9 4.9 6 6 6h20c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H18l-4 4-2-4H6c-1.1 0-2-.9-2-2V8z" fill="white"/>
-              </svg>
+            <div className="absolute inset-0 bg-brand-gradient blur-2xl opacity-50" style={{ borderRadius: '40%' }} />
+            <div className="relative animate-float drop-shadow-[0_10px_30px_rgba(154,77,255,0.45)]">
+              <DakkaIcon size={88} />
             </div>
           </motion.div>
 

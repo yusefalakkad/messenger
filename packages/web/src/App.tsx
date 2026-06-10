@@ -1,12 +1,16 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, lazy, Suspense } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useAppInit } from '@/hooks/useAppInit';
-import AuthPage from '@/pages/AuthPage';
-import ChatPage from '@/pages/ChatPage';
-import LandingPage from '@/pages/LandingPage';
-import CallOverlay from '@/components/call/CallOverlay';
-import GroupCallView from '@/components/call/GroupCallView';
+
+// P1-19: code splitting. Главный путь — лендинг + auth — не должен тянуть
+// livekit-client (~700KB) и весь чат. CallOverlay + GroupCallView рендерятся
+// только при isAuthenticated, AuthPage/LandingPage — только для гостей.
+const AuthPage      = lazy(() => import('@/pages/AuthPage'));
+const ChatPage      = lazy(() => import('@/pages/ChatPage'));
+const LandingPage   = lazy(() => import('@/pages/LandingPage'));
+const CallOverlay   = lazy(() => import('@/components/call/CallOverlay'));
+const GroupCallView = lazy(() => import('@/components/call/GroupCallView'));
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -18,6 +22,24 @@ export default function App() {
     const handler = () => logout();
     window.addEventListener('auth:logout', handler);
     return () => window.removeEventListener('auth:logout', handler);
+  }, [logout]);
+
+  // P2-15: cross-tab logout. zustand persist пишет состояние в localStorage,
+  // но НЕ подписывается на storage event. Если юзер logout'нулся в одной
+  // вкладке — в других он остаётся «онлайн» до hard-reload.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      // ключ зустанд-persist — 'messenger-auth' (см. auth.store.ts).
+      if (e.key !== 'messenger-auth') return;
+      // newValue=null означает что другая вкладка вызвала localStorage.removeItem.
+      // Любое изменение, делающее юзера неавторизованным — выкидываем эту вкладку.
+      try {
+        const stillAuthed = e.newValue ? JSON.parse(e.newValue)?.state?.isAuthenticated === true : false;
+        if (!stillAuthed && useAuthStore.getState().isAuthenticated) logout();
+      } catch { /* malformed JSON — игнорируем */ }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [logout]);
 
   // Показываем пустой экран пока идёт инициализация (обновление токена)
@@ -42,35 +64,51 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Авторизация: гостям — форма, авторизованным — сразу в чаты. */}
-        <Route
-          path="/auth"
-          element={isAuthenticated ? <Navigate to="/" replace /> : <AuthPage />}
-        />
-        {/* «/» и все остальные пути:
-             • если гость и путь корневой — показываем лендинг;
-             • если гость и путь не корневой — редирект на /auth;
-             • если авторизован — основное приложение (ChatPage). */}
-        <Route
-          path="/*"
-          element={
-            isAuthenticated
-              ? <ChatPage />
-              : <GuestRoot />
-          }
-        />
-      </Routes>
-      {/* Глобальный оверлей звонков поверх всего */}
-      {isAuthenticated && <CallOverlay />}
-      {/* Групповые звонки через LiveKit SFU — независимый канал от 1-на-1 */}
-      {isAuthenticated && <GroupCallView />}
+      <Suspense fallback={<div className="min-h-screen bg-dark-bg" />}>
+        <Routes>
+          {/* Авторизация: гостям — форма, авторизованным — сразу в чаты.
+              P2-7: после login возвращаем юзера на запрошенный deep link. */}
+          <Route
+            path="/auth"
+            element={isAuthenticated ? <RedirectAfterAuth /> : <AuthPage />}
+          />
+          {/* «/» и все остальные пути:
+               • если гость и путь корневой — показываем лендинг;
+               • если гость и путь не корневой — редирект на /auth;
+               • если авторизован — основное приложение (ChatPage). */}
+          <Route
+            path="/*"
+            element={
+              isAuthenticated
+                ? <ChatPage />
+                : <GuestRoot />
+            }
+          />
+        </Routes>
+        {/* Глобальный оверлей звонков поверх всего. Lazy — livekit/webrtc-тяжёлый код
+            не качается пока юзер не залогинился. */}
+        {isAuthenticated && <CallOverlay />}
+        {/* Групповые звонки через LiveKit SFU — независимый канал от 1-на-1 */}
+        {isAuthenticated && <GroupCallView />}
+      </Suspense>
     </BrowserRouter>
   );
 }
 
-/** Гостевой root: лендинг на «/», иначе редиректим на /auth. */
+/** Гостевой root: лендинг на «/», иначе редиректим на /auth.
+ *  P2-7: пробрасываем оригинальный путь через state, чтобы после auth юзер
+ *  попал в /chat/abc, а не на «/». */
 function GuestRoot() {
-  const isHome = window.location.pathname === '/' || window.location.pathname === '';
-  return isHome ? <LandingPage /> : <Navigate to="/auth" replace />;
+  const path = window.location.pathname;
+  const isHome = path === '/' || path === '';
+  if (isHome) return <LandingPage />;
+  const from = path + window.location.search + window.location.hash;
+  return <Navigate to="/auth" replace state={{ from }} />;
+}
+
+/** После успешного login возвращаем юзера туда, куда он шёл (state.from), либо на «/». */
+function RedirectAfterAuth() {
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  return <Navigate to={from && from !== '/auth' ? from : '/'} replace />;
 }

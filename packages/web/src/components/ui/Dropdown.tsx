@@ -15,14 +15,19 @@ export default function Dropdown({ open, onClose, anchor = 'right', children, cl
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('mousedown', handler);
+    // P2-19: на iOS click-outside через mousedown не срабатывает (мобильный Safari
+    // эмулирует mouse-события неоднозначно). touchstart ловит тап надёжно — без него
+    // меню Plus/Settings/Attach не закрываются и блокируют интерфейс.
+    document.addEventListener('touchstart', handler, { passive: true });
     document.addEventListener('keydown', esc);
     return () => {
       document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
       document.removeEventListener('keydown', esc);
     };
   }, [open, onClose]);

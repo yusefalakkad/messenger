@@ -85,12 +85,12 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/[0.05] bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
+    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-dark-border bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
       {/* Ambient свечение в шапке сайдбара */}
-      <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-50 pointer-events-none" />
+      <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 
-      {/* ── Header ── */}
-      <div className="relative flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.05]">
+      {/* ── Header (h=64px = 4+44+16 паддинги, hit-target ≥44px) ── */}
+      <div className="relative flex items-center gap-3 px-4 h-16 border-b border-dark-border flex-shrink-0">
 
         {/* Аватар в градиентном кольце с возможностью смены */}
         <div className="relative flex-shrink-0 group">
@@ -126,10 +126,10 @@ export default function Sidebar() {
 
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate leading-tight">{user?.displayName}</p>
-          <p className="text-white/40 text-xs truncate mt-0.5">@{user?.username}</p>
+          <p className="text-white/45 text-[12px] truncate mt-0.5">@{user?.username}</p>
         </div>
 
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
           <div className="relative">
             <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title="Новый чат или группа">
               <Plus size={18} />
@@ -159,10 +159,10 @@ export default function Sidebar() {
       {/* ── In-call pill (LiveKit групповой звонок, виден только в активном звонке) ── */}
       <GroupCallPill />
 
-      {/* ── Search ── */}
-      <div className="px-3 py-2.5">
+      {/* ── Search (44px hit-target — на 8 пиксельных стопов выровнен) ── */}
+      <div className="px-4 py-3 flex-shrink-0">
         <div className="relative">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/35" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
           <input
             className="input-pill w-full"
             placeholder="Поиск чатов..."
@@ -172,18 +172,18 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* ── Archive entry ── */}
+      {/* ── Archive entry — list-item стиля (h=48px компактный) ── */}
       <button
         onClick={() => setShowArchive(true)}
-        className="mx-3 mb-1.5 flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm bg-white/[0.025] hover:bg-white/[0.06] border border-white/[0.04] transition-colors group"
+        className="mx-2 mb-2 flex items-center gap-3 px-3 h-12 rounded-md text-left text-[14px] hover:bg-white/[0.04] active:bg-white/[0.06] transition group flex-shrink-0"
         title="Архивные чаты"
       >
-        <span className="w-7 h-7 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
-          <Archive size={14} />
+        <span className="w-9 h-9 rounded-md bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+          <Archive size={16} />
         </span>
-        <span className="flex-1 text-white/80">Архив</span>
+        <span className="flex-1 text-white/85 font-medium">Архив</span>
         {archivedCount > 0 && (
-          <span className="text-[11px] font-semibold text-white/45 px-1.5">{archivedCount}</span>
+          <span className="text-[12px] font-medium text-white/50 px-2">{archivedCount}</span>
         )}
       </button>
 
