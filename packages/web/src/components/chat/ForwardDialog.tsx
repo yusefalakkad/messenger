@@ -8,9 +8,9 @@ import { sendMessage } from '@/lib/socket';
 import { isChatE2E, getRecipientPublicKey, encryptText, decryptMessage } from '@/lib/e2e';
 import type { Chat, Message } from '@messenger/shared';
 
-interface Props { message: Message; onClose: () => void; }
+interface Props { messages: Message[]; onClose: () => void; }
 
-export default function ForwardDialog({ message, onClose }: Props) {
+export default function ForwardDialog({ messages, onClose }: Props) {
   const chats = useChatStore((s) => s.chats);
   const user  = useAuthStore((s) => s.user);
   const [q, setQ] = useState('');
@@ -29,59 +29,68 @@ export default function ForwardDialog({ message, onClose }: Props) {
     if (!user) return;
     const targetChat = chats.find((c) => c.id === targetChatId);
     if (!targetChat) return;
-    // P1-14: если источник E2E (текстовый шифрованный ИЛИ медиа с шифрованным caption),
-    // а цель — НЕ E2E, показываем диалог. Иначе сразу шлём.
-    const isSourceE2E = !!message.encrypted;
-    if (isSourceE2E && !isChatE2E(targetChat)) {
+    // P1-14: если ХОТЬ ОДНО сообщение E2E, а цель — НЕ E2E, показываем диалог.
+    const anySourceE2E = messages.some((m) => !!m.encrypted);
+    if (anySourceE2E && !isChatE2E(targetChat)) {
       setConfirmTarget(targetChat);
       return;
     }
     void doForward(targetChatId);
   };
 
+  // Пересылка одного сообщения: E2E decrypt → re-encrypt / plain / media.
+  async function forwardOne(message: Message, targetChat: Chat) {
+    if (!user) return;
+    const targetChatId = targetChat.id;
+    const sourceChat = chats.find((c) => c.id === message.chatId);
+    const { privateKey } = useAuthStore.getState();
+
+    // Текст — расшифровать если нужно, перешифровать для нового чата
+    if (message.type === 'text') {
+      let plainText = message.content ?? '';
+      if (message.encrypted && sourceChat && privateKey) {
+        plainText = await decryptMessage(message, sourceChat, user.id, privateKey);
+      }
+      if (isChatE2E(targetChat) && privateKey) {
+        const pub = getRecipientPublicKey(targetChat, user.id);
+        if (pub) {
+          const { ciphertext, nonce } = await encryptText(targetChatId, plainText, pub, privateKey);
+          sendMessage({ chatId: targetChatId, type: 'text', content: ciphertext, nonce, encrypted: true, forwardedFromId: message.id });
+        } else {
+          sendMessage({ chatId: targetChatId, type: 'text', content: plainText, forwardedFromId: message.id });
+        }
+      } else {
+        sendMessage({ chatId: targetChatId, type: 'text', content: plainText, forwardedFromId: message.id });
+      }
+    } else if (message.media) {
+      // Медиа — переиспользуем тот же objectName (Media создаётся новая, но URL одинаковый)
+      sendMessage({
+        chatId: targetChatId,
+        type:    message.type,
+        mediaData: {
+          url:          message.media.url,
+          thumbnailUrl: message.media.thumbnailUrl,
+          mimeType:     message.media.mimeType,
+          size:         message.media.size,
+          width:        message.media.width,
+          height:       message.media.height,
+          duration:     message.media.duration,
+          waveform:     message.media.waveform,
+        },
+        forwardedFromId: message.id,
+      });
+    }
+  }
+
   async function doForward(targetChatId: string) {
     if (!user) return;
     setSending(targetChatId);
     try {
-      const sourceChat = chats.find((c) => c.id === message.chatId);
       const targetChat = chats.find((c) => c.id === targetChatId);
-      const { privateKey } = useAuthStore.getState();
       if (!targetChat) return;
-
-      // Текст — расшифровать если нужно, перешифровать для нового чата
-      if (message.type === 'text') {
-        let plainText = message.content ?? '';
-        if (message.encrypted && sourceChat && privateKey) {
-          plainText = await decryptMessage(message, sourceChat, user.id, privateKey);
-        }
-        if (isChatE2E(targetChat) && privateKey) {
-          const pub = getRecipientPublicKey(targetChat, user.id);
-          if (pub) {
-            const { ciphertext, nonce } = await encryptText(targetChatId, plainText, pub, privateKey);
-            sendMessage({ chatId: targetChatId, type: 'text', content: ciphertext, nonce, encrypted: true, forwardedFromId: message.id });
-          } else {
-            sendMessage({ chatId: targetChatId, type: 'text', content: plainText, forwardedFromId: message.id });
-          }
-        } else {
-          sendMessage({ chatId: targetChatId, type: 'text', content: plainText, forwardedFromId: message.id });
-        }
-      } else if (message.media) {
-        // Медиа — переиспользуем тот же objectName (Media создаётся новая, но URL одинаковый)
-        sendMessage({
-          chatId: targetChatId,
-          type:    message.type,
-          mediaData: {
-            url:          message.media.url,
-            thumbnailUrl: message.media.thumbnailUrl,
-            mimeType:     message.media.mimeType,
-            size:         message.media.size,
-            width:        message.media.width,
-            height:       message.media.height,
-            duration:     message.media.duration,
-            waveform:     message.media.waveform,
-          },
-          forwardedFromId: message.id,
-        });
+      // Последовательно — сохраняем порядок сообщений в целевом чате
+      for (const message of messages) {
+        await forwardOne(message, targetChat);
       }
       onClose();
     } catch (err) {
@@ -107,7 +116,9 @@ export default function ForwardDialog({ message, onClose }: Props) {
         >
           <div className="flex items-center gap-3 px-5 py-4 border-b border-dark-border/60">
             <CornerUpRight size={18} className="text-primary-400" />
-            <h3 className="font-semibold text-base flex-1">Переслать в...</h3>
+            <h3 className="font-semibold text-base flex-1">
+              {messages.length > 1 ? `Переслать (${messages.length})` : 'Переслать в...'}
+            </h3>
             <button onClick={onClose} className="btn-icon btn-icon-sm">
               <X size={16} />
             </button>

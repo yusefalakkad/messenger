@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, KeyRound, User as UserIcon, Loader2, Send } from 'lucide-react';
+import { ArrowRight, KeyRound, Lock, User as UserIcon, Loader2, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
@@ -23,7 +23,13 @@ function getOrCreateDeviceId(): string {
 }
 const DEVICE_NAME = typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 64) : 'web';
 
-type Step = 'phone' | 'link-bot' | 'code' | 'profile';
+// Бэк не отдаёт статус облачного пароля в /me, поэтому кэшируем его per-user
+// в localStorage: пишется при входе здесь и при изменениях в SettingsDialog.
+function setCloudPasswordFlag(userId: string, set: boolean) {
+  try { localStorage.setItem(`cloudpwd:${userId}`, set ? '1' : '0'); } catch { /* инкогнито */ }
+}
+
+type Step = 'phone' | 'link-bot' | 'code' | 'password' | 'profile';
 
 interface RequestCodeResp {
   cooldownSec: number;
@@ -51,6 +57,9 @@ interface VerifyResp {
   isNewUser: boolean;
   verifyToken?: string;
   tokens?: TokensPayload & { user: UserPayload };
+  /** Облачный пароль установлен — токены не выданы, нужен шаг 'password' */
+  passwordRequired?: boolean;
+  passwordToken?: string;
 }
 
 interface CompleteResp {
@@ -84,6 +93,10 @@ export default function PhoneAuthForm() {
   // Собранный E.164-номер для отправки на бэк (бэкенд нормализует через libphonenumber).
   const fullPhone = `${country.dialCode}${phone.replace(/\D/g, '')}`;
   const [verifyToken, setVerifyToken] = useState<string | null>(null);
+
+  // Облачный пароль (второй шаг после verify, если установлен)
+  const [passwordToken, setPasswordToken] = useState<string | null>(null);
+  const [cloudPassword, setCloudPassword] = useState('');
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -133,6 +146,46 @@ export default function PhoneAuthForm() {
     }
   }
 
+  // Общий финал входа существующего юзера (verify без пароля / password-шаг):
+  // keyVault-логика — кэшированный приватный ключ или регенерация пары + PATCH.
+  async function finishExistingLogin(t: TokensPayload & { user: UserPayload }) {
+    // Есть ли у нас сохранённый приватный ключ для этого юзера?
+    const cached = getCachedPrivKey(t.user.id);
+
+    if (cached) {
+      // Reload вкладки — ключ ещё в sessionStorage. Используем как есть.
+      setAuth(t.user as any, t.accessToken, cached);
+      initSocket();
+    } else {
+      // Новое устройство / очистка storage → регенерим, шлём новый publicKey
+      // отдельным запросом (verify-flow одноразовый, OTP уже консумирован).
+      const { publicKey, privateKey } = await generateKeyPair();
+      cachePlaintext(t.user.id, privateKey);
+
+      // КРИТИЧНО: PATCH публичного ключа ДО initSocket. Иначе между шагами
+      // setAuth/initSocket и PATCH собеседник может отправить нам сообщение,
+      // зашифрованное под СТАРЫЙ pubKey → расшифровать не получится никогда.
+      // Шлём axios напрямую с accessToken через header (минуя store/interceptor,
+      // т.к. setAuth ещё не вызван — interceptor токен не найдёт).
+      const patchOk = await api.patch(
+        '/users/me/public-key',
+        { publicKey },
+        { headers: { Authorization: `Bearer ${t.accessToken}` } },
+      ).then(() => true).catch(() => false);
+
+      if (!patchOk) {
+        // Без PATCH — все входящие = "Не удалось расшифровать". Прерываем,
+        // даём юзеру попробовать ещё раз через переotправку кода.
+        throw new Error('Не удалось обновить ключ шифрования. Попробуйте ещё раз.');
+      }
+
+      // Теперь безопасно — на сервере новый pubKey, входящие будут зашифрованы
+      // под него, мы дешифруем приватным ключом.
+      setAuth({ ...t.user, publicKey } as any, t.accessToken, privateKey);
+      initSocket();
+    }
+  }
+
   // ── Шаг 2: проверка кода ──────────────────────────────────────────────────
   async function handleCodeSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -153,42 +206,17 @@ export default function PhoneAuthForm() {
         return;
       }
 
-      const t = v.tokens!;
-      // Есть ли у нас сохранённый приватный ключ для этого юзера?
-      const cached = getCachedPrivKey(t.user.id);
-
-      if (cached) {
-        // Reload вкладки — ключ ещё в sessionStorage. Используем как есть.
-        setAuth(t.user as any, t.accessToken, cached);
-        initSocket();
-      } else {
-        // Новое устройство / очистка storage → регенерим, шлём новый publicKey
-        // отдельным запросом (verify-flow одноразовый, OTP уже консумирован).
-        const { publicKey, privateKey } = await generateKeyPair();
-        cachePlaintext(t.user.id, privateKey);
-
-        // КРИТИЧНО: PATCH публичного ключа ДО initSocket. Иначе между шагами
-        // setAuth/initSocket и PATCH собеседник может отправить нам сообщение,
-        // зашифрованное под СТАРЫЙ pubKey → расшифровать не получится никогда.
-        // Шлём axios напрямую с accessToken через header (минуя store/interceptor,
-        // т.к. setAuth ещё не вызван — interceptor токен не найдёт).
-        const patchOk = await api.patch(
-          '/users/me/public-key',
-          { publicKey },
-          { headers: { Authorization: `Bearer ${t.accessToken}` } },
-        ).then(() => true).catch(() => false);
-
-        if (!patchOk) {
-          // Без PATCH — все входящие = "Не удалось расшифровать". Прерываем,
-          // даём юзеру попробовать ещё раз через переotправку кода.
-          throw new Error('Не удалось обновить ключ шифрования. Попробуйте ещё раз.');
-        }
-
-        // Теперь безопасно — на сервере новый pubKey, входящие будут зашифрованы
-        // под него, мы дешифруем приватным ключом.
-        setAuth({ ...t.user, publicKey } as any, t.accessToken, privateKey);
-        initSocket();
+      // Аккаунт защищён облачным паролем — токенов нет, второй шаг.
+      if (v.passwordRequired) {
+        setPasswordToken(v.passwordToken!);
+        setCloudPassword('');
+        setStep('password');
+        return;
       }
+
+      const t = v.tokens!;
+      setCloudPasswordFlag(t.user.id, false); // вошли без пароля → не установлен
+      await finishExistingLogin(t);
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message;
       const code = err?.response?.data?.error?.code;
@@ -197,7 +225,36 @@ export default function PhoneAuthForm() {
       } else if (code === 'OTP_LOCKED') {
         setError('Слишком много неверных попыток. Запросите новый код.');
       } else {
-        setError(msg ?? 'Неверный код');
+        setError(msg ?? err?.message ?? 'Неверный код');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Шаг 2б: облачный пароль ───────────────────────────────────────────────
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const r = await api.post<{ success: boolean; data: VerifyResp }>(
+        '/auth/phone/password',
+        { passwordToken, password: cloudPassword, deviceId: getOrCreateDeviceId(), deviceName: DEVICE_NAME },
+      );
+      const t = r.data.data.tokens!;
+      setCloudPasswordFlag(t.user.id, true); // вход потребовал пароль → установлен
+      await finishExistingLogin(t);
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code;
+      if (code === 'WRONG_PASSWORD') {
+        setError('Неверный пароль. Попробуйте ещё раз.');
+      } else if (code === 'TOO_MANY_ATTEMPTS') {
+        setError('Слишком много неверных попыток. Запросите новый код и войдите заново.');
+      } else if (code === 'PASSWORD_TOKEN_INVALID') {
+        setError('Сессия входа истекла. Запросите код заново.');
+      } else {
+        setError(err?.response?.data?.error?.message ?? err?.message ?? 'Не удалось войти');
       }
     } finally {
       setLoading(false);
@@ -226,6 +283,7 @@ export default function PhoneAuthForm() {
       // reload вкладки. Без этого после F5 у юзера privateKey=null и все
       // E2E-чаты ломаются ("приватный ключ недоступен. Перелогиньтесь").
       cachePlaintext(data.data.user.id, privateKey);
+      setCloudPasswordFlag(data.data.user.id, false); // новый аккаунт — пароля нет
       setAuth(data.data.user as any, data.data.tokens.accessToken, privateKey);
       initSocket();
     } catch (err: any) {
@@ -404,6 +462,48 @@ export default function PhoneAuthForm() {
                 ? `Отправить новый код можно через ${resendIn}s`
                 : 'Отправить новый код'}
             </button>
+          </form>
+        )}
+
+        {step === 'password' && (
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <button
+              type="button"
+              onClick={() => {
+                // OTP уже консумирован — назад только через новый код.
+                setStep('phone'); setCode(''); setCloudPassword(''); setPasswordToken(null); setError(null);
+              }}
+              className="text-white/45 hover:text-white/80 text-xs"
+            >
+              ← Сменить номер
+            </button>
+            <h2 className="text-white text-xl font-semibold leading-tight">
+              Облачный пароль
+            </h2>
+            <p className="text-white/50 text-sm">
+              Аккаунт защищён дополнительным паролем. Введите его, чтобы войти.
+            </p>
+
+            <label className="block">
+              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl px-4 py-3.5 transition">
+                <Lock size={16} className="text-white/40" />
+                <input
+                  autoFocus
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Пароль"
+                  value={cloudPassword}
+                  onChange={(e) => setCloudPassword(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-white text-[15px] placeholder:text-white/30"
+                />
+              </div>
+            </label>
+
+            {error && <FieldError message={error} />}
+
+            <BrandSubmit loading={loading} disabled={cloudPassword.length < 1}>
+              Войти <ArrowRight size={16} />
+            </BrandSubmit>
           </form>
         )}
 

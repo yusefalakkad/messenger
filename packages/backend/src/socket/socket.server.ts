@@ -130,12 +130,29 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
-    socket.on('message:typing', ({ chatId, isTyping }: WSClientEvents['message:typing']) => {
-      socket.to(`chat:${chatId}`).emit('user:typing', {
-        chatId,
-        userId,
-        isTyping,
-      });
+    // Кэш типа чата per-socket — typing летит на каждый кейстрок, не дёргаем БД каждый раз
+    const chatTypeCache = new Map<string, string>();
+
+    socket.on('message:typing', async ({ chatId, isTyping }: WSClientEvents['message:typing']) => {
+      if (!chatId || typeof chatId !== 'string' || chatId.length > 64) return;
+      try {
+        let type = chatTypeCache.get(chatId);
+        if (!type) {
+          const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } });
+          if (!chat) return;
+          type = chat.type;
+          chatTypeCache.set(chatId, type);
+        }
+        // В каналах typing не бродкастим — подписчикам это не нужно
+        if (type === 'channel') return;
+        socket.to(`chat:${chatId}`).emit('user:typing', {
+          chatId,
+          userId,
+          isTyping,
+        });
+      } catch (err) {
+        logger.error('message:typing error', { err });
+      }
     });
 
     socket.on('message:delete', async ({ messageId }: WSClientEvents['message:delete']) => {
@@ -198,24 +215,203 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
+    // ─── TTL чата (авто-удаление сообщений) ──────────────────────────────────
+
+    socket.on('chat:set-ttl', async ({ chatId, seconds }: WSClientEvents['chat:set-ttl']) => {
+      try {
+        if (typeof chatId !== 'string' || chatId.length === 0 || chatId.length > 64) return;
+        // seconds: null — выключить, иначе 60..31536000 (1 мин .. 1 год)
+        if (seconds !== null
+            && (typeof seconds !== 'number' || !Number.isInteger(seconds) || seconds < 60 || seconds > 31_536_000)) {
+          socket.emit('error', { code: 'BAD_TTL', message: 'TTL must be null or 60..31536000 seconds' });
+          return;
+        }
+        const [member, chat] = await Promise.all([
+          prisma.chatMember.findUnique({
+            where: { chatId_userId: { chatId, userId } },
+            select: { leftAt: true, role: true },
+          }),
+          prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } }),
+        ]);
+        if (!member || member.leftAt || !chat) return;
+
+        // В каналах TTL меняют только owner/admin
+        if (chat.type === 'channel' && member.role !== 'owner' && member.role !== 'admin') {
+          socket.emit('error', { code: 'FORBIDDEN', message: 'Only admins can change TTL in channels' });
+          return;
+        }
+
+        await prisma.chat.update({ where: { id: chatId }, data: { messageTtlSeconds: seconds } });
+        io.to(`chat:${chatId}`).emit('chat:ttl-changed', { chatId, seconds });
+      } catch (err) {
+        logger.error('chat:set-ttl error', { err });
+      }
+    });
+
+    // ─── Медленный режим (интервал между сообщениями для member-ов) ──────────
+
+    socket.on('chat:set-slowmode', async ({ chatId, seconds }: WSClientEvents['chat:set-slowmode']) => {
+      try {
+        if (typeof chatId !== 'string' || chatId.length === 0 || chatId.length > 64) return;
+        // seconds: null — выключить, иначе 5..3600 (5 сек .. 1 час)
+        if (seconds !== null
+            && (typeof seconds !== 'number' || !Number.isInteger(seconds) || seconds < 5 || seconds > 3600)) {
+          socket.emit('error', { code: 'BAD_SLOW_MODE', message: 'Slow mode must be null or 5..3600 seconds' });
+          return;
+        }
+        const [member, chat] = await Promise.all([
+          prisma.chatMember.findUnique({
+            where: { chatId_userId: { chatId, userId } },
+            select: { leftAt: true, role: true },
+          }),
+          prisma.chat.findUnique({ where: { id: chatId }, select: { type: true } }),
+        ]);
+        if (!member || member.leftAt || !chat) return;
+
+        // Только группы и каналы; менять могут owner/admin
+        if (chat.type !== 'group' && chat.type !== 'channel') {
+          socket.emit('error', { code: 'NOT_GROUP', message: 'Slow mode is for groups and channels only' });
+          return;
+        }
+        if (member.role !== 'owner' && member.role !== 'admin') {
+          socket.emit('error', { code: 'FORBIDDEN', message: 'Only admins can change slow mode' });
+          return;
+        }
+
+        await prisma.chat.update({ where: { id: chatId }, data: { slowModeSeconds: seconds } });
+        io.to(`chat:${chatId}`).emit('chat:slowmode-changed', { chatId, seconds });
+      } catch (err) {
+        logger.error('chat:set-slowmode error', { err });
+      }
+    });
+
+    // ─── Закрепление сообщений ────────────────────────────────────────────────
+
+    socket.on('message:pin', async ({ chatId, messageId, pin }: WSClientEvents['message:pin']) => {
+      try {
+        if (typeof chatId !== 'string' || typeof messageId !== 'string'
+            || chatId.length > 64 || messageId.length > 64 || typeof pin !== 'boolean') return;
+
+        const [member, message] = await Promise.all([
+          prisma.chatMember.findUnique({
+            where: { chatId_userId: { chatId, userId } },
+            select: { leftAt: true, role: true },
+          }),
+          prisma.message.findUnique({
+            where: { id: messageId },
+            select: { chatId: true, deletedAt: true, chat: { select: { type: true } } },
+          }),
+        ]);
+        if (!member || member.leftAt) return;
+        if (!message || message.chatId !== chatId || message.deletedAt) return;
+
+        // В каналах пинят только owner/admin (в direct/group — любой участник)
+        if (message.chat.type === 'channel' && member.role !== 'owner' && member.role !== 'admin') {
+          socket.emit('error', { code: 'FORBIDDEN', message: 'Only admins can pin in channels' });
+          return;
+        }
+
+        const pinnedAt = pin ? new Date() : null;
+        await prisma.message.update({ where: { id: messageId }, data: { pinnedAt } });
+        io.to(`chat:${chatId}`).emit('message:pinned', {
+          chatId,
+          messageId,
+          pinnedAt: pinnedAt ? pinnedAt.toISOString() : null,
+        });
+      } catch (err) {
+        logger.error('message:pin error', { err });
+      }
+    });
+
+    // ─── Голосование в опросе ─────────────────────────────────────────────────
+
+    socket.on('poll:vote', async ({ chatId, pollId, optionIds }: WSClientEvents['poll:vote']) => {
+      if (!checkRate('poll:vote', 10, 10_000)) {
+        socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many votes' });
+        return;
+      }
+      try {
+        if (typeof chatId !== 'string' || typeof pollId !== 'string'
+            || chatId.length > 64 || pollId.length > 64) return;
+        if (!Array.isArray(optionIds) || optionIds.length > 10
+            || optionIds.some((o) => typeof o !== 'string' || o.length === 0 || o.length > 64)) return;
+
+        const member = await prisma.chatMember.findUnique({
+          where: { chatId_userId: { chatId, userId } },
+          select: { leftAt: true },
+        });
+        if (!member || member.leftAt) return;
+
+        const poll = await prisma.poll.findUnique({
+          where: { id: pollId },
+          select: { id: true, options: true, multiple: true, message: { select: { id: true, chatId: true, deletedAt: true } } },
+        });
+        if (!poll || poll.message.chatId !== chatId || poll.message.deletedAt) return;
+
+        // Оставляем только валидные optionId из вариантов опроса
+        const validIds = new Set(
+          (poll.options as { id: string; text: string }[]).map((o) => o.id),
+        );
+        let chosen = [...new Set(optionIds.filter((id) => validIds.has(id)))];
+        // single-choice — только первый вариант
+        if (!poll.multiple) chosen = chosen.slice(0, 1);
+
+        await prisma.$transaction(async (tx) => {
+          await tx.pollVote.deleteMany({ where: { pollId, userId } });
+          if (chosen.length > 0) {
+            await tx.pollVote.createMany({
+              data: chosen.map((optionId) => ({ pollId, userId, optionId })),
+            });
+          }
+        });
+
+        const votes = await prisma.pollVote.findMany({
+          where: { pollId },
+          select: { optionId: true, userId: true },
+        });
+        io.to(`chat:${chatId}`).emit('poll:updated', {
+          chatId,
+          messageId: poll.message.id,
+          pollId,
+          votes,
+        });
+      } catch (err) {
+        logger.error('poll:vote error', { err });
+      }
+    });
+
     socket.on('message:edit', async ({ messageId, content }: WSClientEvents['message:edit']) => {
       try {
         // Редактировать может только автор. type=text для защиты от правки медиа-капшнов.
         const message = await prisma.message.findFirst({
           where: { id: messageId, senderId: userId, type: 'text', deletedAt: null },
-          select: { id: true, chatId: true },
+          select: { id: true, chatId: true, content: true, editedAt: true, editHistory: true, createdAt: true },
         });
         if (!message) return;
         if (typeof content !== 'string' || content.length === 0 || content.length > 10_000) return;
 
+        // История правок: дописываем СТАРУЮ версию перед перезаписью.
+        // editedAt версии = момент когда она стала актуальной (editedAt || createdAt).
+        const prevHistory = Array.isArray(message.editHistory)
+          ? (message.editHistory as { content: string; editedAt: string }[])
+          : [];
+        const editHistory = [
+          ...prevHistory,
+          {
+            content:  message.content ?? '',
+            editedAt: (message.editedAt ?? message.createdAt).toISOString(),
+          },
+        ];
+
         const updated = await prisma.message.update({
           where: { id: messageId },
-          data: { content, editedAt: new Date() },
+          data: { content, editedAt: new Date(), editHistory },
         });
         io.to(`chat:${message.chatId}`).emit('message:updated', {
           id: messageId,
           content,
           editedAt: updated.editedAt,
+          editHistory,
           chatId: message.chatId,
         });
       } catch (err) {
@@ -384,6 +580,15 @@ async function handleSendMessage(
     socket.emit('error', { code: 'MEDIA_TOO_LARGE' });
     return;
   }
+  if (payload.viewOnce != null && typeof payload.viewOnce !== 'boolean') {
+    socket.emit('error', { code: 'BAD_VIEW_ONCE' });
+    return;
+  }
+  // Одноразовое медиа («1×»): только при наличии mediaData и для image/video/voice.
+  // Для текста/файлов флаг молча игнорируем — клиент его там и не показывает.
+  const viewOnce = payload.viewOnce === true
+    && !!payload.mediaData
+    && (payload.type === 'image' || payload.type === 'video' || payload.type === 'voice');
 
   // Idempotency: клиент шлёт clientMsgId (UUID), чтобы при auto-reconnect socket.io
   // переотправил тот же payload, мы не создали дубль. TTL 5 мин в Redis — для
@@ -403,10 +608,22 @@ async function handleSendMessage(
   }
 
   // Verify membership (АКТИВНОЕ — кикнутые/leftAt не имеют права слать).
+  // chat подтягиваем заодно — нужен messageTtlSeconds для expiresAt.
   const member = await prisma.chatMember.findUnique({
     where: { chatId_userId: { chatId: payload.chatId, userId } },
+    include: { chat: { select: { messageTtlSeconds: true, type: true, slowModeSeconds: true } } },
   });
   if (!member || member.leftAt) throw new Error('Not a member');
+
+  // Канал: постить могут только owner/admin, обычные подписчики — read-only
+  if (member.chat.type === 'channel' && member.role !== 'owner' && member.role !== 'admin') {
+    socket.emit('error', { code: 'CHANNEL_POST_FORBIDDEN', message: 'Only admins can post in channels' });
+    return;
+  }
+
+  // Авто-удаление: если в чате включён TTL — выставляем expiresAt
+  const ttl = member.chat.messageTtlSeconds;
+  const expiresAt = ttl ? new Date(Date.now() + ttl * 1000) : undefined;
 
   // SECURITY: replyToId должен указывать на сообщение из того же чата
   if (payload.replyToId) {
@@ -458,6 +675,25 @@ async function handleSendMessage(
     }
   }
 
+  // Медленный режим: member-ы шлют не чаще раза в slowModeSeconds (owner/admin
+  // освобождены). SET NX EX — атомарно: ключ уже есть → юзер ещё в кулдауне.
+  // Проверка ПОСЛЕДНЕЙ перед create — отклонённое валидацией сообщение не должно
+  // сжигать кулдаун.
+  const slowSec = member.chat.slowModeSeconds;
+  if (slowSec && member.role === 'member') {
+    const slowKey = `slow:${payload.chatId}:${userId}`;
+    const acquired = await redis.set(slowKey, '1', 'EX', slowSec, 'NX');
+    if (!acquired) {
+      const ttl = await redis.ttl(slowKey);
+      socket.emit('error', {
+        code: 'SLOW_MODE',
+        message: 'Slow mode is on — wait before sending the next message',
+        retryAfter: ttl > 0 ? ttl : slowSec,
+      });
+      return;
+    }
+  }
+
   const message = await prisma.message.create({
     data: {
       chatId: payload.chatId,
@@ -466,8 +702,10 @@ async function handleSendMessage(
       content: payload.content,
       encrypted: payload.encrypted ?? false,
       nonce:     payload.nonce,
+      viewOnce,
       replyToId: payload.replyToId,
       forwardedFromId: payload.forwardedFromId,
+      expiresAt,
       ...(payload.mediaData
         ? {
             media: {
@@ -490,6 +728,7 @@ async function handleSendMessage(
       media:     true,
       reads:     { select: { userId: true, readAt: true } },
       reactions: { select: { userId: true, emoji: true } },
+      poll:      { include: { votes: { select: { optionId: true, userId: true } } } },
       // encrypted+nonce обязательны: без них клиент не отличит шифрованный reply-preview
       // от обычного текста и рендерит base64 ciphertext (P1-13). media — для превью медиа-reply'ев.
       replyTo: {
@@ -564,7 +803,7 @@ async function handleMessageRead(
   // SECURITY: проверяем что:
   //  1) юзер действительно состоит в этом чате
   //  2) messageId принадлежит этому чату (не подделка из чужого чата)
-  const [member, message] = await Promise.all([
+  const [member, message, reader] = await Promise.all([
     prisma.chatMember.findUnique({
       where: { chatId_userId: { chatId, userId } },
       select: { leftAt: true },
@@ -573,15 +812,23 @@ async function handleMessageRead(
       where: { id: messageId },
       select: { chatId: true },
     }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { readReceiptsEnabled: true },
+    }),
   ]);
   if (!member || member.leftAt) return;
   if (!message || message.chatId !== chatId) return;
 
+  // Запись в БД делаем всегда — unread-счётчики должны жить
   await prisma.messageRead.upsert({
     where: { messageId_userId: { messageId, userId } },
     update: {},
     create: { messageId, userId },
   });
+
+  // Приватность: отчёты о прочтении выключены — broadcast не эмитим
+  if (reader?.readReceiptsEnabled === false) return;
 
   io.to(`chat:${chatId}`).emit('message:read', {
     messageId,
@@ -616,13 +863,23 @@ async function broadcastUserStatus(
   status: 'online' | 'offline',
   lastSeenAt?: Date,
 ): Promise<void> {
+  // Приватность: при lastSeenVisibility='nobody' остальные всегда видят
+  // 'offline' и не видят lastSeen — реальный статус не утекает.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { lastSeenVisibility: true },
+  });
+  const hidden = user?.lastSeenVisibility === 'nobody';
+  const emitStatus = hidden ? 'offline' : status;
+  const emitLastSeenAt = hidden ? undefined : lastSeenAt;
+
   // Find all chats this user is in and notify members
   const memberships = await prisma.chatMember.findMany({
     where: { userId, leftAt: null },
     select: { chatId: true },
   });
   memberships.forEach(({ chatId }) => {
-    io.to(`chat:${chatId}`).emit('user:status', { userId, status, lastSeenAt });
+    io.to(`chat:${chatId}`).emit('user:status', { userId, status: emitStatus, lastSeenAt: emitLastSeenAt });
   });
 }
 
@@ -639,6 +896,14 @@ function isMediaOwnedByUser(
   userId: string,
 ): boolean {
   if (!mediaData?.url || typeof mediaData.url !== 'string') return false;
+
+  // GIF из Tenor: внешний CDN-URL, нашему MinIO не принадлежит.
+  // Разрешаем только домен media.tenor.com и только для image/video.
+  const isTenor = (u: unknown): boolean =>
+    typeof u === 'string' && u.startsWith('https://media.tenor.com/');
+  if ((messageType === 'image' || messageType === 'video') && isTenor(mediaData.url)) {
+    return !mediaData.thumbnailUrl || isTenor(mediaData.thumbnailUrl);
+  }
 
   const allowedPrefixes = expectedPrefixesFor(messageType, userId);
   if (!check(mediaData.url, allowedPrefixes)) return false;

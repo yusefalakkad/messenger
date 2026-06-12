@@ -20,6 +20,8 @@ export function formatMessagePreview(msg: LastLike | null | undefined): string {
   if (msg.type === 'image')  return msg.encrypted ? '📷 🔒 Фото' : (msg.content ? `📷 ${msg.content}` : '📷 Фото');
   if (msg.type === 'video')  return msg.encrypted ? '🎬 🔒 Видео' : (msg.content ? `🎬 ${msg.content}` : '🎬 Видео');
   if (msg.type === 'file')   return '📎 Файл';
+  // content у poll — вопрос; при encrypted его не светим.
+  if (msg.type === 'poll')   return msg.encrypted ? '📊 Опрос' : (msg.content ? `📊 ${msg.content}` : '📊 Опрос');
   if (msg.type === 'system') return msg.content ?? '';
   return '';
 }

@@ -3,9 +3,12 @@ import { useParams } from 'react-router-dom';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/lib/api';
+import { toast } from '@/lib/toast';
 import ChatHeader from './ChatHeader';
+import PinnedMessagesBar from '@/components/chat/PinnedMessagesBar';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import SelectionBar from './SelectionBar';
 import { isChatE2E } from '@/lib/e2e';
 import { ShieldCheck, MessageSquareOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -15,10 +18,24 @@ import type { Message } from '@messenger/shared';
 // [] каждый рендер и компонент перерендеривается на любую store-мутацию.
 const EMPTY_MESSAGES: Message[] = [];
 
+// Пресеты обоев чата — ключи совпадают с валидными значениями
+// PUT /chats/:id/wallpaper на бэке. null/неизвестное = фон по умолчанию.
+const WALLPAPERS: Record<string, string> = {
+  aurora: 'linear-gradient(160deg,#1a1430,#251c4a 50%,#1a2438)',
+  sunset: 'linear-gradient(160deg,#2a1626,#3a1e2e 55%,#332220)',
+  ocean:  'linear-gradient(160deg,#0f1d2b,#16283d 55%,#0f2233)',
+  forest: 'linear-gradient(160deg,#13211a,#1b2f24 55%,#16261f)',
+  mono:   '#1c1b22',
+  candy:  'linear-gradient(160deg,#241632,#321a3e 50%,#3a1f33)',
+};
+
 export default function ChatWindow() {
   const { chatId } = useParams<{ chatId: string }>();
   const setActiveChat = useChatStore((s) => s.setActiveChat);
   const mergeMessages = useChatStore((s) => s.mergeMessages);
+  const requestJump = useChatStore((s) => s.requestJump);
+  const clearMessageSelection = useChatStore((s) => s.clearMessageSelection);
+  const updateChat = useChatStore((s) => s.updateChat);
   const messages = useChatStore((s) => chatId ? s.messages[chatId] ?? EMPTY_MESSAGES : EMPTY_MESSAGES);
   const chats = useChatStore((s) => s.chats);
   const user = useAuthStore((s) => s.user);
@@ -34,6 +51,11 @@ export default function ChatWindow() {
     });
     return () => setActiveChat(null);
   }, [chatId, setActiveChat, mergeMessages]);
+
+  // Смена чата — сбрасываем выделение сообщений
+  useEffect(() => {
+    clearMessageSelection();
+  }, [chatId, clearMessageSelection]);
 
   if (!chatId) return null;
 
@@ -67,9 +89,29 @@ export default function ChatWindow() {
 
   const isE2E = isChatE2E(chat);
 
+  // Канал: писать могут только owner/admin. Обычному подписчику вместо
+  // поля ввода показываем бар с toggle уведомлений.
+  const myRole = chat.members.find((m) => m.userId === user?.id)?.role;
+  const isChannelReader = chat.type === 'channel' && myRole !== 'owner' && myRole !== 'admin';
+  const isMuted = !!chat.mutedUntil && new Date(chat.mutedUntil).getTime() > Date.now();
+
+  const toggleMute = async () => {
+    // null — уведомления включены; «вечный» mute — дата в далёком будущем
+    const mutedUntil = isMuted ? null : '2100-01-01T00:00:00.000Z';
+    try {
+      await api.post(`/chats/${chat.id}/mute`, { mutedUntil });
+      updateChat(chat.id, { mutedUntil });
+    } catch {
+      toast.error('Не удалось изменить настройки уведомлений');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full relative">
+      {/* Бар выделения — absolute поверх шапки, сам рендерит null когда пусто */}
+      <SelectionBar chatId={chatId} />
       <ChatHeader chat={chat} otherMember={otherMember ?? undefined} />
+      <PinnedMessagesBar chatId={chatId} onJump={(id) => requestJump(chatId, id)} />
 
       {/* E2E-баннер — показывается один раз при открытии зашифрованного чата */}
       {isE2E && (
@@ -81,8 +123,22 @@ export default function ChatWindow() {
         </div>
       )}
 
-      <MessageList chatId={chatId} messages={messages} />
-      <MessageInput chatId={chatId} />
+      {/* Обои чата: фон области сообщений по chat.wallpaper (self-настройка ChatMember) */}
+      <div
+        className="flex-1 min-h-0 flex flex-col"
+        style={{ background: chat.wallpaper ? WALLPAPERS[chat.wallpaper] : undefined }}
+      >
+        <MessageList chatId={chatId} messages={messages} />
+      </div>
+      {isChannelReader ? (
+        <div className="flex items-center h-14 px-3 border-t border-dark-border bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
+          <button className="btn-ghost btn-block" onClick={toggleMute}>
+            {isMuted ? 'Включить уведомления' : 'Выключить уведомления'}
+          </button>
+        </div>
+      ) : (
+        <MessageInput chatId={chatId} />
+      )}
     </div>
   );
 }

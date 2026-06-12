@@ -5,12 +5,17 @@ import { clsx } from 'clsx';
 import Sidebar from '@/components/layout/Sidebar';
 import ChatWindow from '@/components/chat/ChatWindow';
 import EmptyChat from '@/components/chat/EmptyChat';
+import JoinByCode from '@/components/chat/JoinByCode';
+import AddByUsername from '@/components/chat/AddByUsername';
 import { useChatStore } from '@/stores/chat.store';
 import { api } from '@/lib/api';
 
 export default function ChatPage() {
   const setChats = useChatStore((s) => s.setChats);
   const inChat = useMatch('/chat/:chatId');
+  // /join/:code и /u/:username тоже показываем в main-панели (на мобиле — вместо сайдбара)
+  const inJoin = useMatch('/join/:code');
+  const inUser = useMatch('/u/:username');
   const location = useLocation();
 
   useEffect(() => {
@@ -23,13 +28,13 @@ export default function ChatPage() {
     <div className="flex h-full bg-dark-bg">
       <div className={clsx(
         'flex-shrink-0 w-full lg:w-auto h-full',
-        inChat && 'hidden lg:block',
+        (inChat || inJoin || inUser) && 'hidden lg:block',
       )}>
         <Sidebar />
       </div>
       <main className={clsx(
         'flex-1 flex-col min-w-0 h-full relative',
-        inChat ? 'flex' : 'hidden lg:flex',
+        (inChat || inJoin || inUser) ? 'flex' : 'hidden lg:flex',
       )}>
         <AnimatePresence mode="wait">
           <motion.div
@@ -43,6 +48,8 @@ export default function ChatPage() {
             <Routes location={location}>
               <Route path="/" element={<EmptyChat />} />
               <Route path="/chat/:chatId" element={<ChatWindow />} />
+              <Route path="/join/:code" element={<JoinByCode />} />
+              <Route path="/u/:username" element={<AddByUsername />} />
             </Routes>
           </motion.div>
         </AnimatePresence>

@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive } from 'lucide-react';
+import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStore } from '@/stores/chat.store';
+import { useFoldersStore } from '@/stores/folders.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
@@ -12,14 +13,20 @@ import Dropdown, { DropdownItem } from '@/components/ui/Dropdown';
 import ChatListItem from '@/components/chat/ChatListItem';
 import NewChatModal from '@/components/chat/NewChatModal';
 import NewGroupModal from '@/components/chat/NewGroupModal';
+import NewChannelModal from '@/components/chat/NewChannelModal';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ArchivedChatsDialog from '@/components/chat/ArchivedChatsDialog';
+import GlobalSearchOverlay from '@/components/chat/GlobalSearchOverlay';
+import FolderTabs from '@/components/layout/FolderTabs';
+import FolderEditModal from '@/components/layout/FolderEditModal';
 import GroupCallPill from '@/components/call/GroupCallPill';
+import type { Chat } from '@messenger/shared';
 
 export default function Sidebar() {
   const { chatId } = useParams();
   const navigate = useNavigate();
   const chats = useChatStore((s) => s.chats);
+  const addChat = useChatStore((s) => s.addChat);
   const user  = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
   const logout  = useAuthStore((s) => s.logout);
@@ -27,18 +34,31 @@ export default function Sidebar() {
   const [search,      setSearch]      = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showNewChannel, setShowNewChannel] = useState(false);
   const [showPlus,    setShowPlus]    = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showArchive,  setShowArchive]  = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  // Редактирование папки: open + id (null = создание новой)
+  const [editFolder, setEditFolder] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  const folders        = useFoldersStore((s) => s.folders);
+  const activeFolderId = useFoldersStore((s) => s.activeFolderId);
+  const loadFolders    = useFoldersStore((s) => s.loadFolders);
+
+  useEffect(() => { loadFolders(); }, [loadFolders]);
+
+  const activeFolder = activeFolderId ? folders.find((f) => f.id === activeFolderId) ?? null : null;
+
   // В основном списке прячем архивные (даже если socket прислал archivedAt после загрузки).
+  // На табе-папке показываем только чаты из folder.chatIds.
   // Дополнительно сортируем по pinnedAt DESC, затем по lastMessage — на случай
   // если socket принёс новое закрепление, а порядок ещё не обновился с сервера.
   const visibleChats = [...chats]
     .filter((c) => !c.archivedAt)
+    .filter((c) => !activeFolder || activeFolder.chatIds.includes(c.id))
     .sort((a, b) => {
       const ap = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
       const bp = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
@@ -52,9 +72,34 @@ export default function Sidebar() {
 
   const filtered = visibleChats.filter((c) => {
     if (!search) return true;
-    const name = c.type === 'group' ? c.name : c.members.find((m) => m.userId !== user?.id)?.user.displayName;
+    const name = c.type === 'saved'
+      ? 'избранное'
+      : c.type === 'group' || c.type === 'channel'
+        ? c.name
+        : c.members.find((m) => m.userId !== user?.id)?.user.displayName;
     return name?.toLowerCase().includes(search.toLowerCase());
   });
+
+  // Глобальный поиск активен от 2 символов — оверлей поверх списка чатов
+  const showGlobalSearch = search.trim().length >= 2;
+
+  // ── Избранное (saved messages) ──────────────────────────────────────────────
+  const openSaved = async () => {
+    // Если saved-чат уже загружен — просто переходим
+    const existing = chats.find((c) => c.type === 'saved');
+    if (existing) {
+      navigate(`/chat/${existing.id}`);
+      return;
+    }
+    try {
+      const { data } = await api.post('/chats/saved');
+      const chat = data.data as Chat;
+      if (!useChatStore.getState().chats.some((c) => c.id === chat.id)) addChat(chat);
+      navigate(`/chat/${chat.id}`);
+    } catch (err) {
+      console.error('Failed to open saved messages', err);
+    }
+  };
 
   const handleLogout = async () => {
     await api.post('/auth/logout').catch(() => {});
@@ -143,6 +188,10 @@ export default function Sidebar() {
                 icon={<Users size={16} />} label="Новая группа"
                 onClick={() => { setShowNewGroup(true); setShowPlus(false); }}
               />
+              <DropdownItem
+                icon={<Megaphone size={16} />} label="Новый канал"
+                onClick={() => { setShowNewChannel(true); setShowPlus(false); }}
+              />
             </Dropdown>
           </div>
 
@@ -172,7 +221,11 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* ── Archive entry — list-item стиля (h=48px компактный) ── */}
+      {/* ── Folder tabs — «Все» + папки + «+» ── */}
+      <FolderTabs onEditFolder={(id) => setEditFolder({ open: true, id })} />
+
+      {/* ── Archive entry — list-item стиля (h=48px компактный), только на табе «Все» ── */}
+      {!activeFolderId && (
       <button
         onClick={() => setShowArchive(true)}
         className="mx-2 mb-2 flex items-center gap-3 px-3 h-12 rounded-md text-left text-[14px] hover:bg-white/[0.04] active:bg-white/[0.06] transition group flex-shrink-0"
@@ -186,11 +239,40 @@ export default function Sidebar() {
           <span className="text-[12px] font-medium text-white/50 px-2">{archivedCount}</span>
         )}
       </button>
+      )}
+
+      {/* ── Saved messages entry — «Избранное», только на табе «Все» ── */}
+      {!activeFolderId && (
+      <button
+        onClick={openSaved}
+        className="mx-2 mb-2 flex items-center gap-3 px-3 h-12 rounded-md text-left text-[14px] hover:bg-white/[0.04] active:bg-white/[0.06] transition group flex-shrink-0"
+        title="Избранное"
+      >
+        <span className="w-9 h-9 rounded-md bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
+          <Bookmark size={16} />
+        </span>
+        <span className="flex-1 text-white/85 font-medium">Избранное</span>
+      </button>
+      )}
 
       {/* ── Chat list ── */}
       <div className="relative flex-1 overflow-y-auto px-1">
+        {/* Глобальный поиск поверх списка — локальную фильтрацию не показываем */}
         <AnimatePresence>
-          {filtered.length === 0 ? (
+          {showGlobalSearch && (
+            <GlobalSearchOverlay
+              query={search}
+              onOpenChat={(id, messageId) => {
+                navigate(`/chat/${id}`);
+                setSearch('');
+                // Прыжок после маунта MessageList и загрузки чата
+                if (messageId) setTimeout(() => useChatStore.getState().requestJump(id, messageId), 300);
+              }}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {showGlobalSearch ? null : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-12 px-6 gap-3 text-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-brand-gradient blur-xl opacity-30 rounded-2xl" />
@@ -231,6 +313,13 @@ export default function Sidebar() {
       <AnimatePresence>
         {showNewChat  && <NewChatModal  onClose={() => setShowNewChat(false)} />}
         {showNewGroup && <NewGroupModal onClose={() => setShowNewGroup(false)} />}
+        {showNewChannel && <NewChannelModal onClose={() => setShowNewChannel(false)} />}
+        {editFolder.open && (
+          <FolderEditModal
+            folderId={editFolder.id}
+            onClose={() => setEditFolder({ open: false, id: null })}
+          />
+        )}
       </AnimatePresence>
 
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />

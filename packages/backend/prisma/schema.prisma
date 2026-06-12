@@ -38,6 +38,15 @@ model User {
   twoFactorSecret   String?   // base32 TOTP secret, set after setup, null until enabled
   twoFactorRecovery String[]  @default([])  // SHA-256 hex hashes of 10 one-time recovery codes
 
+  // Облачный пароль (argon2-хэш): запрашивается после OTP при входе. null = не установлен.
+  cloudPasswordHash String?
+
+  // ─── Приватность ────────────────────────────────────────────────────────────
+  // Кому виден онлайн-статус и lastSeen: 'everyone' | 'nobody'
+  lastSeenVisibility  String  @default("everyone")
+  // Отправлять ли отчёты о прочтении (broadcast message:read)
+  readReceiptsEnabled Boolean @default(true)
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -49,6 +58,7 @@ model User {
   reactions        Reaction[]
   contacts         Contact[]    @relation("ContactOwner")
   contactOf        Contact[]    @relation("ContactTarget")
+  folders          ChatFolder[]
 
   @@index([username])
   @@index([phone])
@@ -121,6 +131,14 @@ model Chat {
   // For group chats: description
   description String?
   createdById String?
+  // Каналы: публичный хэндл (lowercase [a-z0-9_]{5,32}); null — приватный канал
+  username  String?  @unique
+  // Ссылка-приглашение (16 hex). СЕКРЕТ: не отдавать в обычных ответах, только админам
+  inviteCode String? @unique
+  // Авто-удаление сообщений: TTL в секундах (null — выключено)
+  messageTtlSeconds Int?
+  // Медленный режим: интервал между сообщениями для member-ов в секундах (null — выключен)
+  slowModeSeconds Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -133,6 +151,8 @@ model Chat {
 enum ChatType {
   direct
   group
+  saved
+  channel
 }
 
 // ─── ChatMember ───────────────────────────────────────────────────────────────
@@ -149,6 +169,11 @@ model ChatMember {
   mutedUntil  DateTime?
   pinnedAt    DateTime?
   archivedAt  DateTime?
+  // Персональные обои чата (пресет: 'aurora'|'sunset'|'ocean'|'forest'|'mono'|'candy', null — по умолчанию)
+  wallpaper   String?
+  // Черновик сообщения (синхронизация между устройствами)
+  draft          String?
+  draftUpdatedAt DateTime?
   joinedAt    DateTime @default(now())
   leftAt      DateTime?
 
@@ -190,7 +215,22 @@ model Message {
   // Media
   media      Media?
 
+  // Опрос (type: poll)
+  poll       Poll?
+
+  // Одноразовое медиа («1×»): после первого просмотра медиа удаляется
+  viewOnce   Boolean     @default(false)
+  // Момент просмотра одноразового медиа (null — ещё не просмотрено)
+  viewedAt   DateTime?
+
+  // Авто-удаление: момент истечения (из chat.messageTtlSeconds)
+  expiresAt  DateTime?
+  // Закреплённое сообщение
+  pinnedAt   DateTime?
+
   editedAt   DateTime?
+  // История правок: массив { content: string, editedAt: ISO } — прошлые версии текста
+  editHistory Json?
   deletedAt  DateTime?
   createdAt  DateTime    @default(now())
 
@@ -199,6 +239,7 @@ model Message {
 
   @@index([chatId, createdAt])
   @@index([senderId])
+  @@index([expiresAt])
 }
 
 enum MessageType {
@@ -209,6 +250,7 @@ enum MessageType {
   circle
   file
   system
+  poll
 }
 
 // ─── Reaction ─────────────────────────────────────────────────────────────────
@@ -260,4 +302,62 @@ model Media {
   uploadedAt   DateTime  @default(now())
 
   @@index([messageId])
+}
+
+// ─── Poll ─────────────────────────────────────────────────────────────────────
+
+model Poll {
+  id        String   @id @default(cuid())
+  messageId String   @unique
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  question  String
+  // Варианты ответа: [{id:string,text:string}]
+  options   Json
+  multiple  Boolean  @default(false)
+
+  votes     PollVote[]
+}
+
+model PollVote {
+  id       String @id @default(cuid())
+  pollId   String
+  poll     Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId   String
+  optionId String
+
+  @@unique([pollId, userId, optionId])
+  @@index([pollId])
+}
+
+// ─── ChatFolder ───────────────────────────────────────────────────────────────
+// Пользовательские папки чатов (как в Telegram): набор chatIds + emoji + позиция.
+
+model ChatFolder {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  emoji     String?
+  // Список id чатов в папке: string[]
+  chatIds   Json
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── ScheduledMessage ─────────────────────────────────────────────────────────
+// Отложенные сообщения: sweeper создаёт Message когда sendAt наступает.
+
+model ScheduledMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  chatId    String
+  type      String
+  content   String?
+  payload   Json?
+  sendAt    DateTime
+  createdAt DateTime @default(now())
+
+  @@index([sendAt])
 }

@@ -45,6 +45,23 @@ export async function verifyCode(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+// ─── POST /auth/phone/password — облачный пароль после OTP ────────────────────
+export const verifyCloudPasswordValidators = [
+  body('passwordToken').isString().isLength({ min: 32, max: 128 }),
+  body('password').isString().isLength({ min: 1, max: 128 }),
+  body('deviceId').optional().isString().isLength({ min: 8, max: 128 }),
+  body('deviceName').optional().isString().isLength({ max: 80 }),
+];
+
+export async function verifyCloudPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { passwordToken, password } = req.body;
+    const meta = getDeviceMeta(req);
+    const result = await phoneAuthService.verifyCloudPassword(passwordToken, password, meta);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+}
+
 // ─── POST /auth/phone/complete-profile — для новых юзеров ─────────────────────
 export const completeProfileValidators = [
   body('verifyToken').isString().isLength({ min: 32, max: 128 }),

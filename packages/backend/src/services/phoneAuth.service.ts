@@ -1,12 +1,22 @@
 import crypto from 'node:crypto';
+import argon2 from 'argon2';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { prisma } from '../lib/prisma';
+import { redis } from '../lib/redis';
 import { logger } from '../lib/logger';
 import { config } from '../config';
 import { signAccessToken, signRefreshToken } from '../utils/jwt';
 import { AppError } from '../utils/response';
 import { getSmsProvider, SmsDeliveryError } from './sms';
 import { otpStore } from './sms/otpStore';
+
+// ── Облачный пароль: redis-гейт после успешного OTP ──────────────────────────
+//   pwgate:<token>          → JSON {userId, freshPublicKey?}, TTL 10 мин
+//   pwgate:attempts:<token> → счётчик неверных попыток, после 5 — токен сжигается
+const PWGATE_KEY = (token: string) => `pwgate:${token}`;
+const PWGATE_ATTEMPTS_KEY = (token: string) => `pwgate:attempts:${token}`;
+const PWGATE_TTL_SEC = 600;
+const PWGATE_MAX_ATTEMPTS = 5;
 
 /** Нормализуем номер в E.164. Бросаем AppError если невалиден.
  *  Принимаем удобные форматы:
@@ -70,6 +80,10 @@ export interface VerifyCodeResult {
   isNewUser: boolean;
   /** При isNewUser=true — токен для completeProfile. */
   verifyToken?: string;
+  /** Установлен облачный пароль — токены не выданы, нужен POST /phone/password. */
+  passwordRequired?: boolean;
+  /** При passwordRequired=true — токен для verifyCloudPassword. */
+  passwordToken?: string;
   /** При isNewUser=false — готовая сессия. */
   tokens?: {
     accessToken: string;
@@ -166,6 +180,20 @@ export class PhoneAuthService {
     const existing = await prisma.user.findUnique({ where: { phone } });
 
     if (existing) {
+      // Облачный пароль установлен — токены НЕ выдаём, нужен второй фактор.
+      // freshPublicKey стэшим в гейт: применим только после верного пароля
+      // (иначе любой с доступом к SMS мог бы ротировать E2E-ключ).
+      if (existing.cloudPasswordHash) {
+        const passwordToken = crypto.randomBytes(32).toString('hex');
+        await redis.set(
+          PWGATE_KEY(passwordToken),
+          JSON.stringify({ userId: existing.id, freshPublicKey }),
+          'EX',
+          PWGATE_TTL_SEC,
+        );
+        return { isNewUser: false, passwordRequired: true, passwordToken };
+      }
+
       const data: { phoneVerified: boolean; status: 'online'; lastSeenAt: Date; publicKey?: string } = {
         phoneVerified: true,
         status: 'online',
@@ -192,6 +220,58 @@ export class PhoneAuthService {
     return {
       isNewUser: true,
       verifyToken,
+    };
+  }
+
+  /** Шаг 2б (если установлен облачный пароль): проверить пароль и выдать сессию. */
+  async verifyCloudPassword(
+    passwordToken: string,
+    password: string,
+    meta: { deviceId: string; deviceName?: string; ipAddress?: string; userAgent?: string },
+  ) {
+    const raw = await redis.get(PWGATE_KEY(passwordToken));
+    if (!raw) {
+      throw new AppError(401, 'PASSWORD_TOKEN_INVALID', 'Password token expired or invalid');
+    }
+    const { userId, freshPublicKey } = JSON.parse(raw) as { userId: string; freshPublicKey?: string };
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.cloudPasswordHash) {
+      // Пароль сняли пока гейт висел — токен больше не нужен
+      await redis.del(PWGATE_KEY(passwordToken));
+      throw new AppError(401, 'PASSWORD_TOKEN_INVALID', 'Password token expired or invalid');
+    }
+
+    const valid = await argon2.verify(user.cloudPasswordHash, password);
+    if (!valid) {
+      // Токен НЕ сжигаем — до 5 попыток, потом удаляем и 429
+      const attemptsKey = PWGATE_ATTEMPTS_KEY(passwordToken);
+      const attempts = await redis.incr(attemptsKey);
+      if (attempts === 1) await redis.expire(attemptsKey, PWGATE_TTL_SEC);
+      if (attempts >= PWGATE_MAX_ATTEMPTS) {
+        await redis.del(PWGATE_KEY(passwordToken), attemptsKey);
+        throw new AppError(429, 'TOO_MANY_ATTEMPTS', 'Too many wrong attempts, request a new code');
+      }
+      throw new AppError(401, 'WRONG_PASSWORD', `Wrong password, ${PWGATE_MAX_ATTEMPTS - attempts} attempts left`);
+    }
+
+    // Успех — сжигаем гейт и завершаем вход как в verifyCode
+    await redis.del(PWGATE_KEY(passwordToken), PWGATE_ATTEMPTS_KEY(passwordToken));
+
+    const data: { phoneVerified: boolean; status: 'online'; lastSeenAt: Date; publicKey?: string } = {
+      phoneVerified: true,
+      status: 'online',
+      lastSeenAt: new Date(),
+    };
+    if (freshPublicKey && freshPublicKey.length >= 32 && freshPublicKey.length <= 256) {
+      data.publicKey = freshPublicKey;
+    }
+    const updated = await prisma.user.update({ where: { id: user.id }, data });
+
+    const tokens = await this._createSession(user.id, meta);
+    return {
+      isNewUser: false as const,
+      tokens: { ...tokens, user: shapeUser(updated) },
     };
   }
 

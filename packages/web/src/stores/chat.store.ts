@@ -12,6 +12,15 @@ interface ChatState {
   replyingTo:     Message | null;
   editingMessage: Message | null;
 
+  // Мульти-выбор сообщений (SelectionBar)
+  selectedMessageIds: string[];
+
+  // Jump-to-message: запрос прыжка (seq — инкремент-счётчик, чтобы повторный
+  // прыжок к тому же сообщению тоже триггерил подписчиков)
+  jumpRequest: { chatId: string; messageId: string; seq: number } | null;
+  // Кратковременная подсветка пузыря после прыжка
+  highlightMessageId: string | null;
+
   setChats: (chats: Chat[]) => void;
   addChat: (chat: Chat) => void;
   updateChat: (chatId: string, update: Partial<Chat>) => void;
@@ -29,13 +38,39 @@ interface ChatState {
   setReplyingTo:     (m: Message | null) => void;
   setEditingMessage: (m: Message | null) => void;
 
+  /** P3-4: накапливает read-receipt (без перезаписи readBy одним юзером). */
+  addReadReceipt: (chatId: string, messageId: string, userId: string, readAt: Date) => void;
+
+  toggleMessageSelection: (messageId: string) => void;
+  clearMessageSelection: () => void;
+
+  /** Запросить прыжок к сообщению (MessageList подписан на jumpRequest). */
+  requestJump: (chatId: string, messageId: string) => void;
+  /** Сбросить обработанный jumpRequest. */
+  consumeJump: () => void;
+  setHighlightMessage: (id: string | null) => void;
+
   applyReaction: (chatId: string, messageId: string, userId: string, emoji: string, action: 'add' | 'remove') => void;
+
+  /** Пин/анпин сообщения (от сервера приходит ISO-строка или null). */
+  setMessagePinned: (chatId: string, messageId: string, pinnedAt: string | null) => void;
+  /** Полная замена голосов опроса (сервер шлёт актуальный снапшот). */
+  applyPollVotes: (chatId: string, messageId: string, votes: { optionId: string; userId: string }[]) => void;
+  /** Батч-удаление истёкших по TTL сообщений (как deleteMessage, но списком). */
+  expireMessages: (chatId: string, ids: string[]) => void;
+
+  /** Одноразовое сообщение просмотрено — фиксируем viewedAt и убираем медиа. */
+  markMessageViewed: (chatId: string, messageId: string) => void;
 
   setTyping: (chatId: string, userId: string, isTyping: boolean) => void;
 
   /** Полный ресет — при logout. См. resetAppState(). */
   reset: () => void;
 }
+
+// Счётчик seq для jumpRequest — НЕ Date.now(): два быстрых прыжка в одну мс
+// дали бы одинаковый seq и второй не сработал бы.
+let jumpSeq = 0;
 
 export const useChatStore = create<ChatState>((set) => ({
   chats: [],
@@ -44,6 +79,9 @@ export const useChatStore = create<ChatState>((set) => ({
   typingUsers: {},
   replyingTo:     null,
   editingMessage: null,
+  selectedMessageIds: [],
+  jumpRequest: null,
+  highlightMessageId: null,
 
   setChats: (chats) => set({ chats }),
 
@@ -59,8 +97,10 @@ export const useChatStore = create<ChatState>((set) => ({
     activeChatId,
     replyingTo:     null,
     editingMessage: null,
+    // Выбор сообщений привязан к открытому чату — при смене сбрасываем.
+    selectedMessageIds: [],
     chats: activeChatId
-      ? s.chats.map((c) => c.id === activeChatId ? { ...c, unreadCount: 0 } : c)
+      ? s.chats.map((c) => c.id === activeChatId ? { ...c, unreadCount: 0, unreadMentions: 0 } : c)
       : s.chats,
   })),
 
@@ -102,8 +142,14 @@ export const useChatStore = create<ChatState>((set) => ({
       if (existing.some((m) => m.id === message.id)) return s;
       // P2-8: unreadCount бампим ТОЛЬКО для чужих сообщений. Иначе forward
       // в не-активный чат накручивает счётчик пользователю на собственный echo.
-      const myUserId = useAuthStore.getState().user?.id;
-      const isMine   = message.senderId === myUserId;
+      const me     = useAuthStore.getState().user;
+      const isMine = message.senderId === me?.id;
+      // Упоминание меня по @username (только незашифрованный текст — в E2E
+      // content нечитаем). Регистр игнорируем.
+      const isMention = !isMine
+        && !!me?.username
+        && !message.encrypted
+        && !!message.content?.toLowerCase().includes('@' + me.username.toLowerCase());
       return {
         messages: { ...s.messages, [chatId]: [...existing, message] },
         chats: s.chats.map((c) => {
@@ -113,6 +159,11 @@ export const useChatStore = create<ChatState>((set) => ({
             ...c,
             lastMessage: message,
             unreadCount: incrementUnread ? (c.unreadCount ?? 0) + 1 : (c.id === s.activeChatId ? 0 : c.unreadCount ?? 0),
+            // Mention-бейдж: как unreadCount — копим только в неактивных чатах
+            // (для активного setActiveChat и так держит 0).
+            unreadMentions: incrementUnread && isMention
+              ? (c.unreadMentions ?? 0) + 1
+              : (c.id === s.activeChatId ? 0 : c.unreadMentions ?? 0),
           };
         }),
       };
@@ -149,6 +200,36 @@ export const useChatStore = create<ChatState>((set) => ({
   setReplyingTo:     (m) => set({ replyingTo: m }),
   setEditingMessage: (m) => set({ editingMessage: m, replyingTo: null }),
 
+  // P3-4: раньше handler 'message:read' звал updateMessage с readBy=[один юзер],
+  // затирая прочтения остальных участников группы. Теперь накапливаем.
+  addReadReceipt: (chatId, messageId, userId, readAt) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [chatId]: (s.messages[chatId] ?? []).map((m) => {
+          if (m.id !== messageId) return m;
+          const others = (m.readBy ?? []).filter((r) => r.userId !== userId);
+          return { ...m, readBy: [...others, { userId, readAt }] };
+        }),
+      },
+    })),
+
+  toggleMessageSelection: (messageId) =>
+    set((s) => ({
+      selectedMessageIds: s.selectedMessageIds.includes(messageId)
+        ? s.selectedMessageIds.filter((id) => id !== messageId)
+        : [...s.selectedMessageIds, messageId],
+    })),
+
+  clearMessageSelection: () => set({ selectedMessageIds: [] }),
+
+  requestJump: (chatId, messageId) =>
+    set({ jumpRequest: { chatId, messageId, seq: ++jumpSeq } }),
+
+  consumeJump: () => set({ jumpRequest: null }),
+
+  setHighlightMessage: (highlightMessageId) => set({ highlightMessageId }),
+
   applyReaction: (chatId, messageId, userId, emoji, action) =>
     set((s) => ({
       messages: {
@@ -161,6 +242,57 @@ export const useChatStore = create<ChatState>((set) => ({
             : prev.filter((r) => !(r.userId === userId && r.emoji === emoji));
           return { ...m, reactions };
         }),
+      },
+    })),
+
+  setMessagePinned: (chatId, messageId, pinnedAt) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [chatId]: (s.messages[chatId] ?? []).map((m) =>
+          m.id === messageId ? { ...m, pinnedAt } : m,
+        ),
+      },
+    })),
+
+  applyPollVotes: (chatId, messageId, votes) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [chatId]: (s.messages[chatId] ?? []).map((m) =>
+          m.id === messageId && m.poll ? { ...m, poll: { ...m.poll, votes } } : m,
+        ),
+      },
+    })),
+
+  expireMessages: (chatId, ids) =>
+    set((s) => {
+      const idSet = new Set(ids);
+      const msgs = (s.messages[chatId] ?? []).map((m) =>
+        idSet.has(m.id) ? { ...m, deletedAt: new Date() } : m,
+      );
+      // Как в deleteMessage: если истекло последнее сообщение чата —
+      // подменяем lastMessage свежайшим неудалённым, чтобы sidebar не врал.
+      const newLast = [...msgs].reverse().find((m) => !m.deletedAt) ?? null;
+      return {
+        messages: { ...s.messages, [chatId]: msgs },
+        chats: s.chats.map((c) => {
+          if (c.id !== chatId) return c;
+          if (!c.lastMessage || !idSet.has(c.lastMessage.id)) return c;
+          return { ...c, lastMessage: newLast };
+        }),
+      };
+    }),
+
+  // View-once: получатель просмотрел — сервер уже уничтожил файл в MinIO,
+  // у нас остаётся только плейсхолдер «Просмотрено» (media обнуляем).
+  markMessageViewed: (chatId, messageId) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [chatId]: (s.messages[chatId] ?? []).map((m) =>
+          m.id === messageId ? { ...m, viewedAt: new Date(), media: undefined } : m,
+        ),
       },
     })),
 
@@ -179,5 +311,8 @@ export const useChatStore = create<ChatState>((set) => ({
     typingUsers: {},
     replyingTo: null,
     editingMessage: null,
+    selectedMessageIds: [],
+    jumpRequest: null,
+    highlightMessageId: null,
   }),
 }));

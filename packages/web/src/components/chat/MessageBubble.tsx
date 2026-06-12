@@ -1,21 +1,30 @@
 /**
  * Пузырёк сообщения — текст, голос, фото, видео, кружок.
  */
-import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { AnimatePresence, motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { clsx } from 'clsx';
-import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight, FileText, Download } from 'lucide-react';
+import { Check, CheckCheck, Play, Lock, CornerUpRight, CornerUpLeft, CheckCircle2, FileText, Download, Timer, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import Avatar from '@/components/ui/Avatar';
 import ImageViewer from '@/components/media/ImageViewer';
 import MessageContextMenu from './MessageContextMenu';
+import EditHistoryPopover from './EditHistoryPopover';
+import VoiceMessage from './VoiceMessage';
+import PollBubble from '@/components/chat/PollBubble';
+import { LinkPreview } from '@/components/chat/LinkPreview';
 import { decryptMessage } from '@/lib/e2e';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { deleteMessage, editMessage as socketEditMessage, reactToMessage } from '@/lib/socket';
+import { api } from '@/lib/api';
+import { haptic } from '@/lib/native';
 import { formatReplyPreview } from '@/lib/messagePreview';
 import ForwardDialog from './ForwardDialog';
 import type { Message } from '@messenger/shared';
+
+// Первый http(s)-URL в тексте — для карточки OG-превью ссылки
+const URL_RE = /https?:\/\/[^\s<>"')]+/i;
 
 // Парсит текст и подсвечивает @username. Returns массив React-узлов.
 const MENTION_RE = /(@[a-zA-Z0-9_]{3,32})/g;
@@ -46,14 +55,54 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
   const [viewerType, setViewerType] = useState<'image' | 'video'>('image');
   const [menuPos,    setMenuPos]    = useState<{ x: number; y: number } | null>(null);
   const [forwarding, setForwarding] = useState(false);
+  const [showHistory, setShowHistory] = useState(false); // поповер истории правок
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // View-once: POST /view ровно один раз; для голосового — локальный снэпшот media,
+  // чтобы инлайн-плеер пережил обнуление message.media после 'message:viewed'
+  const viewedSentRef = useRef(false);
+  const [revealedVoiceMedia, setRevealedVoiceMedia] = useState<Message['media'] | null>(null);
 
   const setReplyingTo     = useChatStore((s) => s.setReplyingTo);
   const setEditingMessage = useChatStore((s) => s.setEditingMessage);
 
+  // Selection-mode + подсветка прыжка
+  const selectedIds            = useChatStore((s) => s.selectedMessageIds);
+  const toggleMessageSelection = useChatStore((s) => s.toggleMessageSelection);
+  const isHighlighted          = useChatStore((s) => s.highlightMessageId === message.id);
+  const selectionMode = selectedIds.length > 0;
+  const isSelected    = selectedIds.includes(message.id);
+
+  // Swipe-to-reply (touch-only): translateX с резистентностью dx/2, максимум 64px
+  const swipeStart  = useRef<{ x: number; y: number; touch: boolean } | null>(null);
+  const swipeActive = useRef(false);
+  const swipeFired  = useRef(false); // haptic один раз за жест
+  const swipeX = useMotionValue(0);
+  const replyIconOpacity = useTransform(swipeX, [12, 48], [0, 1]);
+
   const openViewer = (src: string, type: 'image' | 'video') => {
     setViewerSrc(src);
     setViewerType(type);
+  };
+
+  // Отметить одноразовое просмотренным (guard — один раз за маунт)
+  const sendViewOnce = () => {
+    if (viewedSentRef.current) return;
+    viewedSentRef.current = true;
+    api.post(`/messages/${message.id}/view`).catch(() => {});
+  };
+
+  // Тап по плейсхолдеру одноразового: фото/видео — вьюер, голосовое — инлайн-плеер.
+  // POST шлём сразу ПОСЛЕ открытия: браузер уже начал грузить файл, сервер дальше его удалит
+  const handleViewOnceOpen = () => {
+    const media = message.media;
+    if (!media) return;
+    if (message.type === 'voice') {
+      setRevealedVoiceMedia(media);
+    } else {
+      openViewer(media.url, message.type === 'video' ? 'video' : 'image');
+    }
+    sendViewOnce();
   };
 
   // Правый клик (desktop)
@@ -65,10 +114,64 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
   // Долгое нажатие (mobile)
   const handlePointerDown = (e: React.PointerEvent) => {
     const { clientX, clientY } = e;
+    swipeStart.current  = { x: clientX, y: clientY, touch: e.pointerType === 'touch' };
+    swipeActive.current = false;
+    swipeFired.current  = false;
     longPressRef.current = setTimeout(() => setMenuPos({ x: clientX, y: clientY }), 500);
   };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const start = swipeStart.current;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    // Движение >10px отменяет таймер контекст-меню
+    if ((Math.abs(dx) > 10 || Math.abs(dy) > 10) && longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+    if (!start.touch) return; // свайп-ответ — только touch
+    if (!swipeActive.current) {
+      // Активируем только при явном горизонтальном движении вправо
+      if (dx > 10 && Math.abs(dx) > Math.abs(dy)) {
+        swipeActive.current = true;
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      } else return;
+    }
+    const offset = Math.min(64, Math.max(0, dx / 2));
+    swipeX.set(offset);
+    if (offset >= 48 && !swipeFired.current) {
+      swipeFired.current = true;
+      haptic.light();
+    }
+  };
+
   const handlePointerUp = () => {
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
+    if (swipeActive.current) {
+      if (swipeX.get() >= 48) setReplyingTo(message);
+      animate(swipeX, 0, { type: 'spring', stiffness: 420, damping: 32 });
+    }
+    swipeStart.current  = null;
+    swipeActive.current = false;
+    swipeFired.current  = false;
+  };
+
+  // pointercancel (скролл перехватил жест) — просто spring назад, без reply
+  const handlePointerCancel = () => {
+    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
+    if (swipeActive.current) animate(swipeX, 0, { type: 'spring', stiffness: 420, damping: 32 });
+    swipeStart.current  = null;
+    swipeActive.current = false;
+    swipeFired.current  = false;
+  };
+
+  // Selection-mode: клик по пузырю = toggle, остальные клики (фото и т.д.) глушим
+  const handleClickCapture = (e: React.MouseEvent) => {
+    if (!selectionMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleMessageSelection(message.id);
   };
 
   const handleDelete  = () => deleteMessage(message.id, message.chatId);
@@ -82,10 +185,19 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
 
   // Кружок — только пузырёк без внутренних отступов
   const isCircle = message.type === 'circle';
+  // View-once: «истрачено» = просмотрено или медиа уже удалено сервером.
+  // Получателю медиа в пузыре не показываем (только плейсхолдер), отправителю — как обычно
+  const isViewOnce      = !!message.viewOnce;
+  const viewOnceSpent   = isViewOnce && (message.viewedAt != null || !message.media);
+  const showMediaInline = !!message.media && (!isViewOnce || isOwn);
   // Фото без текста — тоже убираем стандартные паддинги
-  const isPureImage = message.type === 'image' && !message.content;
+  const isPureImage = message.type === 'image' && !message.content && showMediaInline;
   // Видео без подписи — аналогично
-  const isPureVideo = message.type === 'video' && !message.content;
+  const isPureVideo = message.type === 'video' && !message.content && showMediaInline;
+  // Первая ссылка в незашифрованном тексте — рендерим OG-превью под текстом
+  const firstUrl = (message.type === 'text' && !message.encrypted && message.content)
+    ? message.content.match(URL_RE)?.[0] ?? null
+    : null;
 
   // Системные сообщения — отдельный layout, без аватара/контекст-меню
   if (message.type === 'system') {
@@ -112,13 +224,39 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
           )}
         </div>
 
-        <div
-          className={clsx('flex flex-col max-w-[85%] lg:max-w-[70%]', isOwn ? 'items-end' : 'items-start')}
+        <motion.div
+          className={clsx(
+            'relative flex flex-col max-w-[85%] lg:max-w-[70%]',
+            isOwn ? 'items-end' : 'items-start',
+            // Для кружка (без пузырька) ring/подсветка вешаются на контейнер
+            isCircle && isSelected    && 'ring-2 ring-primary-500/70 rounded-3xl',
+            isCircle && isHighlighted && 'ring-2 ring-primary-400/60 bg-primary-500/10 rounded-3xl transition-all duration-500',
+          )}
+          style={{ x: swipeX, touchAction: 'pan-y' }}
           onContextMenu={handleContextMenu}
           onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onClickCapture={handleClickCapture}
         >
+          {/* Иконка свайп-ответа — проявляется по прогрессу свайпа */}
+          <motion.div
+            style={{ opacity: replyIconOpacity }}
+            className="absolute -left-9 top-1/2 -translate-y-1/2 pointer-events-none"
+          >
+            <div className="w-7 h-7 rounded-full bg-dark-surface/90 border border-dark-border flex items-center justify-center">
+              <CornerUpLeft size={16} className="text-white/70" />
+            </div>
+          </motion.div>
+
+          {/* Чек-кружок выбранного сообщения */}
+          {isSelected && (
+            <div className="absolute -left-7 top-1/2 -translate-y-1/2 pointer-events-none">
+              <CheckCircle2 size={18} className="text-primary-400" />
+            </div>
+          )}
+
           {/* Имя отправителя (группы) */}
           {showAvatar && !isOwn && (
             <span className="text-xs text-primary-400 font-medium mb-1 ml-3">
@@ -159,10 +297,27 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
               isOwn ? 'bubble-out' : 'bubble-in',
               (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3.5 py-2',
               'min-w-[88px]',
+              isSelected    && 'ring-2 ring-primary-500/70',
+              isHighlighted && 'ring-2 ring-primary-400/60 bg-primary-500/10 transition-all duration-500',
             )}>
 
+              {/* View-once: получателю до просмотра — интерактивный плейсхолдер */}
+              {isViewOnce && !isOwn && !viewOnceSpent && !revealedVoiceMedia && message.media && (
+                <ViewOnceTeaser type={message.type} onOpen={handleViewOnceOpen} />
+              )}
+
+              {/* View-once голосовое после тапа — играем из локального снэпшота media */}
+              {revealedVoiceMedia && (
+                <VoiceMessage media={revealedVoiceMedia} isOwn={isOwn} />
+              )}
+
+              {/* View-once истрачено — «сгоревший» плейсхолдер */}
+              {viewOnceSpent && !revealedVoiceMedia && (
+                <p className="text-[13px] text-white/45 py-0.5">🔥 Просмотрено</p>
+              )}
+
               {/* Фото */}
-              {message.type === 'image' && message.media && (
+              {message.type === 'image' && message.media && (!isViewOnce || isOwn) && (
                 <button
                   className="block focus:outline-none"
                   onClick={() => openViewer(message.media!.url, 'image')}
@@ -184,7 +339,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
               )}
 
               {/* Видео */}
-              {message.type === 'video' && message.media && (
+              {message.type === 'video' && message.media && (!isViewOnce || isOwn) && (
                 <VideoMessage
                   media={message.media}
                   isPure={isPureVideo}
@@ -204,14 +359,35 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
               {message.type === 'text' && (
                 message.encrypted
                   ? <EncryptedText message={message} chatId={chatId} />
-                  : <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                      {renderRichText(message.content ?? '')}
-                      {message.editedAt && <span className="text-white/40 text-xs ml-1">(изм.)</span>}
-                    </p>
+                  : <>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {renderRichText(message.content ?? '')}
+                        {message.editedAt && (
+                          message.editHistory?.length
+                            // Есть история правок — пометка кликабельна, открывает поповер версий
+                            ? (
+                              <span
+                                className="text-white/40 text-xs ml-1 cursor-pointer hover:underline"
+                                onClick={(e) => { e.stopPropagation(); setShowHistory(true); }}
+                              >
+                                (изм.)
+                              </span>
+                            )
+                            : <span className="text-white/40 text-xs ml-1">(изм.)</span>
+                        )}
+                      </p>
+                      {/* OG-превью первой ссылки */}
+                      {firstUrl && <LinkPreview url={firstUrl} isOwn={isOwn} />}
+                    </>
+              )}
+
+              {/* Опрос — контент целиком рендерит PollBubble (вопрос + опции + голоса) */}
+              {message.type === 'poll' && (
+                <PollBubble message={message} isOwn={isOwn} chatId={chatId} />
               )}
 
               {/* Голосовое */}
-              {message.type === 'voice' && message.media && (
+              {message.type === 'voice' && message.media && (!isViewOnce || isOwn) && (
                 <VoiceMessage media={message.media} isOwn={isOwn} />
               )}
 
@@ -227,6 +403,17 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
               )}>
                 {message.encrypted && (
                   <Lock size={9} className={isPureImage ? 'text-white/70' : 'text-primary-400/80'} />
+                )}
+                {message.expiresAt && (
+                  <span title="Исчезающее сообщение" className="flex items-center">
+                    <Timer size={10} className={(isPureImage || isPureVideo) ? 'text-white/80' : 'text-white/50'} />
+                  </span>
+                )}
+                {/* View-once у отправителя: бейдж «1×», после просмотра — «Просмотрено» */}
+                {isViewOnce && isOwn && (
+                  viewOnceSpent
+                    ? <span className="text-[10px] leading-none text-white/60">Просмотрено</span>
+                    : <span className="text-[10px] leading-none px-1 rounded bg-white/15 text-white/80">1×</span>
                 )}
                 <span className={clsx('text-[11px] leading-none', (isPureImage || isPureVideo) ? 'text-white/80' : 'text-white/50')}>
                   {time}
@@ -248,7 +435,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
               isOwn={isOwn}
             />
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* Контекстное меню */}
@@ -271,8 +458,18 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
 
       {/* Форвард-диалог */}
       {forwarding && (
-        <ForwardDialog message={message} onClose={() => setForwarding(false)} />
+        <ForwardDialog messages={[message]} onClose={() => setForwarding(false)} />
       )}
+
+      {/* Поповер истории правок */}
+      <AnimatePresence>
+        {showHistory && message.editHistory && (
+          <EditHistoryPopover
+            history={message.editHistory}
+            onClose={() => setShowHistory(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Просмотрщик фото/видео */}
       <AnimatePresence>
@@ -288,82 +485,28 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
   );
 }
 
-// ─── Голосовое сообщение ──────────────────────────────────────────────────────
+// ─── View-once плейсхолдер (получатель, до просмотра) ─────────────────────────
 
-function VoiceMessage({
-  media, isOwn,
+function ViewOnceTeaser({
+  type, onOpen,
 }: {
-  media: NonNullable<Message['media']>;
-  isOwn: boolean;
+  type: Message['type'];
+  onOpen: () => void;
 }) {
-  const audioRef  = useRef<HTMLAudioElement>(null);
-  const [playing,  setPlaying]  = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1
-
-  const toggle = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (playing) { a.pause(); setPlaying(false); }
-    else         { a.play().catch(() => {}); setPlaying(true); }
-  }, [playing]);
-
-  const handleTimeUpdate = () => {
-    const a = audioRef.current;
-    if (a && a.duration) setProgress(a.currentTime / a.duration);
-  };
-
-  const handleEnded = () => { setPlaying(false); setProgress(0); };
-
-  const totalBars = 40;
-  const bars = media.waveform
-    ?? Array.from({ length: totalBars }, (_, i) => 0.3 + 0.5 * Math.sin(i * 0.4));
-  const filledCount = Math.round(progress * bars.length);
-
+  const label = type === 'image' ? 'Фото 1×' : type === 'video' ? 'Видео 1×' : 'Голосовое 1×';
   return (
-    <div className="flex items-center gap-3 py-1 min-w-[200px] pr-2">
-      <audio
-        ref={audioRef}
-        src={media.url}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={handleEnded}
-        preload="metadata"
-      />
-
-      {/* Кнопка play/pause */}
-      <button
-        onClick={toggle}
-        className={clsx(
-          'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-          isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-primary-600 hover:bg-primary-500',
-        )}
-      >
-        {playing
-          ? <Pause size={15} fill="currentColor" className="text-white" />
-          : <Play  size={15} fill="currentColor" className="text-white ml-0.5" />
-        }
-      </button>
-
-      {/* Waveform с прогрессом */}
-      <div className="flex items-center gap-[2px] flex-1 h-9">
-        {bars.map((h: number, i: number) => (
-          <div
-            key={i}
-            className={clsx(
-              'flex-1 rounded-full transition-colors duration-75',
-              i < filledCount
-                ? (isOwn ? 'bg-white' : 'bg-primary-400')
-                : (isOwn ? 'bg-white/35' : 'bg-white/25'),
-            )}
-            style={{ height: `${Math.max(3, h * 28)}px` }}
-          />
-        ))}
+    <button
+      onClick={onOpen}
+      className="flex items-center gap-3 py-1.5 pr-2 text-left focus:outline-none"
+    >
+      <div className="w-11 h-11 rounded-full border border-white/20 flex items-center justify-center flex-shrink-0">
+        <Eye size={20} className="text-white/80" />
       </div>
-
-      {/* Длительность */}
-      <span className="text-xs text-white/50 flex-shrink-0 tabular-nums">
-        {formatDuration(media.duration ?? 0)}
-      </span>
-    </div>
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-medium text-white/95">{label}</span>
+        <span className="text-xs text-white/50">Нажмите для просмотра</span>
+      </div>
+    </button>
   );
 }
 

@@ -17,6 +17,7 @@ import { initNativePush } from './lib/push-native';
 import { getSmsProvider } from './services/sms';
 import { initTelegramBot, stopTelegramBot } from './services/telegram/bootstrap';
 import { createSocketServer } from './socket/socket.server';
+import { initSweepers } from './services/sweepers';
 import apiRoutes from './routes/index';
 import { errorHandler, notFound } from './middleware/error.middleware';
 
@@ -108,6 +109,9 @@ async function bootstrap(): Promise<void> {
 
   // Make io available in routes if needed
   app.set('io', io);
+
+  // Фоновые свиперы: TTL-удаление сообщений + отправка отложенных
+  initSweepers(io);
 
   // ─── Start ─────────────────────────────────────────────────────────────────
   httpServer.listen(config.server.port, () => {

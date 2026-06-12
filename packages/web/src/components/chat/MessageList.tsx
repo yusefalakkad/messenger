@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { Virtuoso, type VirtuosoHandle, type Components } from 'react-virtuoso';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { api } from '@/lib/api';
 import { markRead } from '@/lib/socket';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
@@ -13,12 +15,52 @@ interface Props {
   messages: Message[];
 }
 
+// Плоский элемент виртуализированного списка: разделитель даты или сообщение
+type ListItem =
+  | { kind: 'date'; label: string }
+  | { kind: 'msg'; msg: Message; isOwn: boolean; showAvatar: boolean };
+
+interface ListContext {
+  isTyping: boolean;
+  chatId: string;
+}
+
+// «Дно» с запасом — браузер клампит до реального scrollHeight
+const BOTTOM = 1_000_000_000;
+
+// Header/Footer заменяют py-4 контейнера (px-4 перенесён в обёртки элементов,
+// чтобы скроллбар оставался у края)
+function ListHeader() {
+  return <div className="h-4" />;
+}
+
+function ListFooter({ context }: { context?: ListContext }) {
+  return (
+    <div className="px-4 pb-4">
+      {context?.isTyping && <TypingIndicator chatId={context.chatId} />}
+    </div>
+  );
+}
+
+const listComponents: Components<ListItem, ListContext> = {
+  Header: ListHeader,
+  Footer: ListFooter,
+};
+
 export default function MessageList({ chatId, messages }: Props) {
-  const user       = useAuthStore((s) => s.user);
+  const user        = useAuthStore((s) => s.user);
   const typingUsers = useChatStore((s) => s.typingUsers[chatId]);
-  const bottomRef  = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isTyping   = typingUsers && typingUsers.size > 0;
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const isTyping    = !!(typingUsers && typingUsers.size > 0);
+
+  // ── Jump-to-message ──────────────────────────────────────────────────────────
+  const jumpRequest         = useChatStore((s) => s.jumpRequest);
+  const consumeJump         = useChatStore((s) => s.consumeJump);
+  const setHighlightMessage = useChatStore((s) => s.setHighlightMessage);
+  const mergeMessages       = useChatStore((s) => s.mergeMessages);
+  const highlightTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // seq уже запрошенного /around — чтобы не дёргать API повторно, пока ждём merge
+  const aroundSeqRef        = useRef<number | null>(null);
 
   // Показывать ли кнопку «вниз»
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -26,54 +68,119 @@ export default function MessageList({ chatId, messages }: Props) {
   // P2-18: до первой загрузки сообщений считаем юзера «на дне» — иначе фантомный
   // unread-badge инкрементится на первом messages.length:0→N.
   const initialLoadedRef = useRef(false);
+  const atBottomRef      = useRef(true);
+  const prevCountRef     = useRef(0);
+  // Свежие messages для followOutput-колбэка без пересоздания
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
-  // ── Scroll to bottom on new message (если пользователь внизу) ───────────────
+  // ── Плоский список: разделители дат + сообщения ─────────────────────────────
+  const items = useMemo<ListItem[]>(() => {
+    const out: ListItem[] = [];
+    let prevDate: string | null = null;
+    let prevSenderId: string | null = null;
+    for (const msg of messages) {
+      if (msg.deletedAt) continue;
+      const label = new Date(msg.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+      if (label !== prevDate) {
+        out.push({ kind: 'date', label });
+        prevDate = label;
+        prevSenderId = null; // новая дата — группировка отправителя начинается заново
+      }
+      const isOwn = msg.senderId === user?.id;
+      out.push({ kind: 'msg', msg, isOwn, showAvatar: !isOwn && prevSenderId !== msg.senderId });
+      prevSenderId = msg.senderId;
+    }
+    return out;
+  }, [messages, user?.id]);
+
+  // ── Прыжок к сообщению по jumpRequest из store ───────────────────────────────
+  // Индекс ищем в items (плоский список с date-разделителями) — именно его
+  // индексами оперирует Virtuoso. Если сообщения нет в загруженных — догружаем
+  // окрестность через /messages/around; mergeMessages обновит items и эффект
+  // перезапустится сам.
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const lastMsg = messages[messages.length - 1];
-    const isOwnLast = lastMsg && lastMsg.senderId === user?.id;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    // P2-18: первая партия сообщений после открытия чата — всегда «прокрутить
-    // к низу», без unread-badge.
-    if (!initialLoadedRef.current && messages.length > 0) {
-      initialLoadedRef.current = true;
-      bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+    if (!jumpRequest || jumpRequest.chatId !== chatId) return;
+    const { messageId, seq } = jumpRequest;
+    const index = items.findIndex((it) => it.kind === 'msg' && it.msg.id === messageId);
+    if (index >= 0) {
+      virtuosoRef.current?.scrollToIndex({ index, align: 'center', behavior: 'smooth' });
+      setHighlightMessage(messageId);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = setTimeout(() => setHighlightMessage(null), 2000);
+      consumeJump();
       return;
     }
-    // P2-10: собственные сообщения ВСЕГДА скроллим вниз. Если юзер их отправил
-    // прокрученный вверх по истории — он ждёт увидеть свой текст, а не бейдж.
-    if (isOwnLast || distanceFromBottom < 120) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      setUnreadBelow((n) => n + 1);
-    }
-  }, [messages.length, user?.id, messages]);
+    if (aroundSeqRef.current === seq) return; // уже запросили /around — ждём merge
+    aroundSeqRef.current = seq;
+    api
+      .get(`/chats/${chatId}/messages/around`, { params: { messageId } })
+      .then(({ data }) => {
+        const around: Message[] = data.data ?? [];
+        mergeMessages(chatId, around);
+        // Target удалён/не пришёл — items его не покажут, гасим запрос
+        if (!around.some((m) => m.id === messageId && !m.deletedAt)) consumeJump();
+      })
+      .catch(() => consumeJump());
+  }, [jumpRequest, items, chatId, consumeJump, setHighlightMessage, mergeMessages]);
 
-  useEffect(() => {
-    if (isTyping) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [isTyping]);
+  // Очистка таймера подсветки при размонтировании
+  useEffect(() => () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, []);
 
-  // Начальная прокрутка вниз при открытии чата. Сбрасываем initialLoaded flag,
-  // чтобы следующий батч сообщений снова считался «первым» и не показал unread-badge.
+  // Сброс состояния при смене чата (Virtuoso ремаунтится через key={chatId})
   useEffect(() => {
     initialLoadedRef.current = false;
-    bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+    prevCountRef.current = 0;
+    atBottomRef.current = true;
     setShowScrollBtn(false);
     setUnreadBelow(0);
   }, [chatId]);
 
-  // Отслеживаем позицию скролла
-  const handleScroll = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollBtn(distanceFromBottom > 120);
-    if (distanceFromBottom < 120) setUnreadBelow(0);
+  // ── Авто-скролл Virtuoso при появлении новых элементов ───────────────────────
+  // P2-10: собственные сообщения ВСЕГДА скроллим вниз. Если юзер их отправил
+  // прокрученный вверх по истории — он ждёт увидеть свой текст, а не бейдж.
+  const followOutput = useCallback((isAtBottom: boolean): 'smooth' | 'auto' | false => {
+    // P2-18: первая партия после открытия чата — мгновенно к низу
+    if (!initialLoadedRef.current) return 'auto';
+    const msgs = messagesRef.current;
+    const last = msgs[msgs.length - 1];
+    const isOwnLast = !!last && last.senderId === user?.id;
+    return isOwnLast || isAtBottom ? 'smooth' : false;
+  }, [user?.id]);
+
+  // Счётчик непрочитанных под кнопкой «вниз»: чужие сообщения, прилетевшие
+  // пока юзер прокручен вверх (скролл для своих/при-низу делает followOutput)
+  useEffect(() => {
+    const prevCount = prevCountRef.current;
+    prevCountRef.current = messages.length;
+    if (!initialLoadedRef.current) {
+      if (messages.length > 0) {
+        initialLoadedRef.current = true;
+        virtuosoRef.current?.scrollToIndex({ index: 'LAST', align: 'end', behavior: 'auto' });
+      }
+      return;
+    }
+    if (messages.length <= prevCount) return;
+    const last = messages[messages.length - 1];
+    const isOwnLast = !!last && last.senderId === user?.id;
+    if (!isOwnLast && !atBottomRef.current) setUnreadBelow((n) => n + 1);
+  }, [messages.length, user?.id, messages]);
+
+  useEffect(() => {
+    if (isTyping) virtuosoRef.current?.scrollTo({ top: BOTTOM, behavior: 'smooth' });
+  }, [isTyping]);
+
+  // Отслеживаем позицию скролла (порог 120px — как раньше)
+  const handleAtBottomChange = useCallback((atBottom: boolean) => {
+    atBottomRef.current = atBottom;
+    setShowScrollBtn(!atBottom);
+    if (atBottom) setUnreadBelow(0);
   }, []);
 
   const scrollToBottom = () => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    virtuosoRef.current?.scrollTo({ top: BOTTOM, behavior: 'smooth' });
     setUnreadBelow(0);
   };
 
@@ -97,57 +204,64 @@ export default function MessageList({ chatId, messages }: Props) {
     }
   }, [lastMsg?.id, chatId, user?.id]);
 
-  const groups = groupByDate(messages.filter((m) => !m.deletedAt));
+  // ── Рендер элемента ──────────────────────────────────────────────────────────
+  // Без AnimatePresence-exit: виртуализация размонтирует элементы при скролле,
+  // exit-анимации с ней не дружат. px-4 — на обёртке, py вместо my, чтобы
+  // Virtuoso корректно мерил высоту (внешние margin схлопываются).
+  const renderItem = useCallback((_index: number, item: ListItem) => {
+    if (item.kind === 'date') {
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="flex items-center gap-3 py-4 px-4"
+        >
+          <div className="flex-1 divider-grad" />
+          <span className="text-[11px] text-white/40 uppercase tracking-wider font-medium px-2">{item.label}</span>
+          <div className="flex-1 divider-grad" />
+        </motion.div>
+      );
+    }
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+        className="px-4 flow-root"
+      >
+        <MessageBubble
+          message={item.msg}
+          isOwn={item.isOwn}
+          showAvatar={item.showAvatar}
+          chatId={chatId}
+        />
+      </motion.div>
+    );
+  }, [chatId]);
+
+  const computeItemKey = useCallback(
+    (_index: number, item: ListItem) => (item.kind === 'msg' ? item.msg.id : `date-${item.label}`),
+    [],
+  );
 
   return (
     <div className="flex-1 relative overflow-hidden">
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="h-full overflow-y-auto px-4 py-4 space-y-1"
-      >
-        {groups.map(({ date, msgs }) => (
-          <div key={date}>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.4 }}
-              className="flex items-center gap-3 my-4"
-            >
-              <div className="flex-1 divider-grad" />
-              <span className="text-[11px] text-white/40 uppercase tracking-wider font-medium px-2">{date}</span>
-              <div className="flex-1 divider-grad" />
-            </motion.div>
-
-            <AnimatePresence initial={false}>
-              {msgs.map((msg, i) => {
-                const isOwn = msg.senderId === user?.id;
-                const prevMsg = msgs[i - 1];
-                const isFirstInGroup = !prevMsg || prevMsg.senderId !== msg.senderId;
-
-                return (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 16, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
-                  >
-                    <MessageBubble
-                      message={msg}
-                      isOwn={isOwn}
-                      showAvatar={!isOwn && isFirstInGroup}
-                      chatId={chatId}
-                    />
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        ))}
-
-        {isTyping && <TypingIndicator chatId={chatId} />}
-        <div ref={bottomRef} />
-      </div>
+      <Virtuoso<ListItem, ListContext>
+        key={chatId}
+        ref={virtuosoRef}
+        className="h-full"
+        data={items}
+        context={{ isTyping, chatId }}
+        components={listComponents}
+        itemContent={renderItem}
+        computeItemKey={computeItemKey}
+        followOutput={followOutput}
+        atBottomStateChange={handleAtBottomChange}
+        atBottomThreshold={120}
+        increaseViewportBy={{ top: 400, bottom: 200 }}
+        initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
+      />
 
       {/* ── Кнопка «прокрутить вниз» ── */}
       <AnimatePresence>
@@ -175,15 +289,4 @@ export default function MessageList({ chatId, messages }: Props) {
       </AnimatePresence>
     </div>
   );
-}
-
-function groupByDate(messages: Message[]): { date: string; msgs: Message[] }[] {
-  const map = new Map<string, Message[]>();
-  for (const msg of messages) {
-    const d = new Date(msg.createdAt);
-    const key = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(msg);
-  }
-  return Array.from(map.entries()).map(([date, msgs]) => ({ date, msgs }));
 }

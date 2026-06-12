@@ -4,9 +4,10 @@ import { AnimatePresence } from 'framer-motion';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { clsx } from 'clsx';
-import { Pin, BellOff } from 'lucide-react';
+import { Pin, BellOff, Bookmark, Megaphone } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/auth.store';
+import { useChatStore } from '@/stores/chat.store';
 import { formatMessagePreview } from '@/lib/messagePreview';
 import type { Chat } from '@messenger/shared';
 import ChatItemContextMenu from './ChatItemContextMenu';
@@ -21,6 +22,8 @@ const LONG_PRESS_MS = 450;
 
 export default function ChatListItem({ chat, active, onClick }: Props) {
   const user = useAuthStore((s) => s.user);
+  // Кто-то печатает в этом чате — показываем вместо превью.
+  const typing = useChatStore((s) => (s.typingUsers[chat.id]?.size ?? 0) > 0);
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -30,8 +33,12 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
     ? chat.members.find((m) => m.userId !== user?.id)
     : null;
 
-  const name = chat.type === 'group' ? chat.name : otherMember?.user.displayName ?? 'Unknown';
-  const avatar = chat.type === 'group' ? chat.avatar : otherMember?.user.avatar;
+  const isSaved = chat.type === 'saved';
+  const isChannel = chat.type === 'channel';
+  const name = isSaved
+    ? 'Избранное'
+    : chat.type === 'group' || isChannel ? chat.name : otherMember?.user.displayName ?? 'Unknown';
+  const avatar = chat.type === 'group' || isChannel ? chat.avatar : otherMember?.user.avatar;
   const isOnline = otherMember?.user.status === 'online';
 
   // P1-16: draft scoped per-user; согласовано с MessageInput.tsx.
@@ -111,15 +118,22 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         {active && (
           <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient animate-pulse-glow" />
         )}
-        <Avatar
-          src={avatar}
-          name={name ?? '?'}
-          size="md"
-          online={chat.type === 'direct' ? isOnline : undefined}
-        />
+        {isSaved ? (
+          <span className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
+            <Bookmark size={18} className="text-white" />
+          </span>
+        ) : (
+          <Avatar
+            src={avatar}
+            name={name ?? '?'}
+            size="md"
+            online={chat.type === 'direct' ? isOnline : undefined}
+          />
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-[15px] leading-5 truncate text-white/95 flex items-center gap-1.5">
+              {isChannel && <Megaphone size={13} className="text-white/45 flex-shrink-0" />}
               {name}
             </span>
             <span className="text-white/40 text-[12px] leading-4 flex-shrink-0 font-medium flex items-center gap-1">
@@ -128,15 +142,26 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 mt-1">
-            <span className="text-[13px] leading-[18px] truncate flex items-center gap-1">
-              {draft && <span className="text-red-400/90 font-medium">Черновик:</span>}
-              <span className={clsx('truncate', draft ? 'text-white/60' : 'text-white/55')}>
-                {previewText}
+            {typing ? (
+              <span className="text-[13px] leading-[18px] truncate text-primary-300 italic animate-pulse">
+                печатает…
               </span>
-            </span>
+            ) : (
+              <span className="text-[13px] leading-[18px] truncate flex items-center gap-1">
+                {draft && <span className="text-red-400/90 font-medium">Черновик:</span>}
+                <span className={clsx('truncate', draft ? 'text-white/60' : 'text-white/55')}>
+                  {previewText}
+                </span>
+              </span>
+            )}
             <span className="flex items-center gap-1.5 flex-shrink-0">
               {isPinned && (chat.unreadCount ?? 0) === 0 && (
                 <Pin size={12} className="text-accent-violet rotate-45" strokeWidth={2.5} />
+              )}
+              {(chat.unreadMentions ?? 0) > 0 && (
+                <span className="w-5 h-5 rounded-full bg-brand-gradient text-white text-[11px] font-bold flex items-center justify-center">
+                  @
+                </span>
               )}
               {(chat.unreadCount ?? 0) > 0 && (
                 <span className={clsx(

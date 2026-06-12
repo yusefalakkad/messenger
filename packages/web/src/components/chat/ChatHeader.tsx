@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, ChevronLeft, Users } from 'lucide-react';
+import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, ChevronLeft, Users, Timer, Hourglass, Palette } from 'lucide-react';
+import { clsx } from 'clsx';
 import { AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
 import IconBtn from '@/components/ui/IconBtn';
@@ -8,8 +9,9 @@ import Dropdown, { DropdownItem } from '@/components/ui/Dropdown';
 import Dialog, { DialogButton } from '@/components/ui/Dialog';
 import ProfilePanel from './ProfilePanel';
 import ChatSearch from './ChatSearch';
+import WallpaperPicker from './WallpaperPicker';
 import { isChatE2E } from '@/lib/e2e';
-import { initiateCall } from '@/lib/socket';
+import { initiateCall, setChatTtl, setSlowMode } from '@/lib/socket';
 import { useCallStore } from '@/stores/call.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
@@ -22,12 +24,35 @@ interface Props {
   otherMember?: ChatMember;
 }
 
+// Пресеты автоудаления сообщений (null = выключено)
+const TTL_OPTIONS: { label: string; seconds: number | null }[] = [
+  { label: 'Выключено', seconds: null },
+  { label: '1 час',     seconds: 3600 },
+  { label: '24 часа',   seconds: 86400 },
+  { label: '7 дней',    seconds: 604800 },
+  { label: '90 дней',   seconds: 7776000 },
+];
+
+// Пресеты медленного режима (null = выключен)
+const SLOW_MODE_OPTIONS: { label: string; seconds: number | null }[] = [
+  { label: 'Выключен', seconds: null },
+  { label: '10 секунд', seconds: 10 },
+  { label: '30 секунд', seconds: 30 },
+  { label: '1 минута',  seconds: 60 },
+  { label: '5 минут',   seconds: 300 },
+  { label: '15 минут',  seconds: 900 },
+  { label: '1 час',     seconds: 3600 },
+];
+
 export default function ChatHeader({ chat, otherMember }: Props) {
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
   const [showMenu,    setShowMenu]    = useState(false);
   const [showSearch,  setShowSearch]  = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showTtl,      setShowTtl]      = useState(false);
+  const [showSlowMode, setShowSlowMode] = useState(false);
+  const [showWallpaper, setShowWallpaper] = useState(false);
   const myUserId  = useAuthStore((s) => s.user?.id);
   const setOutgoing = useCallStore((s) => s.setOutgoing);
   const setGroupCall = useCallStore((s) => s.setGroupCall);
@@ -35,13 +60,21 @@ export default function ChatHeader({ chat, otherMember }: Props) {
   const clearMessages = useChatStore((s) => s.clearMessages);
   const [startingGroupCall, setStartingGroupCall] = useState(false);
 
-  const name     = chat.type === 'group' ? chat.name : otherMember?.user.displayName;
-  const avatar   = chat.type === 'group' ? chat.avatar : otherMember?.user.avatar;
+  const isChannel = chat.type === 'channel';
+  // Моя роль в чате — медленный режим настраивают только owner/admin групп и каналов
+  const myRole = chat.members.find((m) => m.userId === myUserId)?.role;
+  const canSetSlowMode =
+    (chat.type === 'group' || chat.type === 'channel') &&
+    (myRole === 'owner' || myRole === 'admin');
+  const name     = chat.type === 'direct' ? otherMember?.user.displayName : chat.name;
+  const avatar   = chat.type === 'direct' ? otherMember?.user.avatar : chat.avatar;
   const isOnline = otherMember?.user.status === 'online';
   const e2e      = isChatE2E(chat);
   const subtitle = chat.type === 'group'
     ? `${chat.members.length} участников`
-    : isOnline ? 'в сети' : 'не в сети';
+    : isChannel
+      ? `${chat.members.length} ${pluralRu(chat.members.length, 'подписчик', 'подписчика', 'подписчиков')}`
+      : isOnline ? 'в сети' : 'не в сети';
 
   const peerId = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== myUserId)?.userId
@@ -129,8 +162,13 @@ export default function ChatHeader({ chat, otherMember }: Props) {
               <h4 className="truncate">{name}</h4>
               {e2e && <ShieldCheck size={13} className="text-primary-300 flex-shrink-0" />}
             </div>
-            <p className={`text-[12px] leading-4 truncate mt-0.5 font-medium ${isOnline ? 'text-green-400' : 'text-white/45'}`}>
-              {subtitle}
+            <p className={`flex items-center gap-1 text-[12px] leading-4 truncate mt-0.5 font-medium ${isOnline ? 'text-green-400' : 'text-white/45'}`}>
+              {chat.messageTtlSeconds != null && (
+                <span title="Автоудаление включено" className="flex-shrink-0 inline-flex">
+                  <Timer size={11} className="text-white/45" />
+                </span>
+              )}
+              <span className="truncate">{subtitle}</span>
             </p>
           </div>
         </button>
@@ -166,6 +204,20 @@ export default function ChatHeader({ chat, otherMember }: Props) {
             </IconBtn>
             <Dropdown open={showMenu} onClose={() => setShowMenu(false)}>
               <DropdownItem
+                icon={<Timer size={16} />} label="Автоудаление"
+                onClick={() => { setShowMenu(false); setShowTtl(true); }}
+              />
+              {canSetSlowMode && (
+                <DropdownItem
+                  icon={<Hourglass size={16} />} label="Медленный режим"
+                  onClick={() => { setShowMenu(false); setShowSlowMode(true); }}
+                />
+              )}
+              <DropdownItem
+                icon={<Palette size={16} />} label="Обои чата"
+                onClick={() => { setShowMenu(false); setShowWallpaper(true); }}
+              />
+              <DropdownItem
                 icon={<Trash2 size={16} />} label="Очистить чат" danger
                 onClick={() => { setShowMenu(false); setConfirmClear(true); }}
               />
@@ -187,6 +239,68 @@ export default function ChatHeader({ chat, otherMember }: Props) {
         }
       />
 
+      <Dialog
+        open={showTtl}
+        onClose={() => setShowTtl(false)}
+        title="Автоудаление"
+        description="Новые сообщения будут удаляться автоматически по истечении срока."
+      >
+        <div className="flex flex-col gap-0.5 pb-3">
+          {TTL_OPTIONS.map((opt) => {
+            const active = (chat.messageTtlSeconds ?? null) === opt.seconds;
+            return (
+              <button
+                key={opt.label}
+                className={clsx(
+                  'menu-item',
+                  active && 'text-primary-300 bg-primary-500/15 hover:bg-primary-500/20',
+                )}
+                onClick={() => { setChatTtl(chat.id, opt.seconds); setShowTtl(false); }}
+              >
+                <Timer size={16} className={active ? 'text-primary-300' : 'text-white/45'} />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={showSlowMode}
+        onClose={() => setShowSlowMode(false)}
+        title="Медленный режим"
+        description="Участники смогут отправлять сообщения не чаще выбранного интервала. Админы не ограничены."
+      >
+        <div className="flex flex-col gap-0.5 pb-3">
+          {SLOW_MODE_OPTIONS.map((opt) => {
+            const active = (chat.slowModeSeconds ?? null) === opt.seconds;
+            return (
+              <button
+                key={opt.label}
+                className={clsx(
+                  'menu-item',
+                  active && 'text-primary-300 bg-primary-500/15 hover:bg-primary-500/20',
+                )}
+                onClick={() => { setSlowMode(chat.id, opt.seconds); setShowSlowMode(false); }}
+              >
+                <Hourglass size={16} className={active ? 'text-primary-300' : 'text-white/45'} />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </Dialog>
+
+      <AnimatePresence>
+        {showWallpaper && (
+          <WallpaperPicker
+            chatId={chat.id}
+            current={chat.wallpaper}
+            onClose={() => setShowWallpaper(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showSearch && (
           <ChatSearch chatId={chat.id} onClose={() => setShowSearch(false)} />
@@ -204,4 +318,15 @@ export default function ChatHeader({ chat, otherMember }: Props) {
       </AnimatePresence>
     </>
   );
+}
+
+// Русская плюрализация: 1 подписчик, 2 подписчика, 5 подписчиков.
+// 11..14 — всегда родительный мн. (одиннадцать подписчиков).
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
 }

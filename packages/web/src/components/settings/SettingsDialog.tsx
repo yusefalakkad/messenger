@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, ShieldOff, Loader2, Copy, Check } from 'lucide-react';
+import { X, ShieldCheck, ShieldOff, Loader2, Copy, Check, KeyRound, QrCode as QrCodeIcon } from 'lucide-react';
 import QRCode from 'qrcode';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth.store';
 import { copySensitive } from '@/lib/sensitiveClipboard';
 import IconBtn from '@/components/ui/IconBtn';
+import QRCodeModal from '@/components/ui/QRCodeModal';
+import SettingsPrivacy from '@/components/settings/SettingsPrivacy';
+import SettingsSessions from '@/components/settings/SettingsSessions';
+import SettingsBlocked from '@/components/settings/SettingsBlocked';
+import SettingsDanger from '@/components/settings/SettingsDanger';
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -12,6 +18,7 @@ type Status = { enabled: boolean; remainingRecoveryCodes: number } | null;
 
 export default function SettingsDialog({ open, onClose }: Props) {
   const [status, setStatus] = useState<Status>(null);
+  const userId = useAuthStore((s) => s.user?.id);
 
   useEffect(() => {
     if (!open) return;
@@ -39,12 +46,123 @@ export default function SettingsDialog({ open, onClose }: Props) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Профиль</div>
+              <ProfileSection open={open} />
+              <div className="h-px bg-dark-border/60" aria-hidden />
+              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Безопасность</div>
               <TwoFactorSection status={status} onChange={setStatus} />
+              <div className="h-px bg-dark-border/60" aria-hidden />
+              <CloudPasswordSection />
+              <div className="h-px bg-dark-border/60" aria-hidden />
+              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Конфиденциальность</div>
+              <SettingsPrivacy />
+              <div className="h-px bg-dark-border/60" aria-hidden />
+              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Активные сессии</div>
+              <SettingsSessions />
+              <div className="h-px bg-dark-border/60" aria-hidden />
+              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Чёрный список</div>
+              <SettingsBlocked />
+              <div className="h-px bg-dark-border/60" aria-hidden />
+              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Опасная зона</div>
+              {/* passwordSet — локальный cloudpwd-флаг (тот же паттерн, что в CloudPasswordSection) */}
+              <SettingsDanger passwordSet={getCloudPwdFlag(userId)} />
             </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// ─── Профиль: bio + мой QR-код ───────────────────────────────────────────────
+// В auth.store bio не хранится — подтягиваем актуальное значение с бэка
+// при каждом открытии настроек (GET /users/:id отдаёт bio).
+
+function ProfileSection({ open }: { open: boolean }) {
+  const user = useAuthStore((s) => s.user);
+  const [bio,      setBio]      = useState('');
+  const [savedBio, setSavedBio] = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const [err,      setErr]      = useState('');
+  const [ok,       setOk]       = useState('');
+  const [showQR,   setShowQR]   = useState(false);
+
+  useEffect(() => {
+    if (!open || !user?.id) return;
+    api.get(`/users/${user.id}`)
+      .then(({ data }) => {
+        const b: string = data.data?.bio ?? '';
+        setBio(b);
+        setSavedBio(b);
+      })
+      .catch(() => {});
+  }, [open, user?.id]);
+
+  const dirty = bio !== savedBio;
+
+  const save = async () => {
+    setBusy(true); setErr(''); setOk('');
+    try {
+      const { data } = await api.patch('/users/me', { bio: bio.trim() });
+      const b: string = data.data?.bio ?? bio.trim();
+      setBio(b);
+      setSavedBio(b);
+      setOk('Сохранено');
+    } catch (e: unknown) {
+      setErr(errMsg(e, 'Не удалось сохранить'));
+    } finally { setBusy(false); }
+  };
+
+  const qrValue = user?.username ? `${window.location.origin}/u/${user.username}` : null;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h4 className="font-semibold text-sm">О себе</h4>
+        <textarea
+          value={bio}
+          onChange={(e) => { setBio(e.target.value.slice(0, 140)); setOk(''); setErr(''); }}
+          placeholder="Пара слов о себе…"
+          rows={2}
+          maxLength={140}
+          className="input-base w-full mt-2 resize-none"
+        />
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-[12px] text-white/35 tabular-nums">{bio.length}/140</span>
+          <button
+            onClick={save}
+            disabled={busy || !dirty}
+            className="px-4 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {busy && <Loader2 size={12} className="animate-spin" />}
+            Сохранить
+          </button>
+        </div>
+        {err && <p className="text-red-400 text-sm mt-1">{err}</p>}
+        {ok  && <p className="text-green-400 text-sm mt-1">{ok}</p>}
+      </div>
+
+      {qrValue && (
+        <button
+          onClick={() => setShowQR(true)}
+          className="w-full py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium flex items-center justify-center gap-2"
+        >
+          <QrCodeIcon size={15} />
+          Мой QR-код
+        </button>
+      )}
+
+      <AnimatePresence>
+        {showQR && qrValue && user && (
+          <QRCodeModal
+            value={qrValue}
+            title={user.displayName}
+            subtitle={`@${user.username}`}
+            onClose={() => setShowQR(false)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -227,6 +345,197 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
       )}
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
+    </div>
+  );
+}
+
+// ─── Облачный пароль ─────────────────────────────────────────────────────────
+// Бэк не отдаёт статус пароля в /me, поэтому кэшируем его per-user в
+// localStorage (пишется также в PhoneAuthForm при входе). Если флаг устарел и
+// бэк потребовал текущий пароль — раскрываем поле по факту ошибки.
+
+function getCloudPwdFlag(userId?: string): boolean {
+  try { return !!userId && localStorage.getItem(`cloudpwd:${userId}`) === '1'; } catch { return false; }
+}
+function setCloudPwdFlag(userId: string | undefined, v: boolean) {
+  try { if (userId) localStorage.setItem(`cloudpwd:${userId}`, v ? '1' : '0'); } catch { /* инкогнито */ }
+}
+function errMsg(e: unknown, fallback: string): string {
+  return (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? fallback;
+}
+
+function CloudPasswordSection() {
+  const userId = useAuthStore((s) => s.user?.id);
+  const [hasPassword, setHasPassword] = useState(() => getCloudPwdFlag(userId));
+  const [mode, setMode] = useState<'idle' | 'edit' | 'delete'>('idle');
+  const [current, setCurrent] = useState('');
+  const [pwd1, setPwd1] = useState('');
+  const [pwd2, setPwd2] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState('');
+  const [ok,   setOk]   = useState('');
+  // Локальный флаг устарел (PUT без currentPassword отбит) → показать поле
+  const [needCurrent, setNeedCurrent] = useState(false);
+
+  const askCurrent = hasPassword || needCurrent;
+
+  const openMode = (m: 'edit' | 'delete') => {
+    setCurrent(''); setPwd1(''); setPwd2(''); setErr(''); setOk(''); setMode(m);
+  };
+  const closeForm = () => { setCurrent(''); setPwd1(''); setPwd2(''); setErr(''); setMode('idle'); };
+
+  const save = async () => {
+    setBusy(true); setErr('');
+    try {
+      await api.put('/users/me/cloud-password', {
+        ...(askCurrent ? { currentPassword: current } : {}),
+        newPassword: pwd1,
+      });
+      setCloudPwdFlag(userId, true);
+      setOk(hasPassword ? 'Пароль изменён' : 'Облачный пароль установлен');
+      setHasPassword(true);
+      setNeedCurrent(false);
+      closeForm();
+    } catch (e: unknown) {
+      // Бэк требует текущий пароль, а мы его не слали — флаг устарел.
+      if (!askCurrent) setNeedCurrent(true);
+      setErr(errMsg(e, 'Не удалось сохранить пароль'));
+    } finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    setBusy(true); setErr('');
+    try {
+      await api.delete('/users/me/cloud-password', { data: { currentPassword: current } });
+      setCloudPwdFlag(userId, false);
+      setOk('Облачный пароль удалён');
+      setHasPassword(false);
+      setNeedCurrent(false);
+      closeForm();
+    } catch (e: unknown) {
+      setErr(errMsg(e, 'Не удалось удалить пароль'));
+    } finally { setBusy(false); }
+  };
+
+  // ── Форма установки/смены ──────────────────────────────────────────────────
+  if (mode === 'edit') {
+    const mismatch = pwd2.length > 0 && pwd1 !== pwd2;
+    return (
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm">{hasPassword ? 'Сменить облачный пароль' : 'Установить облачный пароль'}</h4>
+        <p className="text-xs text-white/50">Будет запрашиваться после кода при входе на новом устройстве.</p>
+        {askCurrent && (
+          <input
+            type="password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            placeholder="Текущий пароль"
+            autoComplete="current-password"
+            className="input-base w-full"
+          />
+        )}
+        <input
+          type="password"
+          value={pwd1}
+          onChange={(e) => setPwd1(e.target.value)}
+          placeholder="Новый пароль (мин. 8 символов)"
+          autoComplete="new-password"
+          className="input-base w-full"
+        />
+        <input
+          type="password"
+          value={pwd2}
+          onChange={(e) => setPwd2(e.target.value)}
+          placeholder="Повторите новый пароль"
+          autoComplete="new-password"
+          className="input-base w-full"
+        />
+        {mismatch && <p className="text-red-400 text-xs">Пароли не совпадают</p>}
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={closeForm} className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium">
+            Отмена
+          </button>
+          <button
+            onClick={save}
+            disabled={busy || pwd1.length < 8 || pwd1 !== pwd2 || (askCurrent && !current)}
+            className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            Сохранить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Подтверждение удаления ─────────────────────────────────────────────────
+  if (mode === 'delete') {
+    return (
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm">Удалить облачный пароль?</h4>
+        <p className="text-xs text-white/50">Вход останется только по коду из Telegram. Подтвердите текущим паролем.</p>
+        <input
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          placeholder="Текущий пароль"
+          autoComplete="current-password"
+          className="input-base w-full"
+        />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={closeForm} className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium">
+            Отмена
+          </button>
+          <button
+            onClick={remove}
+            disabled={busy || !current}
+            className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            Удалить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Главный экран ──────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className={`mt-0.5 ${hasPassword ? 'text-green-400' : 'text-white/40'}`}>
+          <KeyRound size={22} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-semibold text-sm">Облачный пароль</h4>
+          <p className="text-xs text-white/50 mt-0.5">
+            {hasPassword
+              ? 'Установлен. Запрашивается после кода при входе с нового устройства.'
+              : 'Не установлен. Дополнительная защита поверх кода из Telegram.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => openMode('edit')}
+          className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium"
+        >
+          {hasPassword ? 'Сменить' : 'Установить'}
+        </button>
+        {hasPassword && (
+          <button
+            onClick={() => openMode('delete')}
+            className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-red-500/20 hover:text-red-400 text-sm font-medium transition-colors"
+          >
+            Удалить
+          </button>
+        )}
+      </div>
+
+      {ok && <p className="text-green-400 text-sm">{ok}</p>}
     </div>
   );
 }

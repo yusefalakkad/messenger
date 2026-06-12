@@ -1,10 +1,12 @@
 /**
  * Превью медиа перед отправкой — показывает фото/видео
- * с возможностью добавить подпись и отправить или отменить.
+ * с возможностью добавить подпись, включить одноразовый просмотр («1×»)
+ * и отправить или отменить.
  */
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Send, Image as ImageIcon, Video } from 'lucide-react';
+import { clsx } from 'clsx';
+import { X, Send, Image as ImageIcon, Video, Eye } from 'lucide-react';
 
 export interface PendingMedia {
   file:      File;
@@ -14,7 +16,7 @@ export interface PendingMedia {
 
 interface Props {
   media:    PendingMedia;
-  onSend:   (caption?: string) => void;
+  onSend:   (caption?: string, viewOnce?: boolean) => void;
   onCancel: () => void;
 }
 
@@ -25,7 +27,9 @@ function formatSize(bytes: number): string {
 }
 
 export default function MediaPreview({ media, onSend, onCancel }: Props) {
-  const [caption, setCaption] = useState('');
+  const [caption,  setCaption]  = useState('');
+  // Одноразовый просмотр: медиа удаляется после первого открытия получателем
+  const [viewOnce, setViewOnce] = useState(false);
   const fileName = media.file.name || (media.type === 'image' ? 'Фото' : 'Видео');
 
   return (
@@ -81,6 +85,20 @@ export default function MediaPreview({ media, onSend, onCancel }: Props) {
         className="flex items-end gap-3 px-4 pt-3 pb-3 flex-shrink-0 border-t border-white/[0.06] bg-black/40 backdrop-blur-md"
         style={{ paddingBottom: 'calc(var(--sab, 0px) + 0.75rem)' }}
       >
+        {/* Toggle «1×» — одноразовый просмотр */}
+        <button
+          onClick={() => setViewOnce((v) => !v)}
+          aria-pressed={viewOnce}
+          title="Одноразовый просмотр"
+          className={clsx(
+            'btn-icon !w-auto h-11 px-3 gap-1.5 flex-shrink-0',
+            viewOnce && '!bg-primary-500/20 !text-primary-300 border border-primary-500/40',
+          )}
+        >
+          <Eye size={16} />
+          <span className="text-[12px] font-semibold tabular-nums">1×</span>
+          {viewOnce && <span className="text-[12px] font-medium">Одноразовое</span>}
+        </button>
         <input
           className="flex-1 bg-white/[0.06] border border-white/[0.10] rounded-lg h-11 px-4
                      text-white text-[15px] placeholder:text-white/40 outline-none
@@ -96,12 +114,12 @@ export default function MediaPreview({ media, onSend, onCancel }: Props) {
             if (e.nativeEvent.isComposing) return;
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              onSend(caption);
+              onSend(caption || undefined, viewOnce);
             }
           }}
         />
         <button
-          onClick={() => onSend(caption || undefined)}
+          onClick={() => onSend(caption || undefined, viewOnce)}
           aria-label="Отправить"
           className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0
                      text-white shadow-glow-violet active:scale-95 transition-transform"

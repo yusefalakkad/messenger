@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
 import { useCallStore } from '@/stores/call.store';
 import { playNotificationSound } from '@/lib/notificationSound';
+import { getNotifPrefs } from '@/lib/prefs';
 import { SOCKET_URL } from '@/lib/config';
 import { api } from '@/lib/api';
 import { clearKeyCache } from '@/lib/e2e';
@@ -62,7 +63,13 @@ export function initSocket(): Socket {
   socket.on('disconnect', () => { /* socket.io сам ретраит */ });
 
   // Сервер обнаружил критическую ошибку (rate-limit, forbidden, validation)
-  socket.on('error', (data: { code?: string; message?: string }) => {
+  socket.on('error', (data: { code?: string; message?: string; retryAfter?: number }) => {
+    // Медленный режим: показываем сколько осталось ждать вместо generic-сообщения
+    if (data?.code === 'SLOW_MODE') {
+      const sec = Math.max(1, Math.ceil(data.retryAfter ?? 0));
+      toast.error(`Медленный режим: подождите ${sec} сек`);
+      return;
+    }
     if (data?.message) toast.error(data.message);
   });
 
@@ -83,7 +90,8 @@ export function initSocket(): Socket {
 
     // Звук + системное уведомление для входящих сообщений
     if (message.senderId !== myUserId) {
-      playNotificationSound();
+      // Локальные prefs: звук можно выключить в настройках уведомлений
+      if (getNotifPrefs().sound) playNotificationSound();
       maybeShowNotification(message);
     }
 
@@ -108,10 +116,10 @@ export function initSocket(): Socket {
     getChatStore().deleteMessage(chatId, messageId);
   });
 
+  // P3-4: НАКАПЛИВАЕМ read-receipts. Раньше updateMessage перезаписывал readBy
+  // массивом из одного юзера — в группе чтение вторым затирало первого.
   socket.on('message:read', ({ messageId, chatId, userId, readAt }: WSServerEvents['message:read']) => {
-    getChatStore().updateMessage(chatId, messageId, {
-      readBy: [{ userId, readAt: new Date(readAt) }],
-    });
+    getChatStore().addReadReceipt(chatId, messageId, userId, new Date(readAt));
   });
 
   socket.on('user:typing', ({ chatId, userId, isTyping }: WSServerEvents['user:typing']) => {
@@ -203,6 +211,36 @@ export function initSocket(): Socket {
       })),
     }));
     clearKeyCache();
+  });
+
+  // TTL чата изменился (исчезающие сообщения)
+  socket.on('chat:ttl-changed', ({ chatId, seconds }: WSServerEvents['chat:ttl-changed']) => {
+    getChatStore().updateChat(chatId, { messageTtlSeconds: seconds });
+  });
+
+  // Медленный режим чата изменился (owner/admin переключил)
+  socket.on('chat:slowmode-changed', ({ chatId, seconds }: WSServerEvents['chat:slowmode-changed']) => {
+    getChatStore().updateChat(chatId, { slowModeSeconds: seconds });
+  });
+
+  // Одноразовое сообщение просмотрено получателем — медиа уничтожено на сервере
+  socket.on('message:viewed', ({ chatId, messageId }: WSServerEvents['message:viewed']) => {
+    getChatStore().markMessageViewed(chatId, messageId);
+  });
+
+  // Сообщение закреплено/откреплено
+  socket.on('message:pinned', ({ chatId, messageId, pinnedAt }: WSServerEvents['message:pinned']) => {
+    getChatStore().setMessagePinned(chatId, messageId, pinnedAt);
+  });
+
+  // Голоса в опросе изменились — сервер шлёт полный снапшот votes
+  socket.on('poll:updated', ({ chatId, messageId, votes }: WSServerEvents['poll:updated']) => {
+    getChatStore().applyPollVotes(chatId, messageId, votes);
+  });
+
+  // Серверный sweeper удалил истёкшие по TTL сообщения
+  socket.on('messages:expired', ({ chatId, messageIds }: WSServerEvents['messages:expired']) => {
+    getChatStore().expireMessages(chatId, messageIds);
   });
 
   socket.on('user:status', ({ userId, status }: WSServerEvents['user:status']) => {
@@ -379,6 +417,24 @@ export function reactToMessage(messageId: string, chatId: string, emoji: string)
   socket?.emit('message:react', { messageId, chatId, emoji });
 }
 
+/** Исчезающие сообщения: TTL чата (null — выключить). */
+export function setChatTtl(chatId: string, seconds: number | null): void {
+  socket?.emit('chat:set-ttl', { chatId, seconds });
+}
+
+/** Медленный режим: интервал между сообщениями для member'ов (null — выключить). */
+export function setSlowMode(chatId: string, seconds: number | null): void {
+  socket?.emit('chat:set-slowmode', { chatId, seconds });
+}
+
+export function pinMessage(chatId: string, messageId: string, pin: boolean): void {
+  socket?.emit('message:pin', { chatId, messageId, pin });
+}
+
+export function votePoll(chatId: string, pollId: string, optionIds: string[]): void {
+  socket?.emit('poll:vote', { chatId, pollId, optionIds });
+}
+
 // ── Call signaling ────────────────────────────────────────────────────────────
 
 export function initiateCall(callId: string, peerId: string, chatId: string, callType: CallType): void {
@@ -408,7 +464,10 @@ function maybeShowNotification(message: Message): void {
   if (document.visibilityState === 'visible') return; // активная вкладка — звука хватит
   try {
     const title = message.sender?.displayName ?? 'Новое сообщение';
-    const body =
+    // Prefs: previews выключены — не раскрываем содержимое, имя отправителя оставляем
+    const body = !getNotifPrefs().previews
+      ? '🔔 Новое сообщение'
+      :
       message.encrypted   ? '🔒 Зашифрованное сообщение' :
       message.type === 'image'  ? '📷 Фото'   :
       message.type === 'video'  ? '🎬 Видео'  :

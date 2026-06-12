@@ -24,13 +24,24 @@ interface SearchUser {
 
 export default function NewGroupModal({ onClose }: Props) {
   const [name,     setName]     = useState('');
+  const [username, setUsername] = useState('');
   const [query,    setQuery]    = useState('');
   const [results,  setResults]  = useState<SearchUser[]>([]);
   const [selected, setSelected] = useState<SearchUser[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [creating, setCreating] = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
   const navigate  = useNavigate();
   const addChat   = useChatStore((s) => s.addChat);
+
+  // Live-нормализация хэндла: lowercase + только [a-z0-9_], максимум 32 (как у каналов)
+  const onUsernameChange = (raw: string) => {
+    setUsername(raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 32));
+    setError(null);
+  };
+
+  // username либо пустой, либо валидный по формату (короткий — ещё не валиден)
+  const usernameTooShort = username.length > 0 && username.length < 5;
 
   const search = async (q: string) => {
     setQuery(q);
@@ -53,17 +64,23 @@ export default function NewGroupModal({ onClose }: Props) {
   };
 
   const create = async () => {
-    if (!name.trim() || selected.length === 0) return;
+    if (!name.trim() || selected.length === 0 || usernameTooShort) return;
     setCreating(true);
+    setError(null);
     try {
       const { data } = await api.post('/chats/group', {
         name: name.trim(),
         memberIds: selected.map((u) => u.id),
+        ...(username ? { username } : {}),
       });
       const chat = data.data as Chat;
       addChat(chat);
       navigate(`/chat/${chat.id}`);
       onClose();
+    } catch (e) {
+      const code = (e as { response?: { data?: { error?: { code?: string } } } })
+        ?.response?.data?.error?.code;
+      setError(code === 'USERNAME_TAKEN' ? 'Это имя уже занято' : 'Не удалось создать группу');
     } finally {
       setCreating(false);
     }
@@ -113,9 +130,28 @@ export default function NewGroupModal({ onClose }: Props) {
               className="input-base w-full !py-2.5"
               placeholder="Название группы..."
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); setError(null); }}
               maxLength={64}
             />
+
+            {/* Публичный хэндл (опционально) — как у каналов */}
+            <div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-sm pointer-events-none z-10">@</span>
+                <input
+                  className="input-base w-full !py-2.5 !pl-8"
+                  placeholder="username (необязательно)"
+                  value={username}
+                  onChange={(e) => onUsernameChange(e.target.value)}
+                  maxLength={32}
+                />
+              </div>
+              <p className={`text-[11px] mt-1.5 px-1 ${usernameTooShort ? 'text-red-400/80' : 'text-white/40'}`}>
+                {usernameTooShort
+                  ? 'Минимум 5 символов: a-z, 0-9 и _'
+                  : 'Публичную группу можно найти в поиске'}
+              </p>
+            </div>
 
             {/* Поиск участников */}
             <div className="relative">
@@ -192,7 +228,10 @@ export default function NewGroupModal({ onClose }: Props) {
 
           {/* Создать */}
           <div className="p-4 border-t border-white/[0.05] space-y-2">
-            {(!name.trim() || selected.length === 0) && (
+            {error && (
+              <p className="text-[11px] text-red-400/90 text-center">{error}</p>
+            )}
+            {!error && (!name.trim() || selected.length === 0) && (
               <p className="text-[11px] text-white/45 text-center">
                 {!name.trim() && selected.length === 0
                   ? 'Введите название группы и выберите хотя бы одного участника'
@@ -204,7 +243,7 @@ export default function NewGroupModal({ onClose }: Props) {
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={create}
-              disabled={!name.trim() || selected.length === 0 || creating}
+              disabled={!name.trim() || selected.length === 0 || usernameTooShort || creating}
               className="btn-primary w-full !py-2.5 flex items-center justify-center gap-2"
             >
               {creating ? (

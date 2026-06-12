@@ -4,7 +4,9 @@
  */
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Reply, Pencil, Trash2, CornerUpRight, Copy } from 'lucide-react';
+import { Reply, Pencil, Trash2, CornerUpRight, Copy, Pin, CheckSquare } from 'lucide-react';
+import { pinMessage } from '@/lib/socket';
+import { useChatStore } from '@/stores/chat.store';
 import type { Message } from '@messenger/shared';
 
 const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
@@ -85,6 +87,14 @@ export default function MessageContextMenu({
           <span>Ответить</span>
         </button>
 
+        <button
+          onClick={() => { pinMessage(message.chatId, message.id, !message.pinnedAt); onClose(); }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
+        >
+          <Pin size={16} className="text-white/50" />
+          <span>{message.pinnedAt ? 'Открепить' : 'Закрепить'}</span>
+        </button>
+
         {canEdit && (
           <button
             onClick={() => { onEdit?.(); onClose(); }}
@@ -104,6 +114,14 @@ export default function MessageContextMenu({
             <span>Переслать</span>
           </button>
         )}
+
+        <button
+          onClick={() => { useChatStore.getState().toggleMessageSelection(message.id); onClose(); }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
+        >
+          <CheckSquare size={16} className="text-white/50" />
+          <span>Выбрать</span>
+        </button>
 
         {message.type === 'text' && !message.encrypted && message.content && (
           <button

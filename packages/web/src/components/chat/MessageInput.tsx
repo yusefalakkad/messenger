@@ -7,7 +7,7 @@
  * • В фиксированном режиме: × отмена, ✓ отправить
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2 } from 'lucide-react';
+import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { sendMessage, sendTyping } from '@/lib/socket';
@@ -21,6 +21,9 @@ import { useAuthStore } from '@/stores/auth.store';
 import { editMessage as socketEditMsg } from '@/lib/socket';
 import CircleRecorder from '@/components/media/CircleRecorder';
 import VideoRecorder from '@/components/chat/VideoRecorder';
+import GifPicker from '@/components/media/GifPicker';
+import ScheduleSendSheet from '@/components/chat/ScheduleSendSheet';
+import PollCreateModal from '@/components/chat/PollCreateModal';
 import MediaPreview, { type PendingMedia } from '@/components/media/MediaPreview';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import IconBtn from '@/components/ui/IconBtn';
@@ -32,15 +35,27 @@ interface Props { chatId: string; }
 
 const BAR_COUNT = 30;
 
+// Отмена через AbortController (axios CanceledError / DOM AbortError) — не ошибка
+const isAbortError = (err: unknown): boolean => {
+  const e = err as { code?: string; name?: string } | null;
+  return e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError' || e?.name === 'AbortError';
+};
+
 export default function MessageInput({ chatId }: Props) {
   const [text,         setText]         = useState('');
   const [showAttach,   setShowAttach]   = useState(false);
   const [showEmoji,    setShowEmoji]    = useState(false);
   const [showCircle,   setShowCircle]   = useState(false);
   const [showVideoRec, setShowVideoRec] = useState(false);
+  const [showPoll,     setShowPoll]     = useState(false);
+  const [showGif,      setShowGif]      = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const [uploading,    setUploading]    = useState(false);
   const [uploadError,  setUploadError]  = useState<string | null>(null);
+  // Прогресс активной загрузки (0..100) и упавшая загрузка для «Повторить»
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [failedUpload,   setFailedUpload]   = useState<{ form: FormData; retry: () => void } | null>(null);
 
   // Автокомплит @username — { query, caretStart } или null если не активен
   const [mention, setMention] = useState<{ query: string; startIdx: number } | null>(null);
@@ -63,8 +78,10 @@ export default function MessageInput({ chatId }: Props) {
   // Рефы (избегаем stale closures и двойного StrictMode-монтирования)
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSyncRef   = useRef<ReturnType<typeof setTimeout> | null>(null); // debounce PUT черновика на сервер
   const imageInputRef  = useRef<HTMLInputElement>(null);
   const videoInputRef  = useRef<HTMLInputElement>(null);
+  const abortRef       = useRef<AbortController | null>(null); // активная загрузка медиа
 
   const ptt = useRef({
     // recording hardware
@@ -114,7 +131,15 @@ export default function MessageInput({ chatId }: Props) {
   useEffect(() => {
     if (editingMessage || !draftKey) return;
     const draft = localStorage.getItem(draftKey);
-    setText(draft ?? '');
+    if (draft !== null) { setText(draft); return; }
+    // localStorage пуст — fallback на серверный черновик (self-обогащение chat.draft из listUserChats)
+    const serverDraft = useChatStore.getState().chats.find((c) => c.id === chatId)?.draft;
+    if (serverDraft) {
+      setText(serverDraft);
+      localStorage.setItem(draftKey, serverDraft);
+    } else {
+      setText('');
+    }
   }, [chatId, draftKey]);
 
   useEffect(() => {
@@ -122,7 +147,57 @@ export default function MessageInput({ chatId }: Props) {
     const t = text.trim();
     if (t) localStorage.setItem(draftKey, text);
     else   localStorage.removeItem(draftKey);
-  }, [text, draftKey, editingMessage]);
+    // Синк на сервер: debounce 1500мс, fire-and-forget; cleanup отменяет
+    // таймер при новом вводе / смене чата / unmount.
+    draftSyncRef.current = setTimeout(() => {
+      draftSyncRef.current = null;
+      api.put(`/chats/${chatId}/draft`, { text: t || null }).catch(() => {});
+    }, 1500);
+    return () => {
+      if (draftSyncRef.current) { clearTimeout(draftSyncRef.current); draftSyncRef.current = null; }
+    };
+  }, [text, chatId, draftKey, editingMessage]);
+
+  // ─── Медленный режим ─────────────────────────────────────────────────────────
+  // Для роли member в чате со slowModeSeconds: после успешной отправки текста
+  // запускаем локальный countdown — вместо кнопки отправки тикает кружок mm:ss.
+  // Owner/admin освобождены (сервер их тоже не троттлит).
+
+  const slowModeSeconds = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.slowModeSeconds ?? null);
+  const myRole = useChatStore((s) =>
+    s.chats.find((c) => c.id === chatId)?.members.find((m) => m.userId === myUserIdForDraft)?.role,
+  );
+  const slowSeconds = slowModeSeconds && myRole === 'member' ? slowModeSeconds : null;
+
+  const [slowUntilTs, setSlowUntilTs] = useState<number | null>(null); // timestamp конца countdown
+  const [slowLeft,    setSlowLeft]    = useState(0);                   // осталось секунд (для рендера)
+
+  // Сброс countdown при смене чата; и если режим выключили/роль изменилась — тоже
+  useEffect(() => { setSlowUntilTs(null); setSlowLeft(0); }, [chatId]);
+  useEffect(() => {
+    if (!slowSeconds) { setSlowUntilTs(null); setSlowLeft(0); }
+  }, [slowSeconds]);
+
+  // Тикающий секундомер: пересчитываем остаток от timestamp (не дрейфует)
+  useEffect(() => {
+    if (!slowUntilTs) return;
+    const tick = () => {
+      const left = Math.ceil((slowUntilTs - Date.now()) / 1000);
+      if (left <= 0) { setSlowUntilTs(null); setSlowLeft(0); }
+      else setSlowLeft(left);
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [slowUntilTs]);
+
+  const slowActive = slowUntilTs !== null;
+
+  const startSlowCountdown = useCallback(() => {
+    if (!slowSeconds) return;
+    setSlowLeft(slowSeconds);
+    setSlowUntilTs(Date.now() + slowSeconds * 1000);
+  }, [slowSeconds]);
 
   // ─── Очистка при смене чата ──────────────────────────────────────────────────
 
@@ -148,6 +223,9 @@ export default function MessageInput({ chatId }: Props) {
   const handleSend = useCallback(async () => {
     const t = text.trim();
     if (!t) return;
+    // Медленный режим: пока тикает countdown — не отправляем (Enter в обход кнопки).
+    // Редактирование не считается новым сообщением и не троттлится.
+    if (!editingMessage && slowUntilTs !== null) { haptic.error?.(); return; }
     haptic.light();
     setText('');
     sendTyping(chatId, false);
@@ -184,6 +262,7 @@ export default function MessageInput({ chatId }: Props) {
       try {
         const { ciphertext, nonce } = await encryptText(chatId, t, recipientPub, privateKey);
         sendMessage({ chatId, type: 'text', content: ciphertext, nonce, encrypted: true, replyToId });
+        startSlowCountdown();
         return;
       } catch (err) {
         console.error('[E2E] Encryption failed', err);
@@ -196,7 +275,8 @@ export default function MessageInput({ chatId }: Props) {
 
     // Чат БЕЗ E2E (например, групповой) — обычная отправка
     sendMessage({ chatId, type: 'text', content: t, replyToId });
-  }, [chatId, text, editingMessage, replyingTo]);
+    startSlowCountdown();
+  }, [chatId, text, editingMessage, replyingTo, slowUntilTs, startSlowCountdown]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Если открыт @-автокомплит, он сам перехватывает нав. клавиши.
@@ -248,6 +328,28 @@ export default function MessageInput({ chatId }: Props) {
       ta.setSelectionRange(caret, caret);
     }, 0);
   }, [mention, text]);
+
+  // ─── Загрузка медиа: общий helper с прогрессом и отменой ────────────────────
+
+  /** POST /media/upload/<type> с onUploadProgress и AbortController. Возвращает data.data. */
+  const uploadWithProgress = useCallback(async (form: FormData, type: string) => {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setUploadProgress(0);
+    try {
+      const { data } = await api.post(`/media/upload/${type}`, form, {
+        signal: ctrl.signal,
+        onUploadProgress: (e) => setUploadProgress(Math.round((e.loaded / (e.total || 1)) * 100)),
+      });
+      return data.data;
+    } finally {
+      abortRef.current = null;
+    }
+  }, []);
+
+  const cancelUpload = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   // ─── PTT: запуск голосовой записи ────────────────────────────────────────────
 
@@ -329,28 +431,32 @@ export default function MessageInput({ chatId }: Props) {
       d.audioCtx = null;
 
       if (send && blob.size > 500) {
-        setUploading(true);
-        try {
-          const form = new FormData();
-          form.append('file', blob, 'voice.webm');
-          form.append('duration', String(Math.max(1, duration)));
-          form.append('waveform', JSON.stringify(finalBars));
-          const { data } = await api.post('/media/upload/voice', form);
-          const m = data.data;
-          sendMessage({
-            chatId,
-            type: 'voice',
-            mediaData: {
-              url: m.url, mimeType: m.mimeType, size: m.size,
-              duration: Math.max(1, duration), waveform: finalBars,
-            },
-          });
-        } catch (err) {
-          console.error('Voice upload failed', err);
-          setUploadError('Не удалось отправить голосовое');
-          setTimeout(() => setUploadError(null), 3000);
-        }
-        finally { setUploading(false); }
+        const form = new FormData();
+        form.append('file', blob, 'voice.webm');
+        form.append('duration', String(Math.max(1, duration)));
+        form.append('waveform', JSON.stringify(finalBars));
+        // Замыкание — «Повторить» гоняет ту же цепочку upload+send заново
+        const doUpload = async () => {
+          setFailedUpload(null);
+          setUploading(true);
+          try {
+            const m = await uploadWithProgress(form, 'voice');
+            sendMessage({
+              chatId,
+              type: 'voice',
+              mediaData: {
+                url: m.url, mimeType: m.mimeType, size: m.size,
+                duration: Math.max(1, duration), waveform: finalBars,
+              },
+            });
+          } catch (err) {
+            if (isAbortError(err)) return; // отменено пользователем
+            console.error('Voice upload failed', err);
+            setFailedUpload({ form, retry: doUpload });
+          }
+          finally { setUploading(false); setUploadProgress(null); }
+        };
+        await doUpload();
       }
     };
 
@@ -435,35 +541,39 @@ export default function MessageInput({ chatId }: Props) {
 
   const handleCircleRecorded = useCallback(async (blob: Blob, duration: number, thumbDataUrl: string) => {
     setShowCircle(false);
-    setUploading(true);
-    try {
-      let thumbnailUrl: string | undefined;
+    const form = new FormData();
+    form.append('file', blob, 'circle.webm');
+    form.append('duration', String(Math.round(duration)));
+
+    const doUpload = async () => {
+      setFailedUpload(null);
+      setUploading(true);
       try {
-        const res = await fetch(thumbDataUrl);
-        const tb  = await res.blob();
-        const tf  = new FormData();
-        tf.append('file', tb, 'thumb.jpg');
-        const { data: td } = await api.post('/media/upload/image', tf);
-        thumbnailUrl = td.data.url;
-      } catch {}
+        let thumbnailUrl: string | undefined;
+        try {
+          const res = await fetch(thumbDataUrl);
+          const tb  = await res.blob();
+          const tf  = new FormData();
+          tf.append('file', tb, 'thumb.jpg');
+          const { data: td } = await api.post('/media/upload/image', tf);
+          thumbnailUrl = td.data.url;
+        } catch {}
 
-      const form = new FormData();
-      form.append('file', blob, 'circle.webm');
-      form.append('duration', String(Math.round(duration)));
-      const { data } = await api.post('/media/upload/circle', form);
-      const m = data.data;
+        const m = await uploadWithProgress(form, 'circle');
 
-      sendMessage({
-        chatId, type: 'circle',
-        mediaData: { url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size, duration: Math.round(duration) },
-      });
-    } catch (err) {
-      console.error('Circle upload failed', err);
-      setUploadError('Не удалось отправить кружок');
-      setTimeout(() => setUploadError(null), 3000);
-    }
-    finally { setUploading(false); }
-  }, [chatId]);
+        sendMessage({
+          chatId, type: 'circle',
+          mediaData: { url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size, duration: Math.round(duration) },
+        });
+      } catch (err) {
+        if (isAbortError(err)) return;
+        console.error('Circle upload failed', err);
+        setFailedUpload({ form, retry: doUpload });
+      }
+      finally { setUploading(false); setUploadProgress(null); }
+    };
+    await doUpload();
+  }, [chatId, uploadWithProgress]);
 
   // ─── Видео-сообщение (запись через камеру) ──────────────────────────────────
 
@@ -474,40 +584,44 @@ export default function MessageInput({ chatId }: Props) {
       setTimeout(() => setUploadError(null), 3000);
       return;
     }
-    setUploading(true);
-    try {
-      // 1. Загружаем превью-кадр (poster)
-      let thumbnailUrl: string | undefined;
+    const form = new FormData();
+    form.append('file', blob, 'video.webm');
+
+    const doUpload = async () => {
+      setFailedUpload(null);
+      setUploading(true);
       try {
-        const res = await fetch(thumbDataUrl);
-        const tb  = await res.blob();
-        const tf  = new FormData();
-        tf.append('file', tb, 'thumb.jpg');
-        const { data: td } = await api.post('/media/upload/image', tf);
-        thumbnailUrl = td.data.url;
-      } catch { /* poster — необязательный */ }
+        // 1. Загружаем превью-кадр (poster)
+        let thumbnailUrl: string | undefined;
+        try {
+          const res = await fetch(thumbDataUrl);
+          const tb  = await res.blob();
+          const tf  = new FormData();
+          tf.append('file', tb, 'thumb.jpg');
+          const { data: td } = await api.post('/media/upload/image', tf);
+          thumbnailUrl = td.data.url;
+        } catch { /* poster — необязательный */ }
 
-      // 2. Загружаем само видео
-      const form = new FormData();
-      form.append('file', blob, 'video.webm');
-      const { data } = await api.post('/media/upload/video', form);
-      const m = data.data;
+        // 2. Загружаем само видео
+        const m = await uploadWithProgress(form, 'video');
 
-      sendMessage({
-        chatId,
-        type: 'video',
-        mediaData: {
-          url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size,
-          duration: Math.max(1, Math.round(duration)),
-          width: m.width, height: m.height,
-        },
-      });
-    } catch (err) {
-      console.error('Video upload failed', err);
-      setUploadError('Не удалось отправить видео');
-      setTimeout(() => setUploadError(null), 3000);
-    } finally { setUploading(false); }
-  }, [chatId]);
+        sendMessage({
+          chatId,
+          type: 'video',
+          mediaData: {
+            url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size,
+            duration: Math.max(1, Math.round(duration)),
+            width: m.width, height: m.height,
+          },
+        });
+      } catch (err) {
+        if (isAbortError(err)) return;
+        console.error('Video upload failed', err);
+        setFailedUpload({ form, retry: doUpload });
+      } finally { setUploading(false); setUploadProgress(null); }
+    };
+    await doUpload();
+  }, [chatId, uploadWithProgress]);
 
   // ─── Файл (фото / видео) ──────────────────────────────────────────────────────
 
@@ -526,84 +640,97 @@ export default function MessageInput({ chatId }: Props) {
     e.target.value = '';
   };
 
-  const handleMediaSend = useCallback(async (caption?: string) => {
+  const handleMediaSend = useCallback(async (caption?: string, viewOnce?: boolean) => {
     if (!pendingMedia) return;
     const { file, type, previewUrl } = pendingMedia;
     URL.revokeObjectURL(previewUrl);
     setPendingMedia(null);
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      const { data } = await api.post(`/media/upload/${type}`, form);
-      const m = data.data;
 
-      // P1-6: для видео-файла генерим poster + извлекаем dimensions/duration.
-      // Без этого в пузырьке показывается серый плейсхолдер без длительности.
-      let videoThumbnailUrl: string | undefined;
-      let videoWidth: number | undefined;
-      let videoHeight: number | undefined;
-      let videoDuration: number | undefined;
-      if (type === 'video') {
-        try {
-          const meta = await extractVideoPoster(file);
-          videoWidth    = meta.width;
-          videoHeight   = meta.height;
-          videoDuration = meta.duration;
-          if (meta.posterBlob) {
-            const tf = new FormData();
-            tf.append('file', meta.posterBlob, 'poster.jpg');
-            const { data: td } = await api.post('/media/upload/image', tf);
-            videoThumbnailUrl = td.data.url;
-          }
-        } catch (err) {
-          console.warn('[Video] poster extraction failed, sending without', err);
-        }
-      }
+    const form = new FormData();
+    form.append('file', file);
 
-      // P1-15: caption в E2E-чате должен идти зашифрованным, иначе sidebar
-      // светит подпись в открытом виде, а сервер видит «секрет».
-      const chat = useChatStore.getState().chats.find((c) => c.id === chatId);
-      const { user, privateKey } = useAuthStore.getState();
-      let captionContent: string | undefined = caption || undefined;
-      let captionNonce:    string | undefined;
-      let captionEncrypted = false;
+    // Вся цепочка upload+send в замыкании — «Повторить» запускает её заново,
+    // файл живёт в form/closure до успеха или отмены.
+    const doUpload = async () => {
+      setFailedUpload(null);
+      setUploading(true);
+      try {
+        const m = await uploadWithProgress(form, type);
 
-      if (caption && chat && isChatE2E(chat) && user && privateKey) {
-        const recipientPub = getRecipientPublicKey(chat, user.id);
-        if (recipientPub) {
+        // P1-6: для видео-файла генерим poster + извлекаем dimensions/duration.
+        // Без этого в пузырьке показывается серый плейсхолдер без длительности.
+        let videoThumbnailUrl: string | undefined;
+        let videoWidth: number | undefined;
+        let videoHeight: number | undefined;
+        let videoDuration: number | undefined;
+        if (type === 'video') {
           try {
-            const enc = await encryptText(chatId, caption, recipientPub, privateKey);
-            captionContent   = enc.ciphertext;
-            captionNonce     = enc.nonce;
-            captionEncrypted = true;
+            const meta = await extractVideoPoster(file);
+            videoWidth    = meta.width;
+            videoHeight   = meta.height;
+            videoDuration = meta.duration;
+            if (meta.posterBlob) {
+              const tf = new FormData();
+              tf.append('file', meta.posterBlob, 'poster.jpg');
+              const { data: td } = await api.post('/media/upload/image', tf);
+              videoThumbnailUrl = td.data.url;
+            }
           } catch (err) {
-            console.error('[E2E] Caption encrypt failed — sending without caption', err);
-            toast.error('Не удалось зашифровать подпись. Отправляем без неё.');
-            captionContent = undefined; // лучше без подписи, чем светить plaintext
+            console.warn('[Video] poster extraction failed, sending without', err);
           }
         }
-      }
 
-      sendMessage({
-        chatId,
-        type: type as MessageType,
-        content: captionContent,
-        nonce: captionNonce,
-        encrypted: captionEncrypted,
-        mediaData: {
-          url: m.url,
-          mimeType: m.mimeType,
-          size: m.size,
-          width:        videoWidth     ?? m.width,
-          height:       videoHeight    ?? m.height,
-          duration:     videoDuration,
-          thumbnailUrl: videoThumbnailUrl,
-        },
-      });
-    } catch (err) { console.error('Media upload failed', err); }
-    finally { setUploading(false); }
-  }, [chatId, pendingMedia]);
+        // P1-15: caption в E2E-чате должен идти зашифрованным, иначе sidebar
+        // светит подпись в открытом виде, а сервер видит «секрет».
+        const chat = useChatStore.getState().chats.find((c) => c.id === chatId);
+        const { user, privateKey } = useAuthStore.getState();
+        let captionContent: string | undefined = caption || undefined;
+        let captionNonce:    string | undefined;
+        let captionEncrypted = false;
+
+        if (caption && chat && isChatE2E(chat) && user && privateKey) {
+          const recipientPub = getRecipientPublicKey(chat, user.id);
+          if (recipientPub) {
+            try {
+              const enc = await encryptText(chatId, caption, recipientPub, privateKey);
+              captionContent   = enc.ciphertext;
+              captionNonce     = enc.nonce;
+              captionEncrypted = true;
+            } catch (err) {
+              console.error('[E2E] Caption encrypt failed — sending without caption', err);
+              toast.error('Не удалось зашифровать подпись. Отправляем без неё.');
+              captionContent = undefined; // лучше без подписи, чем светить plaintext
+            }
+          }
+        }
+
+        sendMessage({
+          chatId,
+          type: type as MessageType,
+          content: captionContent,
+          nonce: captionNonce,
+          encrypted: captionEncrypted,
+          // Одноразовый просмотр («1×») — сервер примет только при наличии mediaData
+          viewOnce: viewOnce || undefined,
+          mediaData: {
+            url: m.url,
+            mimeType: m.mimeType,
+            size: m.size,
+            width:        videoWidth     ?? m.width,
+            height:       videoHeight    ?? m.height,
+            duration:     videoDuration,
+            thumbnailUrl: videoThumbnailUrl,
+          },
+        });
+      } catch (err) {
+        if (isAbortError(err)) return;
+        console.error('Media upload failed', err);
+        setFailedUpload({ form, retry: doUpload });
+      }
+      finally { setUploading(false); setUploadProgress(null); }
+    };
+    await doUpload();
+  }, [chatId, pendingMedia, uploadWithProgress]);
 
   const handleMediaCancel = useCallback(() => {
     if (pendingMedia) URL.revokeObjectURL(pendingMedia.previewUrl);
@@ -621,6 +748,8 @@ export default function MessageInput({ chatId }: Props) {
   // ─── Вспомогалки ─────────────────────────────────────────────────────────────
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  // mm:ss для кружка медленного режима
+  const fmtSlow = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const isRecording = pttState !== 'idle';
   const hasText     = text.trim().length > 0;
 
@@ -642,6 +771,33 @@ export default function MessageInput({ chatId }: Props) {
       <AnimatePresence>
         {pendingMedia && (
           <MediaPreview media={pendingMedia} onSend={handleMediaSend} onCancel={handleMediaCancel} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showPoll && (
+          <PollCreateModal chatId={chatId} onClose={() => setShowPoll(false)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showSchedule && (
+          <ScheduleSendSheet
+            onClose={() => setShowSchedule(false)}
+            onPick={async (d) => {
+              const t = text.trim();
+              setShowSchedule(false);
+              if (!t) return;
+              try {
+                await api.post('/messages/schedule', {
+                  chatId, sendAt: d.toISOString(), type: 'text', content: t,
+                });
+                setText('');
+                toast.success('Запланировано');
+              } catch (err) {
+                console.error('Schedule failed', err);
+                toast.error('Не удалось запланировать отправку');
+              }
+            }}
+          />
         )}
       </AnimatePresence>
 
@@ -694,19 +850,51 @@ export default function MessageInput({ chatId }: Props) {
           )}
         </AnimatePresence>
 
-        {/* Загрузка */}
+        {/* Загрузка: спиннер + % + прогресс-бар + X (отмена) */}
         <AnimatePresence>
           {uploading && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="flex items-center gap-2 bg-primary-600/10 border border-primary-600/20 rounded-xl px-4 py-2.5 mb-3">
-              <div className="w-3.5 h-3.5 border-2 border-primary-400/50 border-t-primary-400 rounded-full animate-spin flex-shrink-0" />
-              <span className="text-sm text-primary-400">Загрузка медиа...</span>
+              className="bg-primary-600/10 border border-primary-600/20 rounded-xl px-4 py-2.5 mb-3 overflow-hidden">
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-3.5 border-2 border-primary-400/50 border-t-primary-400 rounded-full animate-spin flex-shrink-0" />
+                <span className="text-sm text-primary-400 flex-1 min-w-0 truncate">Загрузка медиа...</span>
+                {uploadProgress !== null && (
+                  <span className="text-xs text-primary-300 tabular-nums flex-shrink-0">{uploadProgress}%</span>
+                )}
+                <button onClick={cancelUpload} aria-label="Отменить загрузку"
+                  className="text-white/40 hover:text-white flex-shrink-0 transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="mt-2 h-1 rounded-full bg-primary-500/15 overflow-hidden">
+                <div className="h-1 rounded-full bg-primary-500 transition-all duration-200"
+                  style={{ width: `${uploadProgress ?? 0}%` }} />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Ошибка загрузки */}
+        {/* Упавшая загрузка: «Повторить» + X (файл живёт в failedUpload до успеха/отмены) */}
+        <AnimatePresence>
+          {failedUpload && !uploading && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 mb-3 overflow-hidden">
+              <span className="text-sm text-red-400 flex-1 min-w-0 truncate">Не удалось загрузить медиа</span>
+              <button onClick={() => failedUpload.retry()}
+                className="px-2.5 py-1 rounded-lg text-[13px] font-medium text-red-300 hover:bg-red-500/15 transition-colors flex-shrink-0">
+                Повторить
+              </button>
+              <button onClick={() => setFailedUpload(null)} aria-label="Закрыть"
+                className="text-white/40 hover:text-white flex-shrink-0 transition-colors">
+                <X size={16} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Ошибка загрузки (лимиты размера и пр.) */}
         <AnimatePresence>
           {uploadError && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
@@ -750,7 +938,35 @@ export default function MessageInput({ chatId }: Props) {
                   icon={<Film size={16} />} label="Видео-файл"
                   onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}
                 />
+                <div className="my-1 mx-3 border-t border-dark-border" />
+                <DropdownItem
+                  icon={<BarChart3 size={16} />} label="Опрос"
+                  onClick={() => { setShowPoll(true); setShowAttach(false); }}
+                />
+                <DropdownItem
+                  icon={<ImagePlay size={16} />} label="GIF"
+                  onClick={() => { setShowGif(true); setShowAttach(false); }}
+                />
               </Dropdown>
+
+              {/* GIF-пикер — absolute bottom-full над кнопкой прикрепления */}
+              <AnimatePresence>
+                {showGif && (
+                  <GifPicker
+                    onSelect={(gif) => {
+                      sendMessage({
+                        chatId,
+                        type: 'image',
+                        mediaData: {
+                          url: gif.url, mimeType: 'image/gif', size: 0,
+                          width: gif.width, height: gif.height,
+                        },
+                      });
+                    }}
+                    onClose={() => setShowGif(false)}
+                  />
+                )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -891,10 +1107,23 @@ export default function MessageInput({ chatId }: Props) {
           </div>
 
           {/* ── Правая кнопка ── */}
+          {/* Медленный режим: countdown вместо кнопки отправки (textarea не блокируем) */}
+          {hasText && !isRecording && slowActive && !editingMessage && (
+            <button
+              disabled
+              title="Медленный режим: подождите перед следующим сообщением"
+              className="w-11 h-11 rounded-full border border-dark-border flex items-center justify-center flex-shrink-0 cursor-not-allowed"
+            >
+              <span className="text-[11px] tabular-nums text-white/60">{fmtSlow(slowLeft)}</span>
+            </button>
+          )}
+
           {/* Текст → градиентная кнопка отправки */}
-          {hasText && !isRecording && (
+          {hasText && !isRecording && !(slowActive && !editingMessage) && (
             <motion.button
               onClick={handleSend}
+              onContextMenu={(e) => { e.preventDefault(); setShowSchedule(true); }}
+              title="ПКМ — отправить позже"
               whileTap={{ scale: 0.9 }}
               whileHover={{ scale: 1.05 }}
               initial={{ scale: 0.6, opacity: 0 }}
