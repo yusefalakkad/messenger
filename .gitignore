@@ -41,3 +41,6 @@ packages/web/android/.idea/
 *.jks
 google-services.json
 .claude/worktrees/
+
+# Electron desktop build output
+apps/desktop/release/

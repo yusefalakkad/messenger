@@ -26,14 +26,34 @@ function resolve(mode: ThemeMode): 'dark' | 'light' {
   return mode;
 }
 
+let unsuppressRaf = 0;
+
 /** Применяет тему к документу + обновляет meta theme-color (status bar). */
 export function applyTheme(mode: ThemeMode): void {
   const actual = resolve(mode);
   const root = document.documentElement;
+
+  // ВАЖНО: глушим все CSS-transitions на момент переключения. Иначе смена
+  // data-theme разом анимирует цвет/фон тысяч элементов + body-transition с
+  // background-attachment:fixed форсит дорогой re-composite всех backdrop-filter
+  // на каждом кадре 300мс → главный поток фризит («экран блокируется»).
+  // С глушилкой тема меняется одним мгновенным репейнтом.
+  root.classList.add('theme-switching');
   root.setAttribute('data-theme', actual);
   // theme-color для PWA/мобильного статус-бара.
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', actual === 'light' ? '#f4f2f7' : '#17151e');
+
+  // Снимаем глушилку после того, как браузер применил новые переменные
+  // (двойной rAF — гарантированно следующий кадр).
+  if (unsuppressRaf) cancelAnimationFrame(unsuppressRaf);
+  if (typeof requestAnimationFrame !== 'undefined') {
+    unsuppressRaf = requestAnimationFrame(() => {
+      unsuppressRaf = requestAnimationFrame(() => root.classList.remove('theme-switching'));
+    });
+  } else {
+    root.classList.remove('theme-switching');
+  }
 }
 
 export function setMode(mode: ThemeMode): void {

@@ -63,6 +63,17 @@
   color-scheme: light;
 }
 
+/* На момент переключения темы (lib/theme.ts добавляет .theme-switching на <html>)
+   вырубаем ВСЕ переходы — браузер делает один мгновенный репейнт вместо
+   одновременной анимации цвета/фона тысяч элементов и пересборки backdrop-filter.
+   Без этого экран фризил на ~300мс. Вне @layer — чтобы !important точно победил. */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -88,11 +99,25 @@
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 20px;
-    /* Фон + ambient-засветки берутся из переменных темы. */
+    /* Только сплошной фон. Ambient-засветки — на отдельном fixed-слое ниже,
+       чтобы НЕ использовать background-attachment:fixed (он форсит репейнт
+       всего вьюпорта при смене темы/скролле и фризит UI под backdrop-filter). */
     background-color: var(--bg);
-    background-image: var(--app-bg-image);
-    background-attachment: fixed;
     transition: background-color 0.3s ease;
+  }
+
+  /* Ambient-градиент темы на собственном композ-слое (fixed + own layer):
+     не вызывает репейнт страницы при смене темы, рисуется за контентом. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--app-bg-image);
+    /* выносим в свой GPU-слой, чтобы перекраска была дешёвой */
+    will-change: opacity;
+    transform: translateZ(0);
   }
 
   /* Типографическая иерархия (без @apply — JIT тут не успевает). */
