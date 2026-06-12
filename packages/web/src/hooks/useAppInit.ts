@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
-import { api } from '@/lib/api';
+import { refreshAccessToken } from '@/lib/api';
 import { initSocket, disconnectSocket } from '@/lib/socket';
 import { setupPush } from '@/lib/push';
 import { registerPushNotifications } from '@/lib/native';
@@ -17,7 +17,6 @@ export function useAppInit(): boolean {
   const [ready, setReady] = useState(false);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const accessToken    = useAuthStore((s) => s.accessToken);
-  const setAccessToken = useAuthStore((s) => s.setAccessToken);
   const logout         = useAuthStore((s) => s.logout);
 
   useEffect(() => {
@@ -26,13 +25,11 @@ export function useAppInit(): boolean {
     async function init() {
       if (isAuthenticated) {
         if (!accessToken) {
-          // Токен не сохранился (short-lived) — обновляем через httpOnly cookie
+          // Токен не сохранился (short-lived) — обновляем через httpOnly cookie.
+          // Общий single-flight refresh: не гонится с interceptor'ом (см. api.ts).
           try {
-            const { data } = await api.post('/auth/refresh');
-            if (!cancelled) {
-              setAccessToken(data.data.accessToken);
-              initSocket();
-            }
+            await refreshAccessToken(); // сам пишет accessToken в стор
+            if (!cancelled) initSocket();
           } catch {
             if (!cancelled) {
               disconnectSocket();

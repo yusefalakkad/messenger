@@ -102,7 +102,7 @@ export default function SettingsDanger({ passwordSet }: { passwordSet: boolean }
           )}
           <div>
             <p className="text-[12px] text-content/40 mb-1.5">
-              Введите <span className="font-semibold text-rose-300">{CONFIRM_WORD}</span> для подтверждения:
+              Введите <span className="font-semibold text-rose-600 dark:text-rose-300">{CONFIRM_WORD}</span> для подтверждения:
             </p>
             <input
               value={confirmText}

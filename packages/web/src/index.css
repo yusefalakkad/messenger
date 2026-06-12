@@ -243,7 +243,7 @@
     @apply btn bg-transparent text-content/70 hover:text-content hover:bg-content/[0.06];
   }
   .btn-danger {
-    @apply btn bg-rose-500/[0.12] border border-rose-500/30 text-rose-200
+    @apply btn bg-rose-500/[0.12] border border-rose-500/30 text-rose-600 dark:text-rose-200
            hover:bg-rose-500/20;
   }
 

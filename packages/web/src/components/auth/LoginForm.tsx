@@ -187,7 +187,7 @@ export default function LoginForm() {
         <motion.div
           initial={{ opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-3 text-rose-300 text-sm"
+          className="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-3 text-rose-600 dark:text-rose-300 text-sm"
         >
           {error}
         </motion.div>

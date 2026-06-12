@@ -201,16 +201,17 @@ export class AuthService {
       throw new AppError(401, 'SESSION_EXPIRED', 'Session expired, please login again');
     }
 
-    // Rotate: blacklist old token, issue new pair
+    // Rotate. Идемпотентно и устойчиво к гонке: фронт нередко шлёт несколько
+    // /refresh с одним токеном (волна 401 на буте, несколько вкладок). Раньше
+    // здесь был prisma.session.delete() — проигравший в гонке падал с
+    // «Record to delete does not exist» → 500 → ложный логаут (и «сообщение
+    // зашифровано»). deleteMany не бросает на 0 строк; старый jti блэклистим,
+    // выдаём новую пару. Все конкурентные запросы получают валидные токены.
     const ttl = Math.floor((session.expiresAt.getTime() - Date.now()) / 1000);
     await blacklistToken(payload.jti, ttl);
+    await prisma.session.deleteMany({ where: { id: session.id } });
 
-    const tokens = await this._createSession(session.userId, session.deviceId);
-
-    // Delete old session
-    await prisma.session.delete({ where: { id: session.id } });
-
-    return tokens;
+    return this._createSession(session.userId, session.deviceId);
   }
 
   // ─── Logout ────────────────────────────────────────────────────────────────

@@ -897,9 +897,9 @@ export default function MessageInput({ chatId }: Props) {
               transition={{ duration: 0.22, ease: EASE.soft }}
               className="overflow-hidden">
               <div className="flex items-center gap-2 bg-rose-500/[0.08] border border-rose-500/20 rounded-xl px-4 py-2.5 mb-2.5 overflow-hidden">
-                <span className="text-[13px] text-rose-300 flex-1 min-w-0 truncate">Не удалось загрузить медиа</span>
+                <span className="text-[13px] text-rose-600 dark:text-rose-300 flex-1 min-w-0 truncate">Не удалось загрузить медиа</span>
                 <motion.button whileTap={tap} transition={SPRING.snappy} onClick={() => failedUpload.retry()}
-                  className="px-2.5 h-8 rounded-lg text-[13px] font-medium text-rose-200 hover:bg-rose-500/15 transition-colors flex-shrink-0">
+                  className="px-2.5 h-8 rounded-lg text-[13px] font-medium text-rose-600 dark:text-rose-200 hover:bg-rose-500/15 transition-colors flex-shrink-0">
                   Повторить
                 </motion.button>
                 <button onClick={() => setFailedUpload(null)} aria-label="Закрыть"
@@ -919,7 +919,7 @@ export default function MessageInput({ chatId }: Props) {
               transition={{ duration: 0.22, ease: EASE.soft }}
               className="overflow-hidden">
               <div className="flex items-center gap-2 bg-rose-500/[0.08] border border-rose-500/20 rounded-xl px-4 py-2.5 mb-2.5">
-                <span className="text-[13px] text-rose-300">{uploadError}</span>
+                <span className="text-[13px] text-rose-600 dark:text-rose-300">{uploadError}</span>
               </div>
             </motion.div>
           )}

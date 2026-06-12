@@ -385,9 +385,10 @@ router.delete('/me',
 );
 
 // POST /users/me/avatar — upload avatar
+// Поле формы — 'file' (единая конвенция со всей медиа-загрузкой; фронт шлёт 'file').
 router.post('/me/avatar',
   requireAuth,
-  upload.single('avatar'),
+  upload.single('file'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ success: false, error: { code: 'NO_FILE', message: 'Avatar file required' } }); return; }

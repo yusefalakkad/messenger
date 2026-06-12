@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, KeyRound, Lock, User as UserIcon, Loader2, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Lock, User as UserIcon, Loader2, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
@@ -432,21 +432,23 @@ export default function PhoneAuthForm() {
               </div>
             )}
 
-            {/* Крупный моноширинный центрированный код-инпут */}
+            {/* Крупный моноширинный центрированный код-инпут.
+                Без иконки — она бы сдвигала центр. text-indent компенсирует
+                «хвост» letter-spacing справа, чтобы цифры стояли строго по центру. */}
             <label className="block">
-              <div className="flex items-center gap-3 bg-content/[0.04] border border-dark-border rounded-xl h-16 px-4
+              <div className="bg-content/[0.04] border border-dark-border rounded-xl h-16 px-4 flex items-center
                               transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
                               focus-within:ring-2 focus-within:ring-primary-500/15">
-                <KeyRound size={18} className="text-content/35 flex-shrink-0" />
                 <input
                   ref={codeInputRef}
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder="• • • • • •"
+                  placeholder="••••••"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-center text-content text-2xl font-mono
-                             font-semibold tracking-[0.35em] tabular-nums placeholder:text-content/20 placeholder:tracking-[0.2em]"
+                  className="w-full bg-transparent outline-none text-center text-content text-3xl font-mono
+                             font-semibold tracking-[0.45em] [text-indent:0.45em] tabular-nums
+                             placeholder:text-content/20"
                 />
               </div>
             </label>
@@ -600,7 +602,7 @@ function FieldError({ message }: { message: string | null }) {
           transition={{ duration: 0.22, ease: EASE.out }}
           className="overflow-hidden"
         >
-          <div className="text-rose-300/95 text-xs bg-rose-500/[0.08] border border-rose-500/[0.22] rounded-lg px-3 py-2">
+          <div className="text-rose-600/95 dark:text-rose-300/95 text-xs bg-rose-500/[0.08] border border-rose-500/[0.22] rounded-lg px-3 py-2">
             {message}
           </div>
         </motion.div>

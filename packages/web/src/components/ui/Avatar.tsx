@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 
 interface AvatarProps {
@@ -34,7 +34,12 @@ export default function Avatar({ src, name, size = 'md', online, ring, className
   const s = sizes[size];
   // Плавное проявление img — пока не загрузилась, держим opacity-0.
   const [loaded, setLoaded] = useState(false);
+  // Если картинка не загрузилась (404/битый URL) — откатываемся на инициалы,
+  // иначе был бы пустой прозрачный кружок. Сбрасываем при смене src.
+  const [errored, setErrored] = useState(false);
+  useEffect(() => { setLoaded(false); setErrored(false); }, [src]);
   const initials = name.trim().split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const showImg = src && !errored;
 
   return (
     <div className={clsx('relative flex-shrink-0', className)}>
@@ -46,11 +51,12 @@ export default function Avatar({ src, name, size = 'md', online, ring, className
           ring && 'ring-gradient',
         )}
       >
-        {src ? (
+        {showImg ? (
           <img
             src={src}
             alt={name}
             onLoad={() => setLoaded(true)}
+            onError={() => setErrored(true)}
             className={clsx(
               'w-full h-full object-cover rounded-full transition-opacity duration-300 ease-out',
               loaded ? 'opacity-100' : 'opacity-0',

@@ -21,6 +21,27 @@ api.interceptors.request.use((config) => {
 let isRefreshing = false;
 let refreshQueue: Array<(token: string) => void> = [];
 
+// Единый in-flight refresh на всё приложение. И interceptor (волна 401), и
+// useAppInit (восстановление токена на буте) идут через него — иначе они шлют
+// ДВА /auth/refresh с одним cookie-токеном, ловят гонку ротации сессии и один
+// из них валит логаут. Здесь — single-flight: повторные вызовы ждут тот же промис.
+let inFlightRefresh: Promise<string> | null = null;
+export function refreshAccessToken(): Promise<string> {
+  if (inFlightRefresh) return inFlightRefresh;
+  inFlightRefresh = axios
+    .post(`${API_URL}/auth/refresh`, {}, { withCredentials: !isNative() })
+    .then(({ data }) => {
+      const newToken = data.data.accessToken as string;
+      useAuthStore.getState().setAccessToken(newToken);
+      // socket.io читает auth только на handshake — подменяем токен у живого сокета.
+      const s = getSocket();
+      if (s) { s.auth = { token: newToken }; if (!s.connected) s.connect(); }
+      return newToken;
+    })
+    .finally(() => { inFlightRefresh = null; });
+  return inFlightRefresh;
+}
+
 // Эти пути возвращают 401 как ЛОГИЧЕСКУЮ ошибку (wrong code / invalid token),
 // а не "истёкший access token". Они НЕ должны триггерить auto-refresh +
 // logout-каскад — иначе юзер на каждый неверный код вылетает обратно на /auth
@@ -50,17 +71,9 @@ api.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
       try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: !isNative() });
-        const newToken = data.data.accessToken;
-        useAuthStore.getState().setAccessToken(newToken);
-        // P1-7: socket.io читает auth payload только в момент handshake. После
-        // тихого refresh подменяем auth в текущем сокете, чтобы следующая волна
-        // реконнектов прошла под новым access-токеном, а не отвалилась с auth_failed.
-        const s = getSocket();
-        if (s) {
-          s.auth = { token: newToken };
-          if (!s.connected) s.connect();
-        }
+        // Общий single-flight refresh (см. refreshAccessToken) — не плодит
+        // параллельные /auth/refresh с одним cookie-токеном.
+        const newToken = await refreshAccessToken();
         refreshQueue.forEach((cb) => cb(newToken));
         refreshQueue = [];
         original.headers.Authorization = `Bearer ${newToken}`;

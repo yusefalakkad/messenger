@@ -59,6 +59,9 @@ export default function Sidebar() {
   // если socket принёс новое закрепление, а порядок ещё не обновился с сервера.
   const visibleChats = [...chats]
     .filter((c) => !c.archivedAt)
+    // «Избранное» (saved) исключаем из общего списка — у него отдельный
+    // постоянный пункт выше, иначе дублируется (два «Избранное»).
+    .filter((c) => c.type !== 'saved')
     .filter((c) => !activeFolder || activeFolder.chatIds.includes(c.id))
     .sort((a, b) => {
       const ap = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
