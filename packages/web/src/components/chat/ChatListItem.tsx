@@ -106,17 +106,19 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         onTouchMove={cancelLongPress}
         onTouchCancel={cancelLongPress}
         className={clsx(
-          'relative w-full flex items-center gap-3 px-3 py-3 mx-2 rounded-md text-left group transition',
-          'active:scale-[0.985]',
+          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 rounded-lg text-left group',
+          'transition-[background-color,transform,box-shadow] duration-200 ease-out',
+          'active:scale-[0.985] active:duration-75',
           active
-            ? 'bg-white/[0.07]'
-            : 'hover:bg-white/[0.045]',
-          isPinned && !active && 'bg-accent-violet/[0.04]',
+            ? 'bg-dark-card shadow-e1'
+            : 'hover:bg-dark-hover/60 hover:-translate-y-px',
+          isPinned && !active && 'bg-accent-violet/[0.05]',
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >
+        {/* Активный чат — выраженная brand-полоса слева */}
         {active && (
-          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient animate-pulse-glow" />
+          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow" />
         )}
         {isSaved ? (
           <span className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
@@ -132,24 +134,24 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-[15px] leading-5 truncate text-white/95 flex items-center gap-1.5">
-              {isChannel && <Megaphone size={13} className="text-white/45 flex-shrink-0" />}
+            <span className="font-semibold text-[15px] leading-5 truncate text-content/95 flex items-center gap-1.5">
+              {isChannel && <Megaphone size={13} className="text-content/45 flex-shrink-0" />}
               {name}
             </span>
-            <span className="text-white/40 text-[12px] leading-4 flex-shrink-0 font-medium flex items-center gap-1">
-              {isMuted && <BellOff size={11} className="text-white/40 opacity-70" />}
+            <span className="text-content/45 text-[12px] leading-4 flex-shrink-0 font-medium flex items-center gap-1 tabular-nums">
+              {isMuted && <BellOff size={11} className="text-content/40 opacity-70" />}
               {timeStr}
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 mt-1">
             {typing ? (
-              <span className="text-[13px] leading-[18px] truncate text-primary-300 italic animate-pulse">
+              <span className="text-[13px] leading-[18px] truncate text-primary-600 dark:text-primary-300 italic animate-pulse">
                 печатает…
               </span>
             ) : (
               <span className="text-[13px] leading-[18px] truncate flex items-center gap-1">
                 {draft && <span className="text-red-400/90 font-medium">Черновик:</span>}
-                <span className={clsx('truncate', draft ? 'text-white/60' : 'text-white/55')}>
+                <span className={clsx('truncate', draft ? 'text-content/60' : 'text-content/55')}>
                   {previewText}
                 </span>
               </span>
@@ -159,16 +161,16 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
                 <Pin size={12} className="text-accent-violet rotate-45" strokeWidth={2.5} />
               )}
               {(chat.unreadMentions ?? 0) > 0 && (
-                <span className="w-5 h-5 rounded-full bg-brand-gradient text-white text-[11px] font-bold flex items-center justify-center">
+                <span className="w-[22px] h-[22px] rounded-full bg-brand-gradient shadow-glow-violet text-white text-[12px] font-bold flex items-center justify-center">
                   @
                 </span>
               )}
               {(chat.unreadCount ?? 0) > 0 && (
                 <span className={clsx(
-                  'text-white text-[12px] rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5 font-semibold',
+                  'text-[12px] rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5 font-semibold tabular-nums',
                   isMuted
-                    ? 'bg-white/15 text-white/70'
-                    : 'bg-brand-gradient shadow-glow-violet',
+                    ? 'bg-content/15 text-content/70'
+                    : 'bg-brand-gradient text-white shadow-glow-violet',
                 )}>
                   {chat.unreadCount}
                 </span>

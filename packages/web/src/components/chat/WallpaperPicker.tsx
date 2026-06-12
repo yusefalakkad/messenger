@@ -9,6 +9,7 @@ import { Check, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { useChatStore } from '@/stores/chat.store';
+import { backdrop, popIn, tap } from '@/lib/motion';
 
 interface Props {
   chatId: string;
@@ -46,20 +47,20 @@ export default function WallpaperPicker({ chatId, current, onClose }: Props) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      variants={backdrop}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="fixed inset-0 z-overlay flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+        variants={popIn}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
         onClick={(e) => e.stopPropagation()}
-        className="max-w-sm w-[calc(100vw-2rem)] rounded-xl bg-dark-card border border-dark-border shadow-e3 p-5"
+        className="relative z-modal max-w-sm w-full surface-2 rounded-2xl shadow-e4 p-5"
       >
         <div className="flex items-center justify-between mb-4">
           <h4 className="font-semibold text-[15px]">Обои чата</h4>
@@ -69,34 +70,41 @@ export default function WallpaperPicker({ chatId, current, onClose }: Props) {
         </div>
 
         {/* Сетка пресетов 2×4 */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2.5">
           {PRESETS.map((p) => {
             const isActive = (current ?? null) === p.id;
             return (
-              <button
+              <motion.button
                 key={p.id ?? 'default'}
                 onClick={() => pick(p.id)}
                 disabled={saving}
                 aria-label={p.label}
+                whileTap={saving ? undefined : tap}
                 className="flex flex-col items-center gap-1.5 group disabled:opacity-60"
               >
                 <span
                   style={{ background: p.background }}
-                  className={`relative w-[72px] h-[72px] rounded-lg border border-dark-border
-                              transition group-hover:brightness-125
-                              ${isActive ? 'ring-2 ring-primary-500/70' : ''}`}
+                  className={`relative w-full aspect-square rounded-lg border transition-all duration-200
+                              group-hover:brightness-125
+                              ${isActive
+                                ? 'border-transparent ring-2 ring-primary-500/80 shadow-glow-violet'
+                                : 'border-dark-border group-hover:border-content/20'}`}
                 >
                   {isActive && (
-                    <Check
-                      size={16}
-                      className="absolute inset-0 m-auto text-primary-300"
-                    />
+                    <motion.span
+                      initial={{ scale: 0.4, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 26 }}
+                      className="absolute inset-0 m-auto w-6 h-6 rounded-full bg-brand-gradient flex items-center justify-center shadow-e2"
+                    >
+                      <Check size={14} className="text-white" strokeWidth={3} />
+                    </motion.span>
                   )}
                 </span>
-                <span className={`text-[12px] leading-4 ${isActive ? 'text-primary-300' : 'text-white/60'}`}>
+                <span className={`text-[12px] leading-4 transition-colors ${isActive ? 'text-primary-600 dark:text-primary-300 font-medium' : 'text-content/60 group-hover:text-content/80'}`}>
                   {p.label}
                 </span>
-              </button>
+              </motion.button>
             );
           })}
         </div>

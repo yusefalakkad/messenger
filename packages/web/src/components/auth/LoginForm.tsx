@@ -104,12 +104,12 @@ export default function LoginForm() {
   if (twoFactor) {
     return (
       <form onSubmit={handleVerify} className="space-y-4">
-        <div className="flex items-center gap-2 text-primary-300 text-sm">
+        <div className="flex items-center gap-2 text-primary-600 dark:text-primary-300 text-sm">
           <ShieldCheck size={16} />
           <span>Двухфакторная аутентификация</span>
         </div>
         <div>
-          <label className="block text-sm text-white/60 mb-1.5">
+          <label className="block text-sm text-content/60 mb-1.5">
             Код из приложения (или recovery-код)
           </label>
           <input
@@ -137,7 +137,7 @@ export default function LoginForm() {
         <button
           type="button"
           onClick={() => { setTwoFactor(null); setCode(''); setError(''); }}
-          className="w-full text-sm text-white/40 hover:text-white/70"
+          className="w-full text-sm text-content/40 hover:text-content/70"
         >
           ← Назад
         </button>
@@ -150,7 +150,7 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm text-white/60 mb-1.5">Логин, телефон или email</label>
+        <label className="block text-sm text-content/60 mb-1.5">Логин, телефон или email</label>
         <input
           className="input-base w-full"
           placeholder="@username"
@@ -162,7 +162,7 @@ export default function LoginForm() {
       </div>
 
       <div>
-        <label className="block text-sm text-white/60 mb-1.5">Пароль</label>
+        <label className="block text-sm text-content/60 mb-1.5">Пароль</label>
         <div className="relative">
           <input
             className="input-base w-full pr-12"
@@ -176,7 +176,7 @@ export default function LoginForm() {
           <button
             type="button"
             onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 p-1"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-content/40 hover:text-content/70 p-1"
           >
             {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>

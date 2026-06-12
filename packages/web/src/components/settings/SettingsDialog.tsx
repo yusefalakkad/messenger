@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, ShieldOff, Loader2, Copy, Check, KeyRound, QrCode as QrCodeIcon } from 'lucide-react';
+import { X, ShieldCheck, ShieldOff, Loader2, Copy, Check, KeyRound, QrCode as QrCodeIcon, Moon, Sun, Monitor } from 'lucide-react';
 import QRCode from 'qrcode';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { copySensitive } from '@/lib/sensitiveClipboard';
+import { getStoredMode, setMode, type ThemeMode } from '@/lib/theme';
 import IconBtn from '@/components/ui/IconBtn';
 import QRCodeModal from '@/components/ui/QRCodeModal';
 import SettingsPrivacy from '@/components/settings/SettingsPrivacy';
 import SettingsSessions from '@/components/settings/SettingsSessions';
 import SettingsBlocked from '@/components/settings/SettingsBlocked';
 import SettingsDanger from '@/components/settings/SettingsDanger';
+import { backdrop, popIn, fadeUp, listParent, tap, SPRING } from '@/lib/motion';
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -29,48 +31,119 @@ export default function SettingsDialog({ open, onClose }: Props) {
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          variants={backdrop}
+          initial="hidden" animate="visible" exit="exit"
+          className="fixed inset-0 z-overlay flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            variants={popIn}
+            initial="hidden" animate="visible" exit="exit"
             onClick={(e) => e.stopPropagation()}
-            className="bg-dark-card border border-dark-border rounded-3xl shadow-2xl shadow-black/60 w-full max-w-md mx-4 max-h-[85vh] flex flex-col overflow-hidden"
+            className="relative z-modal bg-dark-card border border-dark-border rounded-3xl shadow-e3 w-full max-w-md mx-4 max-h-[85vh] flex flex-col overflow-hidden"
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border/60">
+            <div className="flex items-center justify-between px-5 h-16 border-b border-dark-border bg-dark-card/80 backdrop-blur-xl flex-shrink-0 z-header">
               <h3 className="font-semibold text-base">Настройки</h3>
               <IconBtn size="sm" onClick={onClose}><X size={16} /></IconBtn>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Профиль</div>
-              <ProfileSection open={open} />
-              <div className="h-px bg-dark-border/60" aria-hidden />
-              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Безопасность</div>
-              <TwoFactorSection status={status} onChange={setStatus} />
-              <div className="h-px bg-dark-border/60" aria-hidden />
-              <CloudPasswordSection />
-              <div className="h-px bg-dark-border/60" aria-hidden />
-              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Конфиденциальность</div>
-              <SettingsPrivacy />
-              <div className="h-px bg-dark-border/60" aria-hidden />
-              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Активные сессии</div>
-              <SettingsSessions />
-              <div className="h-px bg-dark-border/60" aria-hidden />
-              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Чёрный список</div>
-              <SettingsBlocked />
-              <div className="h-px bg-dark-border/60" aria-hidden />
-              <div className="text-[11px] uppercase tracking-wider text-white/35 font-medium">Опасная зона</div>
-              {/* passwordSet — локальный cloudpwd-флаг (тот же паттерн, что в CloudPasswordSection) */}
-              <SettingsDanger passwordSet={getCloudPwdFlag(userId)} />
-            </div>
+            <motion.div
+              variants={listParent}
+              initial="hidden" animate="visible"
+              className="flex-1 overflow-y-auto p-4 space-y-3"
+            >
+              <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
+                <SectionTitle>Внешний вид</SectionTitle>
+                <AppearanceSection />
+              </motion.section>
+
+              <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
+                <SectionTitle>Профиль</SectionTitle>
+                <ProfileSection open={open} />
+              </motion.section>
+
+              <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2 space-y-5">
+                <SectionTitle>Безопасность</SectionTitle>
+                <TwoFactorSection status={status} onChange={setStatus} />
+                <div className="h-px bg-dark-border" aria-hidden />
+                <CloudPasswordSection />
+              </motion.section>
+
+              <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
+                <SettingsPrivacy />
+              </motion.section>
+
+              <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
+                <SettingsSessions />
+              </motion.section>
+
+              <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
+                <SettingsBlocked />
+              </motion.section>
+
+              <motion.section variants={fadeUp} className="rounded-2xl p-4 border border-red-500/25 bg-red-500/[0.04] shadow-e2">
+                {/* passwordSet — локальный cloudpwd-флаг (тот же паттерн, что в CloudPasswordSection) */}
+                <SettingsDanger passwordSet={getCloudPwdFlag(userId)} />
+              </motion.section>
+            </motion.div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/** Uppercase-заголовок секции по дизайн-системе (12px, tracking-wider, content/55). */
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-3 px-0.5">
+      <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">{children}</span>
+    </div>
+  );
+}
+
+// ─── Внешний вид: переключатель темы (Тёмная / Светлая / Авто) ────────────────
+// Сегментированный контрол с «пилюлей»-подсветкой активного режима.
+const THEME_OPTIONS: { mode: ThemeMode; label: string; Icon: typeof Moon }[] = [
+  { mode: 'dark',  label: 'Тёмная',  Icon: Moon },
+  { mode: 'light', label: 'Светлая', Icon: Sun },
+  { mode: 'auto',  label: 'Авто',    Icon: Monitor },
+];
+
+function AppearanceSection() {
+  const [mode, setLocalMode] = useState<ThemeMode>(() => getStoredMode());
+
+  const choose = (m: ThemeMode) => {
+    setLocalMode(m);
+    setMode(m); // применяет data-theme + сохраняет в localStorage
+  };
+
+  return (
+    <div className="relative grid grid-cols-3 gap-1 p-1 rounded-xl bg-content/[0.05] border border-dark-border">
+      {THEME_OPTIONS.map(({ mode: m, label, Icon }) => {
+        const active = mode === m;
+        return (
+          <button
+            key={m}
+            onClick={() => choose(m)}
+            className="relative flex flex-col items-center justify-center gap-1.5 h-16 rounded-lg
+                       text-content/60 transition-colors hover:text-content/90"
+          >
+            {active && (
+              <motion.span
+                layoutId="theme-pill"
+                transition={SPRING.snappy}
+                className="absolute inset-0 rounded-lg bg-brand-gradient shadow-glow-violet"
+              />
+            )}
+            <span className={`relative z-10 flex flex-col items-center gap-1.5 ${active ? 'text-white' : ''}`}>
+              <Icon size={20} />
+              <span className="text-[12px] font-medium">{label}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -128,28 +201,32 @@ function ProfileSection({ open }: { open: boolean }) {
           className="input-base w-full mt-2 resize-none"
         />
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[12px] text-white/35 tabular-nums">{bio.length}/140</span>
-          <button
+          <span className="text-[12px] text-content/35 tabular-nums">{bio.length}/140</span>
+          <motion.button
             onClick={save}
             disabled={busy || !dirty}
-            className="px-4 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium disabled:opacity-40 flex items-center gap-1.5"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-primary btn-sm disabled:opacity-40"
           >
-            {busy && <Loader2 size={12} className="animate-spin" />}
+            {busy && <Loader2 size={14} className="animate-spin" />}
             Сохранить
-          </button>
+          </motion.button>
         </div>
         {err && <p className="text-red-400 text-sm mt-1">{err}</p>}
         {ok  && <p className="text-green-400 text-sm mt-1">{ok}</p>}
       </div>
 
       {qrValue && (
-        <button
+        <motion.button
           onClick={() => setShowQR(true)}
-          className="w-full py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium flex items-center justify-center gap-2"
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="btn-secondary btn-block"
         >
           <QrCodeIcon size={15} />
           Мой QR-код
-        </button>
+        </motion.button>
       )}
 
       <AnimatePresence>
@@ -230,19 +307,19 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
       <div className="space-y-4">
         <div>
           <h4 className="font-semibold text-sm mb-1">Шаг 1 — отсканируй QR</h4>
-          <p className="text-xs text-white/50">Google Authenticator, Authy, 1Password — любое TOTP-приложение.</p>
+          <p className="text-xs text-content/50">Google Authenticator, Authy, 1Password — любое TOTP-приложение.</p>
         </div>
-        <div className="bg-white p-3 rounded-2xl flex items-center justify-center">
+        <div className="bg-white p-3 rounded-2xl flex items-center justify-center shadow-e2">
           <img src={setup.qr} alt="QR" className="w-48 h-48" />
         </div>
         <div>
-          <p className="text-xs text-white/40 mb-1">Или введи секрет вручную:</p>
-          <code className="block bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-xs font-mono break-all text-white/80">
+          <p className="text-xs text-content/40 mb-1">Или введи секрет вручную:</p>
+          <code className="block bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-xs font-mono break-all text-content/80">
             {setup.secret}
           </code>
         </div>
 
-        <div className="border-t border-dark-border/40 pt-4">
+        <div className="border-t border-dark-border pt-4">
           <h4 className="font-semibold text-sm mb-2">Шаг 2 — введи 6-значный код из приложения</h4>
           <input
             value={code}
@@ -256,20 +333,24 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
         {err && <p className="text-red-400 text-sm">{err}</p>}
 
         <div className="flex gap-2">
-          <button
+          <motion.button
             onClick={() => setSetup(null)}
-            className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-secondary flex-1"
           >
             Отмена
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             onClick={confirmEnable}
             disabled={busy || code.length < 6}
-            className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-primary flex-1 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             Включить
-          </button>
+          </motion.button>
         </div>
       </div>
     );
@@ -280,7 +361,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
     return (
       <div className="space-y-4">
         <h4 className="font-semibold text-sm">Отключить двухфакторную аутентификацию?</h4>
-        <p className="text-xs text-white/50">Подтверди паролем и текущим кодом из приложения.</p>
+        <p className="text-xs text-content/50">Подтверди паролем и текущим кодом из приложения.</p>
         <input
           type="password"
           value={disablePwd}
@@ -297,13 +378,13 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
         />
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={() => setShowDisable(false)} className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium">
+          <motion.button onClick={() => setShowDisable(false)} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
             Отмена
-          </button>
-          <button onClick={disable} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+          </motion.button>
+          <motion.button onClick={disable} disabled={busy} whileTap={tap} transition={SPRING.snappy} className="btn-danger flex-1 disabled:opacity-50">
             {busy && <Loader2 size={14} className="animate-spin" />}
             Отключить
-          </button>
+          </motion.button>
         </div>
       </div>
     );
@@ -313,12 +394,12 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
-        <div className={`mt-0.5 ${status?.enabled ? 'text-green-400' : 'text-white/40'}`}>
+        <div className={`mt-0.5 ${status?.enabled ? 'text-green-400' : 'text-content/40'}`}>
           {status?.enabled ? <ShieldCheck size={22} /> : <ShieldOff size={22} />}
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm">Двухфакторная аутентификация</h4>
-          <p className="text-xs text-white/50 mt-0.5">
+          <p className="text-xs text-content/50 mt-0.5">
             {status?.enabled
               ? `Включена. Осталось ${status.remainingRecoveryCodes} recovery-кодов.`
               : 'Пароль + одноразовый код из приложения при каждом входе.'}
@@ -327,21 +408,25 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
       </div>
 
       {!status?.enabled ? (
-        <button
+        <motion.button
           onClick={startSetup}
           disabled={busy}
-          className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="btn-primary btn-block disabled:opacity-50"
         >
           {busy && <Loader2 size={14} className="animate-spin" />}
           Включить 2FA
-        </button>
+        </motion.button>
       ) : (
-        <button
+        <motion.button
           onClick={() => setShowDisable(true)}
-          className="w-full py-2.5 rounded-xl bg-dark-hover hover:bg-red-500/20 hover:text-red-400 text-sm font-medium transition-colors"
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="btn-secondary btn-block hover:bg-red-500/20 hover:text-red-400"
         >
           Отключить 2FA
-        </button>
+        </motion.button>
       )}
 
       {err && <p className="text-red-400 text-sm">{err}</p>}
@@ -423,7 +508,7 @@ function CloudPasswordSection() {
     return (
       <div className="space-y-3">
         <h4 className="font-semibold text-sm">{hasPassword ? 'Сменить облачный пароль' : 'Установить облачный пароль'}</h4>
-        <p className="text-xs text-white/50">Будет запрашиваться после кода при входе на новом устройстве.</p>
+        <p className="text-xs text-content/50">Будет запрашиваться после кода при входе на новом устройстве.</p>
         {askCurrent && (
           <input
             type="password"
@@ -453,17 +538,19 @@ function CloudPasswordSection() {
         {mismatch && <p className="text-red-400 text-xs">Пароли не совпадают</p>}
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={closeForm} className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium">
+          <motion.button onClick={closeForm} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
             Отмена
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             onClick={save}
             disabled={busy || pwd1.length < 8 || pwd1 !== pwd2 || (askCurrent && !current)}
-            className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-primary flex-1 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             Сохранить
-          </button>
+          </motion.button>
         </div>
       </div>
     );
@@ -474,7 +561,7 @@ function CloudPasswordSection() {
     return (
       <div className="space-y-3">
         <h4 className="font-semibold text-sm">Удалить облачный пароль?</h4>
-        <p className="text-xs text-white/50">Вход останется только по коду из Telegram. Подтвердите текущим паролем.</p>
+        <p className="text-xs text-content/50">Вход останется только по коду из Telegram. Подтвердите текущим паролем.</p>
         <input
           type="password"
           value={current}
@@ -485,17 +572,19 @@ function CloudPasswordSection() {
         />
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={closeForm} className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium">
+          <motion.button onClick={closeForm} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
             Отмена
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             onClick={remove}
             disabled={busy || !current}
-            className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-danger flex-1 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             Удалить
-          </button>
+          </motion.button>
         </div>
       </div>
     );
@@ -505,12 +594,12 @@ function CloudPasswordSection() {
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
-        <div className={`mt-0.5 ${hasPassword ? 'text-green-400' : 'text-white/40'}`}>
+        <div className={`mt-0.5 ${hasPassword ? 'text-green-400' : 'text-content/40'}`}>
           <KeyRound size={22} />
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm">Облачный пароль</h4>
-          <p className="text-xs text-white/50 mt-0.5">
+          <p className="text-xs text-content/50 mt-0.5">
             {hasPassword
               ? 'Установлен. Запрашивается после кода при входе с нового устройства.'
               : 'Не установлен. Дополнительная защита поверх кода из Telegram.'}
@@ -519,19 +608,23 @@ function CloudPasswordSection() {
       </div>
 
       <div className="flex gap-2">
-        <button
+        <motion.button
           onClick={() => openMode('edit')}
-          className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium"
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="btn-primary flex-1"
         >
           {hasPassword ? 'Сменить' : 'Установить'}
-        </button>
+        </motion.button>
         {hasPassword && (
-          <button
+          <motion.button
             onClick={() => openMode('delete')}
-            className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-red-500/20 hover:text-red-400 text-sm font-medium transition-colors"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-secondary flex-1 hover:bg-red-500/20 hover:text-red-400"
           >
             Удалить
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -558,29 +651,33 @@ function RecoveryCodesView({ codes, onDone }: { codes: string[]; onDone: () => v
           <ShieldCheck size={16} className="text-green-400" />
           2FA включена
         </h4>
-        <p className="text-xs text-white/60 mt-2">
+        <p className="text-xs text-content/60 mt-2">
           <strong className="text-red-400">Сохрани эти 10 recovery-кодов сейчас.</strong> Каждый можно использовать
           один раз вместо TOTP-кода, если потеряешь телефон. Больше они не покажутся.
         </p>
       </div>
 
       <div className="bg-dark-bg border border-dark-border rounded-2xl p-4 grid grid-cols-2 gap-2 font-mono text-sm">
-        {codes.map((c) => <div key={c} className="text-white/85">{c}</div>)}
+        {codes.map((c) => <div key={c} className="text-content/85">{c}</div>)}
       </div>
 
       <div className="flex gap-2">
-        <button
+        <motion.button
           onClick={copyAll}
-          className="flex-1 py-2.5 rounded-xl bg-dark-hover hover:bg-dark-border text-sm font-medium flex items-center justify-center gap-2"
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="btn-secondary flex-1"
         >
           {copied ? <><Check size={14} /> Скопировано</> : <><Copy size={14} /> Скопировать все</>}
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           onClick={onDone}
-          className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium"
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="btn-primary flex-1"
         >
           Сохранил
-        </button>
+        </motion.button>
       </div>
     </div>
   );

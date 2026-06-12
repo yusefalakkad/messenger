@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Trash2, Play, Pause, Square } from 'lucide-react';
+import { SPRING, tap } from '@/lib/motion';
 
 interface Props {
   onRecorded: (blob: Blob, duration: number, thumbnailUrl: string) => void;
@@ -166,17 +167,21 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center gap-8 px-6"
+      className="fixed inset-0 z-overlay bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center gap-8 px-6"
     >
       {/* Кнопка закрытия — в углу, не теснит запись.
           Во время recording → confirm; в preview → discard. */}
-      <button
+      <motion.button
         onClick={recording ? cancelRecording : (preview ? discardPreview : onCancel)}
         aria-label="Отменить"
-        className="absolute top-6 right-6 w-11 h-11 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white/75 hover:text-white transition-colors backdrop-blur-md"
+        whileHover={{ scale: 1.06 }}
+        whileTap={tap}
+        transition={SPRING.snappy}
+        className="absolute top-6 right-6 w-11 h-11 rounded-full bg-white/[0.08] hover:bg-white/[0.16] flex items-center justify-center text-white/75 hover:text-white transition-colors backdrop-blur-md"
+        style={{ top: 'calc(var(--sat, 0px) + 1.5rem)' }}
       >
         <X size={20} />
-      </button>
+      </motion.button>
 
       {/* Круговой превью / playback */}
       <div className="relative" style={{ width: 280, height: 280 }}>
@@ -236,23 +241,34 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
 
           {/* REC-индикатор только при активной записи */}
           {recording && (
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/65 backdrop-blur-sm rounded-full px-2.5 py-1 z-10">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/65 backdrop-blur-sm rounded-full px-2.5 py-1 z-raised"
+            >
+              <motion.span
+                className="w-2 h-2 rounded-full bg-red-500"
+                animate={{ opacity: [1, 0.3, 1], scale: [1, 0.85, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              />
               <span className="text-[11px] text-white font-semibold tracking-wide">REC</span>
-            </div>
+            </motion.div>
           )}
 
           {/* Play-overlay в preview-mode */}
           {preview && !previewPlaying && (
-            <button
+            <motion.button
               onClick={togglePreviewPlay}
-              className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors z-10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              whileTap={tap}
+              className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors z-raised"
               aria-label="Воспроизвести"
             >
-              <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-2xl">
+              <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-e3">
                 <Play size={28} className="text-dark-bg translate-x-0.5" fill="currentColor" />
               </span>
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
@@ -290,12 +306,14 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
               animate={{ scale: 1,   opacity: 1 }}
               exit={{    scale: 0.7, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+              whileHover={ready ? { scale: 1.05 } : undefined}
+              whileTap={ready ? tap : undefined}
               onClick={startRecording}
               disabled={!ready}
               aria-label="Начать запись"
-              className="w-24 h-24 rounded-full bg-white hover:bg-white/95 flex items-center justify-center shadow-2xl ring-4 ring-white/10 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-e3 ring-4 ring-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <div className="w-16 h-16 rounded-full bg-red-500" />
+              <div className="w-16 h-16 rounded-full bg-red-500 shadow-[0_0_24px_-4px_rgba(239,68,68,0.7)]" />
             </motion.button>
           )}
 
@@ -309,21 +327,32 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
               transition={{ duration: 0.18 }}
               className="flex items-center gap-10"
             >
-              <button
+              <motion.button
                 onClick={cancelRecording}
                 aria-label="Отменить запись"
                 title="Отменить запись"
-                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-all active:scale-95"
+                whileHover={{ scale: 1.06 }}
+                whileTap={tap}
+                transition={SPRING.snappy}
+                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-colors"
               >
                 <Trash2 size={22} />
-              </button>
-              <button
+              </motion.button>
+              {/* Stop — пульсирующее красное кольцо */}
+              <motion.button
                 onClick={stopRecording}
                 aria-label="Остановить запись"
-                className="w-24 h-24 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center shadow-2xl shadow-red-500/50 ring-4 ring-red-500/20 active:scale-95 transition-transform"
+                whileTap={tap}
+                transition={SPRING.snappy}
+                className="relative w-24 h-24 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center shadow-e3 shadow-red-500/50"
               >
+                <motion.span
+                  className="absolute inset-0 rounded-full ring-4 ring-red-500/40"
+                  animate={{ scale: [1, 1.18, 1], opacity: [0.6, 0, 0.6] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+                />
                 <Square size={28} className="text-white" fill="currentColor" />
-              </button>
+              </motion.button>
             </motion.div>
           )}
 
@@ -337,29 +366,38 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
               transition={{ duration: 0.18 }}
               className="flex items-center gap-10"
             >
-              <button
+              <motion.button
                 onClick={discardPreview}
                 aria-label="Переснять"
                 title="Переснять"
-                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-all active:scale-95"
+                whileHover={{ scale: 1.06 }}
+                whileTap={tap}
+                transition={SPRING.snappy}
+                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-colors"
               >
                 <Trash2 size={22} />
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 onClick={togglePreviewPlay}
                 aria-label={previewPlaying ? 'Пауза' : 'Воспроизвести'}
                 title={previewPlaying ? 'Пауза' : 'Воспроизвести'}
-                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-all active:scale-95"
+                whileHover={{ scale: 1.06 }}
+                whileTap={tap}
+                transition={SPRING.snappy}
+                className="w-14 h-14 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 flex items-center justify-center text-white/85 hover:text-white transition-colors"
               >
                 {previewPlaying ? <Pause size={22} /> : <Play size={22} fill="currentColor" />}
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 onClick={sendPreview}
                 aria-label="Отправить"
-                className="w-24 h-24 rounded-full bg-brand-gradient flex items-center justify-center shadow-2xl shadow-primary-500/40 active:scale-95 transition-transform"
+                whileHover={{ scale: 1.05 }}
+                whileTap={tap}
+                transition={SPRING.snappy}
+                className="w-24 h-24 rounded-full bg-brand-gradient flex items-center justify-center shadow-e3 shadow-primary-500/40"
               >
                 <Send size={28} className="text-white -translate-x-0.5" />
-              </button>
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>

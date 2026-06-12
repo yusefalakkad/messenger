@@ -60,7 +60,7 @@ function FolderTab({
       onTouchMove={cancelLongPress}
       onTouchCancel={cancelLongPress}
       className={`relative flex-shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-full text-[13px] font-medium transition ${
-        active ? 'bg-white/[0.08] text-white' : 'text-white/55 hover:text-white/80 hover:bg-white/[0.04]'
+        active ? 'bg-content/[0.08] text-content' : 'text-content/55 hover:text-content/80 hover:bg-content/[0.04]'
       }`}
     >
       {folder?.emoji && <span className="text-[14px] leading-none">{folder.emoji}</span>}
@@ -121,7 +121,7 @@ export default function FolderTabs({ onEditFolder }: Props) {
       <button
         onClick={() => onEditFolder(null)}
         title="Новая папка"
-        className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-white/55 hover:text-white hover:bg-white/[0.06] active:scale-95 transition"
+        className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-content/55 hover:text-content hover:bg-content/[0.06] active:scale-95 transition"
       >
         <Plus size={16} />
       </button>

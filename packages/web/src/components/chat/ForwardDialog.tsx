@@ -6,6 +6,7 @@ import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { sendMessage } from '@/lib/socket';
 import { isChatE2E, getRecipientPublicKey, encryptText, decryptMessage } from '@/lib/e2e';
+import { backdrop, popIn, listParent, listChild, tap, SPRING } from '@/lib/motion';
 import type { Chat, Message } from '@messenger/shared';
 
 interface Props { messages: Message[]; onClose: () => void; }
@@ -102,31 +103,39 @@ export default function ForwardDialog({ messages, onClose }: Props) {
 
   return (
     <AnimatePresence>
+      {/* Подложка — z-overlay */}
       <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        variants={backdrop}
+        initial="hidden" animate="visible" exit="exit"
+        className="fixed inset-0 z-overlay flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       >
+        {/* Карточка — z-modal */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 8 }}
+          variants={popIn}
+          initial="hidden" animate="visible" exit="exit"
           onClick={(e) => e.stopPropagation()}
-          className="bg-dark-card border border-dark-border rounded-3xl shadow-2xl shadow-black/60 w-[28rem] max-h-[80vh] flex flex-col overflow-hidden"
+          className="relative z-modal surface-2 rounded-2xl shadow-e3 w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
         >
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-dark-border/60">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-dark-border">
             <CornerUpRight size={18} className="text-primary-400" />
             <h3 className="font-semibold text-base flex-1">
               {messages.length > 1 ? `Переслать (${messages.length})` : 'Переслать в...'}
             </h3>
-            <button onClick={onClose} className="btn-icon btn-icon-sm">
+            <motion.button
+              whileTap={tap}
+              transition={SPRING.snappy}
+              onClick={onClose}
+              className="btn-icon btn-icon-sm"
+              aria-label="Закрыть"
+            >
               <X size={16} />
-            </button>
+            </motion.button>
           </div>
 
-          <div className="px-4 py-3 border-b border-dark-border/40">
+          <div className="px-4 py-3 border-b border-dark-border">
             <div className="relative">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/35" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-content/35 z-raised" />
               <input
                 autoFocus
                 value={q}
@@ -144,7 +153,7 @@ export default function ForwardDialog({ messages, onClose }: Props) {
                 <AlertTriangle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 text-sm">
                   <p className="font-medium text-amber-200 mb-1">Пересылка шифрованного сообщения</p>
-                  <p className="text-white/70 text-xs leading-relaxed">
+                  <p className="text-content/70 text-xs leading-relaxed">
                     В чате «{confirmTarget.type === 'group'
                       ? confirmTarget.name
                       : confirmTarget.members.find((m) => m.userId !== user?.id)?.user.displayName ?? 'Личный чат'}»
@@ -153,13 +162,13 @@ export default function ForwardDialog({ messages, onClose }: Props) {
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => setConfirmTarget(null)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-hover text-white/70 hover:text-white"
+                      className="btn-ghost btn-sm"
                     >
                       Отмена
                     </button>
                     <button
                       onClick={() => { void doForward(confirmTarget.id); setConfirmTarget(null); }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/80 text-white hover:bg-amber-500"
+                      className="btn-sm bg-amber-500/85 text-white hover:bg-amber-500 transition"
                     >
                       Переслать
                     </button>
@@ -169,29 +178,39 @@ export default function ForwardDialog({ messages, onClose }: Props) {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto py-1">
+          <div className="flex-1 overflow-y-auto px-2 py-1">
             {filtered.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-white/40">Нет подходящих чатов</div>
+              // Пустое состояние с brand-glow иконкой
+              <div className="flex flex-col items-center text-center px-6 py-8">
+                <div className="w-14 h-14 rounded-2xl bg-brand-gradient-soft border border-dark-border shadow-glow-violet flex items-center justify-center mb-3">
+                  <Search size={24} className="text-content/55" />
+                </div>
+                <p className="text-[15px] font-medium">Нет подходящих чатов</p>
+                <p className="text-[13px] text-content/45 mt-1">Попробуйте другой запрос</p>
+              </div>
             )}
-            {filtered.map((c) => {
-              const other = c.type === 'direct' ? c.members.find((m) => m.userId !== user?.id) : null;
-              const name = c.type === 'group' ? c.name : other?.user.displayName ?? '?';
-              const avatar = c.type === 'group' ? c.avatar : other?.user.avatar;
-              return (
-                <button
-                  key={c.id}
-                  disabled={sending === c.id}
-                  onClick={() => startForward(c.id)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-left disabled:opacity-50"
-                >
-                  <Avatar src={avatar} name={name ?? '?'} size="sm" />
-                  <span className="flex-1 text-sm font-medium truncate">{name}</span>
-                  {sending === c.id && (
-                    <span className="text-xs text-primary-400">отправка...</span>
-                  )}
-                </button>
-              );
-            })}
+            <motion.div variants={listParent} initial="hidden" animate="visible">
+              {filtered.map((c) => {
+                const other = c.type === 'direct' ? c.members.find((m) => m.userId !== user?.id) : null;
+                const name = c.type === 'group' ? c.name : other?.user.displayName ?? '?';
+                const avatar = c.type === 'group' ? c.avatar : other?.user.avatar;
+                return (
+                  <motion.button
+                    key={c.id}
+                    variants={listChild}
+                    disabled={sending === c.id}
+                    onClick={() => startForward(c.id)}
+                    className="list-item w-full min-h-[48px] text-left disabled:opacity-50"
+                  >
+                    <Avatar src={avatar} name={name ?? '?'} size="sm" />
+                    <span className="flex-1 text-[15px] font-medium truncate">{name}</span>
+                    {sending === c.id && (
+                      <span className="text-[12px] text-primary-400">отправка...</span>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
           </div>
         </motion.div>
       </motion.div>

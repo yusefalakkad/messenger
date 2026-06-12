@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { clsx } from 'clsx';
 
 interface AvatarProps {
@@ -5,6 +6,8 @@ interface AvatarProps {
   name: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   online?: boolean;
+  /** Градиентное брендовое кольцо вокруг аватара. */
+  ring?: boolean;
   className?: string;
 }
 
@@ -27,27 +30,49 @@ function nameToColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export default function Avatar({ src, name, size = 'md', online, className }: AvatarProps) {
+export default function Avatar({ src, name, size = 'md', online, ring, className }: AvatarProps) {
   const s = sizes[size];
+  // Плавное проявление img — пока не загрузилась, держим opacity-0.
+  const [loaded, setLoaded] = useState(false);
   const initials = name.trim().split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
   return (
     <div className={clsx('relative flex-shrink-0', className)}>
-      <div className={clsx('rounded-full flex items-center justify-center overflow-hidden', s.box)}>
+      <div
+        className={clsx(
+          'rounded-full flex items-center justify-center overflow-hidden',
+          s.box,
+          // Кольцо: градиентный padding-обод вокруг.
+          ring && 'ring-gradient',
+        )}
+      >
         {src ? (
-          <img src={src} alt={name} className="w-full h-full object-cover" />
+          <img
+            src={src}
+            alt={name}
+            onLoad={() => setLoaded(true)}
+            className={clsx(
+              'w-full h-full object-cover rounded-full transition-opacity duration-300 ease-out',
+              loaded ? 'opacity-100' : 'opacity-0',
+            )}
+          />
         ) : (
-          <div className={clsx('w-full h-full flex items-center justify-center font-semibold text-white', s.text, nameToColor(name))}>
+          <div className={clsx('w-full h-full flex items-center justify-center font-semibold text-white rounded-full', s.text, nameToColor(name))}>
             {initials}
           </div>
         )}
       </div>
       {online !== undefined && (
         <span className={clsx(
-          'absolute bottom-0 right-0 rounded-full border-2 border-dark-surface',
+          'absolute bottom-0 right-0 rounded-full border-2 border-dark-surface transition-colors duration-300',
           s.dot,
-          online ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-white/25',
-        )} />
+          online ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.65)]' : 'bg-content/25',
+        )}>
+          {/* Мягкий пульс-ореол только для онлайна. */}
+          {online && (
+            <span className="absolute inset-0 rounded-full bg-emerald-400/60 animate-ping" />
+          )}
+        </span>
       )}
     </div>
   );

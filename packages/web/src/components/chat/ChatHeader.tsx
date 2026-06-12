@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, ChevronLeft, Users, Timer, Hourglass, Palette } from 'lucide-react';
+import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, ChevronLeft, Users, Timer, Hourglass, Palette, Bookmark } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
@@ -61,20 +61,24 @@ export default function ChatHeader({ chat, otherMember }: Props) {
   const [startingGroupCall, setStartingGroupCall] = useState(false);
 
   const isChannel = chat.type === 'channel';
+  const isSaved   = chat.type === 'saved';
   // Моя роль в чате — медленный режим настраивают только owner/admin групп и каналов
   const myRole = chat.members.find((m) => m.userId === myUserId)?.role;
   const canSetSlowMode =
     (chat.type === 'group' || chat.type === 'channel') &&
     (myRole === 'owner' || myRole === 'admin');
-  const name     = chat.type === 'direct' ? otherMember?.user.displayName : chat.name;
+  const name     = isSaved ? 'Избранное' : chat.type === 'direct' ? otherMember?.user.displayName : chat.name;
   const avatar   = chat.type === 'direct' ? otherMember?.user.avatar : chat.avatar;
   const isOnline = otherMember?.user.status === 'online';
-  const e2e      = isChatE2E(chat);
-  const subtitle = chat.type === 'group'
-    ? `${chat.members.length} участников`
-    : isChannel
-      ? `${chat.members.length} ${pluralRu(chat.members.length, 'подписчик', 'подписчика', 'подписчиков')}`
-      : isOnline ? 'в сети' : 'не в сети';
+  // «Избранное» — личное хранилище, не показываем индикатор шифрования.
+  const e2e      = !isSaved && isChatE2E(chat);
+  const subtitle = isSaved
+    ? 'Сохранённые сообщения'
+    : chat.type === 'group'
+      ? `${chat.members.length} участников`
+      : isChannel
+        ? `${chat.members.length} ${pluralRu(chat.members.length, 'подписчик', 'подписчика', 'подписчиков')}`
+        : isOnline ? 'в сети' : 'не в сети';
 
   const peerId = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== myUserId)?.userId
@@ -142,30 +146,37 @@ export default function ChatHeader({ chat, otherMember }: Props) {
     <>
       {/* Высота 64px (h-16), padding x16/y0 — стандарт messenger-headers по 8-сетке.
           На мобиле — h-15 (60) и компактный отступ от safe-area. */}
-      <header className="flex items-center gap-2 px-4 h-16 pt-[var(--sat)] border-b border-dark-border bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
+      <header className="relative z-30 flex items-center gap-2 px-4 h-16 pt-[var(--sat)] border-b border-dark-border bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
         <IconBtn onClick={() => navigate('/')} className="lg:hidden -ml-2" title="Назад">
           <ChevronLeft size={20} />
         </IconBtn>
 
         <button
-          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity h-full"
-          onClick={() => setShowProfile(true)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity h-full disabled:hover:opacity-100"
+          onClick={() => { if (!isSaved) setShowProfile(true); }}
+          disabled={isSaved}
         >
-          <Avatar
-            src={avatar}
-            name={name ?? '?'}
-            size="md"
-            online={chat.type === 'direct' ? isOnline : undefined}
-          />
+          {isSaved ? (
+            <span className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
+              <Bookmark size={18} className="text-white" />
+            </span>
+          ) : (
+            <Avatar
+              src={avatar}
+              name={name ?? '?'}
+              size="md"
+              online={chat.type === 'direct' ? isOnline : undefined}
+            />
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <h4 className="truncate">{name}</h4>
-              {e2e && <ShieldCheck size={13} className="text-primary-300 flex-shrink-0" />}
+              {e2e && <ShieldCheck size={13} className="text-primary-600 dark:text-primary-300 flex-shrink-0" />}
             </div>
-            <p className={`flex items-center gap-1 text-[12px] leading-4 truncate mt-0.5 font-medium ${isOnline ? 'text-green-400' : 'text-white/45'}`}>
+            <p className={`flex items-center gap-1 text-[12px] leading-4 truncate mt-0.5 font-medium ${isOnline ? 'text-green-400' : 'text-content/45'}`}>
               {chat.messageTtlSeconds != null && (
                 <span title="Автоудаление включено" className="flex-shrink-0 inline-flex">
-                  <Timer size={11} className="text-white/45" />
+                  <Timer size={11} className="text-content/45" />
                 </span>
               )}
               <span className="truncate">{subtitle}</span>
@@ -253,11 +264,11 @@ export default function ChatHeader({ chat, otherMember }: Props) {
                 key={opt.label}
                 className={clsx(
                   'menu-item',
-                  active && 'text-primary-300 bg-primary-500/15 hover:bg-primary-500/20',
+                  active && 'text-primary-600 dark:text-primary-300 bg-primary-500/15 hover:bg-primary-500/20',
                 )}
                 onClick={() => { setChatTtl(chat.id, opt.seconds); setShowTtl(false); }}
               >
-                <Timer size={16} className={active ? 'text-primary-300' : 'text-white/45'} />
+                <Timer size={16} className={active ? 'text-primary-600 dark:text-primary-300' : 'text-content/45'} />
                 {opt.label}
               </button>
             );
@@ -279,11 +290,11 @@ export default function ChatHeader({ chat, otherMember }: Props) {
                 key={opt.label}
                 className={clsx(
                   'menu-item',
-                  active && 'text-primary-300 bg-primary-500/15 hover:bg-primary-500/20',
+                  active && 'text-primary-600 dark:text-primary-300 bg-primary-500/15 hover:bg-primary-500/20',
                 )}
                 onClick={() => { setSlowMode(chat.id, opt.seconds); setShowSlowMode(false); }}
               >
-                <Hourglass size={16} className={active ? 'text-primary-300' : 'text-white/45'} />
+                <Hourglass size={16} className={active ? 'text-primary-600 dark:text-primary-300' : 'text-content/45'} />
                 {opt.label}
               </button>
             );

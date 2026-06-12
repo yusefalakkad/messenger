@@ -34,7 +34,7 @@ function renderRichText(text: string): ReactNode[] {
     if (MENTION_RE.test(part)) {
       MENTION_RE.lastIndex = 0;
       return (
-        <span key={i} className="text-primary-300 font-medium cursor-pointer hover:underline">
+        <span key={i} className="text-primary-600 dark:text-primary-300 font-medium cursor-pointer hover:underline">
           {part}
         </span>
       );
@@ -47,10 +47,12 @@ interface Props {
   message: Message;
   isOwn: boolean;
   showAvatar: boolean;
+  showName?: boolean;
+  isCont?: boolean;
   chatId: string;
 }
 
-export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Props) {
+export default function MessageBubble({ message, isOwn, showAvatar, showName = false, isCont = false, chatId }: Props) {
   const [viewerSrc,  setViewerSrc]  = useState<string | null>(null);
   const [viewerType, setViewerType] = useState<'image' | 'video'>('image');
   const [menuPos,    setMenuPos]    = useState<{ x: number; y: number } | null>(null);
@@ -185,6 +187,8 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
 
   // Кружок — только пузырёк без внутренних отступов
   const isCircle = message.type === 'circle';
+  // Опрос всегда на нейтральном фоне — на ярком градиенте текст/проценты нечитаемы.
+  const isPoll = message.type === 'poll';
   // View-once: «истрачено» = просмотрено или медиа уже удалено сервером.
   // Получателю медиа в пузыре не показываем (только плейсхолдер), отправителю — как обычно
   const isViewOnce      = !!message.viewOnce;
@@ -203,7 +207,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
   if (message.type === 'system') {
     return (
       <div className="flex justify-center my-2">
-        <div className="text-[11px] text-white/45 bg-white/[0.04] px-3 py-1 rounded-full">
+        <div className="text-[11px] text-content/45 bg-content/[0.04] px-3 py-1 rounded-full">
           {message.content ?? ''}
         </div>
       </div>
@@ -246,7 +250,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
             className="absolute -left-9 top-1/2 -translate-y-1/2 pointer-events-none"
           >
             <div className="w-7 h-7 rounded-full bg-dark-surface/90 border border-dark-border flex items-center justify-center">
-              <CornerUpLeft size={16} className="text-white/70" />
+              <CornerUpLeft size={16} className="text-content/70" />
             </div>
           </motion.div>
 
@@ -257,9 +261,9 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
             </div>
           )}
 
-          {/* Имя отправителя (группы) */}
-          {showAvatar && !isOwn && (
-            <span className="text-xs text-primary-400 font-medium mb-1 ml-3">
+          {/* Имя отправителя — только в группах, у первого в серии */}
+          {showName && !isOwn && (
+            <span className="text-[12px] text-primary-600 dark:text-primary-300 font-semibold mb-1 ml-3">
               {message.sender?.displayName}
             </span>
           )}
@@ -278,7 +282,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
                 )}>
                   {(message.replyTo as any).sender?.displayName}
                 </p>
-                <p className={clsx('text-xs truncate', isOwn ? 'text-white/75' : 'text-white/60')}>
+                <p className={clsx('text-xs truncate', isOwn ? 'text-white/75' : 'text-content/60')}>
                   {/* Зашифрованные сообщения в reply показываем как 🔒, а не как base64-мусор */}
                   {formatReplyPreview(message.replyTo as any) || message.replyTo.content}
                 </p>
@@ -294,7 +298,9 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
           {/* ─── Обычный пузырёк ─── */}
           {!isCircle && (
             <div className={clsx(
-              isOwn ? 'bubble-out' : 'bubble-in',
+              // Опрос — всегда нейтральный пузырь (bubble-in), даже у отправителя.
+              isPoll ? 'bubble-in' : (isOwn ? 'bubble-out' : 'bubble-in'),
+              isCont && 'is-cont',
               (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3.5 py-2',
               'min-w-[88px]',
               isSelected    && 'ring-2 ring-primary-500/70',
@@ -313,7 +319,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
 
               {/* View-once истрачено — «сгоревший» плейсхолдер */}
               {viewOnceSpent && !revealedVoiceMedia && (
-                <p className="text-[13px] text-white/45 py-0.5">🔥 Просмотрено</p>
+                <p className={clsx('text-[13px] py-0.5', isOwn ? 'text-white/45' : 'text-content/45')}>🔥 Просмотрено</p>
               )}
 
               {/* Фото */}
@@ -367,13 +373,13 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
                             // Есть история правок — пометка кликабельна, открывает поповер версий
                             ? (
                               <span
-                                className="text-white/40 text-xs ml-1 cursor-pointer hover:underline"
+                                className={clsx('text-xs ml-1 cursor-pointer hover:underline', isOwn ? 'text-white/40' : 'text-content/40')}
                                 onClick={(e) => { e.stopPropagation(); setShowHistory(true); }}
                               >
                                 (изм.)
                               </span>
                             )
-                            : <span className="text-white/40 text-xs ml-1">(изм.)</span>
+                            : <span className={clsx('text-xs ml-1', isOwn ? 'text-white/40' : 'text-content/40')}>(изм.)</span>
                         )}
                       </p>
                       {/* OG-превью первой ссылки */}
@@ -406,7 +412,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
                 )}
                 {message.expiresAt && (
                   <span title="Исчезающее сообщение" className="flex items-center">
-                    <Timer size={10} className={(isPureImage || isPureVideo) ? 'text-white/80' : 'text-white/50'} />
+                    <Timer size={10} className={(isPureImage || isPureVideo) ? 'text-white/80' : (isOwn ? 'text-white/50' : 'text-content/50')} />
                   </span>
                 )}
                 {/* View-once у отправителя: бейдж «1×», после просмотра — «Просмотрено» */}
@@ -415,12 +421,12 @@ export default function MessageBubble({ message, isOwn, showAvatar, chatId }: Pr
                     ? <span className="text-[10px] leading-none text-white/60">Просмотрено</span>
                     : <span className="text-[10px] leading-none px-1 rounded bg-white/15 text-white/80">1×</span>
                 )}
-                <span className={clsx('text-[11px] leading-none', (isPureImage || isPureVideo) ? 'text-white/80' : 'text-white/50')}>
+                <span className={clsx('text-[11px] leading-none', (isPureImage || isPureVideo) ? 'text-white/80' : (isOwn ? 'text-white/50' : 'text-content/50'))}>
                   {time}
                 </span>
                 {isOwn && (
                   isRead
-                    ? <CheckCheck size={12} className="text-primary-300" />
+                    ? <CheckCheck size={12} className="text-primary-600 dark:text-primary-300" />
                     : <Check size={12} className="text-white/50" />
                 )}
               </div>
@@ -499,12 +505,12 @@ function ViewOnceTeaser({
       onClick={onOpen}
       className="flex items-center gap-3 py-1.5 pr-2 text-left focus:outline-none"
     >
-      <div className="w-11 h-11 rounded-full border border-white/20 flex items-center justify-center flex-shrink-0">
-        <Eye size={20} className="text-white/80" />
+      <div className="w-11 h-11 rounded-full border border-content/20 flex items-center justify-center flex-shrink-0">
+        <Eye size={20} className="text-content/80" />
       </div>
       <div className="flex flex-col min-w-0">
-        <span className="text-sm font-medium text-white/95">{label}</span>
-        <span className="text-xs text-white/50">Нажмите для просмотра</span>
+        <span className="text-sm font-medium text-content/95">{label}</span>
+        <span className="text-xs text-content/50">Нажмите для просмотра</span>
       </div>
     </button>
   );
@@ -537,7 +543,7 @@ function VideoMessage({
         />
       ) : (
         <div className="w-full h-48 bg-dark-hover flex items-center justify-center">
-          <Play size={40} className="text-white/60" />
+          <Play size={40} className="text-content/60" />
         </div>
       )}
       {/* Play overlay */}
@@ -609,7 +615,7 @@ function CircleMessage({
 
       {/* Время под кружком */}
       <div className="flex items-center gap-1 mt-1 mr-1">
-        <span className="text-[11px] text-white/40 leading-none">{time}</span>
+        <span className="text-[11px] text-content/40 leading-none">{time}</span>
       </div>
     </div>
   );
@@ -644,8 +650,8 @@ function ReactionBar({
           className={clsx(
             'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs border transition-all',
             mine
-              ? 'bg-primary-600/25 border-primary-500/50 text-primary-300'
-              : 'bg-dark-hover border-dark-border text-white/60 hover:border-white/20',
+              ? 'bg-primary-600/25 border-primary-500/50 text-primary-600 dark:text-primary-300'
+              : 'bg-dark-hover border-dark-border text-content/60 hover:border-content/20',
           )}
         >
           <span>{emoji}</span>
@@ -696,7 +702,7 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
 
   if (failed) {
     return (
-      <p className="text-xs text-white/35 italic flex items-center gap-1.5">
+      <p className="text-xs text-content/35 italic flex items-center gap-1.5">
         <Lock size={11} />
         <span>Сообщение из прошлой сессии</span>
       </p>
@@ -706,8 +712,8 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
   if (plaintext === null) {
     return (
       <div className="flex items-center gap-1.5 py-0.5">
-        <Lock size={11} className="text-white/30 animate-pulse" />
-        <span className="text-xs text-white/30">Расшифровка...</span>
+        <Lock size={11} className="text-content/30 animate-pulse" />
+        <span className="text-xs text-content/30">Расшифровка...</span>
       </div>
     );
   }
@@ -745,16 +751,16 @@ function FileMessage({
         <FileText size={20} className="text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={clsx('text-sm font-medium truncate', isOwn ? 'text-white' : 'text-white/95')}>
+        <p className={clsx('text-sm font-medium truncate', isOwn ? 'text-white' : 'text-content/95')}>
           {name}
         </p>
         {sizeStr && (
-          <p className={clsx('text-xs', isOwn ? 'text-white/70' : 'text-white/45')}>
+          <p className={clsx('text-xs', isOwn ? 'text-white/70' : 'text-content/45')}>
             {sizeStr}
           </p>
         )}
       </div>
-      <Download size={16} className={isOwn ? 'text-white/80' : 'text-white/50'} />
+      <Download size={16} className={isOwn ? 'text-white/80' : 'text-content/50'} />
     </a>
   );
 }

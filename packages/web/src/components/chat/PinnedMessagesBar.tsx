@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { pinMessage } from '@/lib/socket';
 import { useChatStore } from '@/stores/chat.store';
 import { formatMessagePreview } from '@/lib/messagePreview';
+import { EASE } from '@/lib/motion';
 
 interface Props {
   chatId: string;
@@ -91,28 +92,30 @@ export default function PinnedMessagesBar({ chatId, onJump }: Props) {
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 48, opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-          className="overflow-hidden flex-shrink-0 bg-dark-surface/80 backdrop-blur border-b border-dark-border"
+          transition={{ duration: 0.22, ease: EASE.soft }}
+          className="relative z-raised overflow-hidden flex-shrink-0 bg-dark-surface/80 backdrop-blur-xl border-b border-dark-border"
         >
           <div
             role="button"
             tabIndex={0}
             onClick={handleClick}
             onKeyDown={(e) => e.key === 'Enter' && handleClick()}
-            className="h-12 px-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.03] transition"
+            className="h-12 px-4 flex items-center gap-3 cursor-pointer hover:bg-content/[0.03] transition-colors duration-200"
           >
-            <Pin size={16} className="text-primary-400 rotate-45 flex-shrink-0" />
+            {/* Brand-полоска-акцент слева */}
+            <span className="w-[3px] self-stretch my-2 rounded-full bg-brand-gradient flex-shrink-0" />
+            <Pin size={15} className="text-primary-400 rotate-45 flex-shrink-0" />
             <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <span className="text-[12px] leading-4 text-primary-300 tabular-nums">
+              <span className="text-[12px] leading-4 text-primary-600 dark:text-primary-300 tabular-nums font-medium">
                 Закреплённое сообщение {safeIndex + 1} из {pinned.length}
               </span>
-              <span className="text-[13px] leading-4 text-white/80 truncate">
+              <span className="text-[13px] leading-4 text-content/70 truncate">
                 {formatMessagePreview(current)}
               </span>
             </div>
             <button
               onClick={handleUnpin}
-              className="btn-icon btn-icon-sm flex-shrink-0"
+              className="btn-icon btn-icon-sm text-content/45 hover:text-content flex-shrink-0"
               aria-label="Открепить сообщение"
             >
               <X size={16} />

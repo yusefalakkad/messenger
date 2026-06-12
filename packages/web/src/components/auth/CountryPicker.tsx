@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search } from 'lucide-react';
 import { clsx } from 'clsx';
+import { menu, SPRING, tapSoft } from '@/lib/motion';
 
 /**
  * Минимальный country-picker для phone-auth. ~60 стран с приоритетом СНГ + Europe + US.
@@ -184,66 +185,80 @@ export default function CountryPicker({ value, onChange }: Props) {
 
   return (
     <div ref={wrapRef} className="relative">
-      <button
+      <motion.button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 h-full px-2 -ml-1 rounded-md text-white/85 hover:bg-white/[0.05] active:scale-[0.97] transition"
+        whileTap={tapSoft}
+        transition={SPRING.snappy}
+        className="flex items-center gap-1.5 h-10 px-2 -ml-1 rounded-md text-content/85 hover:bg-content/[0.06]
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 transition-colors"
         aria-label="Выбрать страну"
       >
         <span className="text-lg leading-none">{value.flag}</span>
         <span className="font-medium text-[14px] tabular-nums">{value.dialCode}</span>
-        <ChevronDown size={14} className={clsx('text-white/45 transition-transform', open && 'rotate-180')} />
-      </button>
+        <ChevronDown size={14} className={clsx('text-content/45 transition-transform duration-200', open && 'rotate-180')} />
+      </motion.button>
 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0,  scale: 1 }}
-            exit={{    opacity: 0, y: -6, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-            className="absolute z-50 top-full left-0 mt-2 w-[280px] max-w-[calc(100vw-2rem)] rounded-xl
+            variants={menu}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ transformOrigin: 'top left' }}
+            className="absolute z-dropdown top-full left-0 mt-2 w-[280px] max-w-[calc(100vw-2rem)] rounded-xl
                        bg-dark-surface border border-dark-border shadow-e3 overflow-hidden"
           >
             <div className="p-2 border-b border-dark-border">
               <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-content/40" />
                 <input
                   ref={inputRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Поиск страны или кода"
-                  className="w-full h-9 pl-9 pr-3 rounded-md bg-white/[0.04] text-white text-[13px]
-                             placeholder:text-white/35 outline-none focus:bg-white/[0.06]
-                             focus:ring-2 focus:ring-primary-500/25"
+                  className="w-full h-9 pl-9 pr-3 rounded-md bg-content/[0.04] border border-dark-border text-content text-[13px]
+                             placeholder:text-content/35 outline-none transition focus:bg-content/[0.06]
+                             focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20"
                 />
               </div>
             </div>
 
-            <div className="max-h-[280px] overflow-y-auto py-1">
+            <div className="max-h-[280px] overflow-y-auto py-1 overscroll-contain">
               {filtered.length === 0 ? (
-                <div className="px-4 py-6 text-center text-white/40 text-[13px]">Ничего не найдено</div>
+                <div className="px-4 py-8 text-center text-content/40 text-[13px]">Ничего не найдено</div>
               ) : (
-                filtered.map((c) => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    onClick={() => {
-                      onChange(c);
-                      setOpen(false);
-                      setSearch('');
-                    }}
-                    className={clsx(
-                      'w-full flex items-center gap-3 px-3 h-10 text-left transition',
-                      'hover:bg-white/[0.06] active:bg-white/[0.09]',
-                      c.code === value.code && 'bg-white/[0.04]',
-                    )}
-                  >
-                    <span className="text-base leading-none flex-shrink-0">{c.flag}</span>
-                    <span className="flex-1 truncate text-[14px] text-white/85">{c.name}</span>
-                    <span className="text-[13px] text-white/45 tabular-nums flex-shrink-0">{c.dialCode}</span>
-                  </button>
-                ))
+                filtered.map((c) => {
+                  const selected = c.code === value.code;
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => {
+                        onChange(c);
+                        setOpen(false);
+                        setSearch('');
+                      }}
+                      className={clsx(
+                        'group w-full flex items-center gap-3 px-3 h-10 text-left transition-colors',
+                        'hover:bg-content/[0.06] active:bg-content/[0.09]',
+                        'focus-visible:outline-none focus-visible:bg-content/[0.06]',
+                        selected && 'bg-primary-500/[0.12]',
+                      )}
+                    >
+                      <span className="text-base leading-none flex-shrink-0">{c.flag}</span>
+                      <span className={clsx(
+                        'flex-1 truncate text-[14px]',
+                        selected ? 'text-content font-medium' : 'text-content/85',
+                      )}>{c.name}</span>
+                      <span className={clsx(
+                        'text-[13px] tabular-nums flex-shrink-0',
+                        selected ? 'text-primary-600 dark:text-primary-300' : 'text-content/45',
+                      )}>{c.dialCode}</span>
+                    </button>
+                  );
+                })
               )}
             </div>
           </motion.div>

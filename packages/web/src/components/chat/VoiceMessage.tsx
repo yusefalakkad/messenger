@@ -153,7 +153,7 @@ export default function VoiceMessage({
               !dragging && 'transition-colors duration-75',
               i < filledCount
                 ? (isOwn ? 'bg-white' : 'bg-primary-400')
-                : (isOwn ? 'bg-white/35' : 'bg-white/25'),
+                : (isOwn ? 'bg-white/35' : 'bg-content/25'),
             )}
             style={{ height: `${Math.max(3, h * 28)}px` }}
           />
@@ -161,7 +161,7 @@ export default function VoiceMessage({
       </div>
 
       {/* Время: при playing/drag — текущее / общее, иначе длительность */}
-      <span className="text-xs text-white/50 flex-shrink-0 tabular-nums">
+      <span className={clsx('text-xs flex-shrink-0 tabular-nums', isOwn ? 'text-white/50' : 'text-content/50')}>
         {playing || dragging
           ? `${formatDuration(current)} / ${formatDuration(duration)}`
           : formatDuration(duration)}
@@ -175,7 +175,7 @@ export default function VoiceMessage({
           'text-[11px] font-medium tabular-nums transition-colors',
           isOwn
             ? 'bg-white/15 hover:bg-white/25 text-white/80'
-            : 'bg-white/10 hover:bg-white/20 text-white/70',
+            : 'bg-content/10 hover:bg-content/20 text-content/70',
         )}
       >
         {RATES[rateIdx]}x

@@ -83,7 +83,7 @@ export default function MessageContextMenu({
           onClick={() => { onReply(); onClose(); }}
           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
         >
-          <Reply size={16} className="text-white/50" />
+          <Reply size={16} className="text-content/50" />
           <span>Ответить</span>
         </button>
 
@@ -91,7 +91,7 @@ export default function MessageContextMenu({
           onClick={() => { pinMessage(message.chatId, message.id, !message.pinnedAt); onClose(); }}
           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
         >
-          <Pin size={16} className="text-white/50" />
+          <Pin size={16} className="text-content/50" />
           <span>{message.pinnedAt ? 'Открепить' : 'Закрепить'}</span>
         </button>
 
@@ -100,7 +100,7 @@ export default function MessageContextMenu({
             onClick={() => { onEdit?.(); onClose(); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
           >
-            <Pencil size={16} className="text-white/50" />
+            <Pencil size={16} className="text-content/50" />
             <span>Редактировать</span>
           </button>
         )}
@@ -110,7 +110,7 @@ export default function MessageContextMenu({
             onClick={() => { onForward(); onClose(); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
           >
-            <CornerUpRight size={16} className="text-white/50" />
+            <CornerUpRight size={16} className="text-content/50" />
             <span>Переслать</span>
           </button>
         )}
@@ -119,7 +119,7 @@ export default function MessageContextMenu({
           onClick={() => { useChatStore.getState().toggleMessageSelection(message.id); onClose(); }}
           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
         >
-          <CheckSquare size={16} className="text-white/50" />
+          <CheckSquare size={16} className="text-content/50" />
           <span>Выбрать</span>
         </button>
 
@@ -128,7 +128,7 @@ export default function MessageContextMenu({
             onClick={() => { navigator.clipboard.writeText(message.content!).catch(() => {}); onClose(); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-dark-hover transition-colors text-sm"
           >
-            <Copy size={16} className="text-white/50" />
+            <Copy size={16} className="text-content/50" />
             <span>Копировать</span>
           </button>
         )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
+import { menu, tapSoft } from '@/lib/motion';
 
 type Props = {
   open: boolean;
@@ -37,13 +38,14 @@ export default function Dropdown({ open, onClose, anchor = 'right', children, cl
       {open && (
         <motion.div
           ref={ref}
-          initial={{ opacity: 0, scale: 0.94, y: -6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: -6 }}
-          transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+          variants={menu}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          style={{ transformOrigin: anchor === 'right' ? 'top right' : 'top left' }}
           className={clsx(
             'absolute top-full mt-2 min-w-[190px] glass',
-            'rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50',
+            'rounded-2xl shadow-e3 overflow-hidden z-dropdown p-1',
             anchor === 'right' ? 'right-0' : 'left-0',
             className,
           )}
@@ -59,14 +61,23 @@ export function DropdownItem({
   icon, label, onClick, danger,
 }: { icon?: ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
-    <button onClick={onClick} className={clsx('menu-item', danger && 'menu-item-danger')}>
+    <motion.button
+      onClick={onClick}
+      whileTap={tapSoft}
+      className={clsx('group menu-item rounded-lg', danger && 'menu-item-danger')}
+    >
       {icon && (
         <span className={clsx(
-          'flex-shrink-0 transition-transform duration-200',
-          danger ? 'text-rose-400' : 'text-primary-300',
+          'flex-shrink-0 transition-transform duration-200 group-hover:scale-110',
+          danger ? 'text-rose-400' : 'text-primary-600 dark:text-primary-300',
         )}>{icon}</span>
       )}
       <span>{label}</span>
-    </button>
+    </motion.button>
   );
+}
+
+// Тонкий разделитель между группами пунктов меню.
+export function DropdownDivider() {
+  return <div className="my-1 h-px bg-dark-border/70" />;
 }

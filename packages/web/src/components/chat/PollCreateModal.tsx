@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Plus, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
+import { backdrop, popIn, tap, SPRING } from '@/lib/motion';
 
 interface Props {
   chatId: string;
@@ -49,33 +50,32 @@ export default function PollCreateModal({ chatId, onClose }: Props) {
   };
 
   return (
+    // Подложка — z-overlay
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md"
+      variants={backdrop}
+      initial="hidden" animate="visible" exit="exit"
+      className="fixed inset-0 z-overlay flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Карточка — z-modal */}
       <motion.div
-        initial={{ scale: 0.92, y: 16, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.92, y: 16, opacity: 0 }}
-        transition={{ duration: 0.25, ease: [0.34, 1.3, 0.64, 1] }}
+        variants={popIn}
+        initial="hidden" animate="visible" exit="exit"
         onClick={(e) => e.stopPropagation()}
-        className="glass-card w-full max-w-sm overflow-hidden relative"
+        className="relative z-modal glass-card rounded-2xl shadow-e3 w-full max-w-sm overflow-hidden"
       >
         <div className="absolute -top-20 -right-20 w-56 h-56 bg-spot-violet blur-3xl pointer-events-none" />
         <div className="relative">
           <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
-            <h2 className="font-semibold">Создать опрос</h2>
+            <h3 className="font-semibold">Создать опрос</h3>
             <motion.button
-              whileTap={{ scale: 0.9 }}
-              whileHover={{ rotate: 90 }}
+              whileTap={tap}
+              transition={SPRING.snappy}
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/[0.07] text-white/60"
+              className="btn-icon btn-icon-sm"
+              aria-label="Закрыть"
             >
-              <X size={18} />
+              <X size={16} />
             </motion.button>
           </div>
 
@@ -102,7 +102,7 @@ export default function PollCreateModal({ chatId, onClose }: Props) {
                   {options.length > 2 && (
                     <button
                       onClick={() => removeOption(idx)}
-                      className="p-2 rounded-lg hover:bg-white/[0.07] text-white/45 hover:text-white/80 transition"
+                      className="btn-icon btn-icon-sm flex-shrink-0"
                       aria-label="Удалить опцию"
                     >
                       <X size={16} />
@@ -113,7 +113,7 @@ export default function PollCreateModal({ chatId, onClose }: Props) {
               {options.length < 10 && (
                 <button
                   onClick={addOption}
-                  className="flex items-center gap-1.5 text-sm text-primary-300 hover:text-primary-200 py-2 px-1 transition self-start"
+                  className="flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-300 hover:text-primary-500 dark:hover:text-primary-200 py-2 px-1 transition self-start"
                 >
                   <Plus size={16} />
                   Добавить опцию
@@ -123,14 +123,14 @@ export default function PollCreateModal({ chatId, onClose }: Props) {
 
             <button
               onClick={() => setMultiple((v) => !v)}
-              className="flex items-center gap-2.5 py-2 px-1 text-sm text-white/80 self-start"
+              className="flex items-center gap-2.5 py-2 px-1 text-sm text-content/80 self-start"
             >
               <span
                 className={clsx(
                   'w-5 h-5 rounded-md border flex items-center justify-center transition',
                   multiple
-                    ? 'bg-primary-500 border-primary-500'
-                    : 'border-dark-border bg-white/[0.04]',
+                    ? 'bg-brand-gradient border-transparent shadow-glow-violet'
+                    : 'border-dark-border bg-content/[0.04]',
                 )}
               >
                 {multiple && <Check size={14} className="text-white" />}
@@ -138,10 +138,10 @@ export default function PollCreateModal({ chatId, onClose }: Props) {
               Несколько ответов
             </button>
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-[13px] text-red-400">{error}</p>}
           </div>
 
-          <div className="flex justify-end gap-2 px-4 pb-4">
+          <div className="flex justify-end gap-2 px-4 pb-4 pt-1">
             <button className="btn-ghost" onClick={onClose}>
               Отмена
             </button>

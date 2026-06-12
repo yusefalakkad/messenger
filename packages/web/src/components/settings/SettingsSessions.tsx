@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Monitor, Smartphone, X, Loader2 } from 'lucide-react';
+import { Monitor, Smartphone, X } from 'lucide-react';
 import type { UserSession } from '@messenger/shared';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import Dialog, { DialogButton } from '@/components/ui/Dialog';
+import { listParent, listChild, tap, SPRING } from '@/lib/motion';
 
 /**
  * Секция «Активные сессии» — список устройств юзера (GET /auth/sessions).
@@ -76,26 +77,38 @@ export default function SettingsSessions() {
   return (
     <div>
       <div className="mb-3 px-1">
-        <span className="text-[12px] uppercase tracking-wider font-semibold text-white/55">Активные сессии</span>
+        <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">Активные сессии</span>
       </div>
 
       {sessions === null ? (
-        <div className="flex justify-center py-8">
-          <Loader2 size={20} className="animate-spin text-white/40" />
+        // Skeleton-плейсхолдеры вместо спиннера
+        <div className="space-y-1">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="list-item cursor-default">
+              <div className="skeleton w-10 h-10 rounded-md flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="skeleton h-3.5 w-32 rounded" />
+                <div className="skeleton h-2.5 w-44 rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : sessions.length === 0 ? (
-        <p className="text-[13px] text-white/35 px-1 py-3">Нет активных сессий</p>
+        <p className="text-[13px] text-content/35 px-1 py-3">Нет активных сессий</p>
       ) : (
-        <div className="space-y-1">
+        <motion.div
+          variants={listParent}
+          initial="hidden"
+          animate="visible"
+          className="space-y-1"
+        >
           {sessions.map((s) => (
             <motion.div
               key={s.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.18 }}
+              variants={listChild}
               className="list-item cursor-default"
             >
-              <div className="w-10 h-10 rounded-md bg-white/[0.05] border border-dark-border flex items-center justify-center text-white/65 flex-shrink-0">
+              <div className="w-10 h-10 rounded-md bg-dark-card border border-dark-border flex items-center justify-center text-content/65 flex-shrink-0">
                 {isMobileUA(s.userAgent) ? <Smartphone size={18} /> : <Monitor size={18} />}
               </div>
               <div className="flex-1 min-w-0">
@@ -104,36 +117,41 @@ export default function SettingsSessions() {
                     {s.deviceName || (isMobileUA(s.userAgent) ? 'Телефон' : 'Компьютер')}
                   </span>
                   {s.isCurrent && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-primary-500/15 text-primary-300 font-medium flex-shrink-0">
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-gradient text-white font-medium flex-shrink-0">
                       Текущая
                     </span>
                   )}
                 </div>
-                <div className="text-[12px] text-white/40 truncate tabular-nums">
+                <div className="text-[12px] text-content/40 truncate tabular-nums">
                   {[s.ipAddress, formatDate(s.createdAt)].filter(Boolean).join(' · ')}
                 </div>
               </div>
               {!s.isCurrent && (
-                <button
+                <motion.button
                   className="btn-icon btn-icon-danger flex-shrink-0"
+                  whileTap={tap}
+                  whileHover={{ scale: 1.04 }}
+                  transition={SPRING.snappy}
                   onClick={() => setConfirm({ type: 'one', session: s })}
                   aria-label="Завершить сессию"
                 >
                   <X size={16} />
-                </button>
+                </motion.button>
               )}
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       {others.length > 0 && (
-        <button
+        <motion.button
           className="btn-danger btn-sm w-full mt-3"
+          whileTap={tap}
+          transition={SPRING.snappy}
           onClick={() => setConfirm({ type: 'all' })}
         >
           Завершить все остальные
-        </button>
+        </motion.button>
       )}
 
       {/* Подтверждение терминации */}

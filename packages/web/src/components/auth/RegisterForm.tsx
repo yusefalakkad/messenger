@@ -56,7 +56,7 @@ export default function RegisterForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm text-white/60 mb-1.5">Username</label>
+          <label className="block text-sm text-content/60 mb-1.5">Username</label>
           <input
             className="input-base w-full"
             placeholder="@username"
@@ -68,7 +68,7 @@ export default function RegisterForm() {
           />
         </div>
         <div>
-          <label className="block text-sm text-white/60 mb-1.5">Имя</label>
+          <label className="block text-sm text-content/60 mb-1.5">Имя</label>
           <input
             className="input-base w-full"
             placeholder="Иван"
@@ -80,7 +80,7 @@ export default function RegisterForm() {
       </div>
 
       <div>
-        <label className="block text-sm text-white/60 mb-1.5">Телефон (необязательно)</label>
+        <label className="block text-sm text-content/60 mb-1.5">Телефон (необязательно)</label>
         <input
           className="input-base w-full"
           type="tel"
@@ -91,7 +91,7 @@ export default function RegisterForm() {
       </div>
 
       <div>
-        <label className="block text-sm text-white/60 mb-1.5">Пароль</label>
+        <label className="block text-sm text-content/60 mb-1.5">Пароль</label>
         <div className="relative">
           <input
             className="input-base w-full pr-12"
@@ -105,7 +105,7 @@ export default function RegisterForm() {
           <button
             type="button"
             onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 p-1"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-content/40 hover:text-content/70 p-1"
           >
             {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
@@ -119,8 +119,8 @@ export default function RegisterForm() {
         transition={{ delay: 0.1 }}
         className="flex items-start gap-2.5 bg-primary-600/10 border border-primary-500/25 rounded-xl px-4 py-3"
       >
-        <ShieldCheck size={16} className="text-primary-300 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-primary-200/85 leading-relaxed">
+        <ShieldCheck size={16} className="text-primary-600 dark:text-primary-300 mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-primary-500/85 dark:text-primary-200/85 leading-relaxed">
           При регистрации автоматически создаётся ключ шифрования. Приватный ключ хранится только на вашем устройстве.
         </p>
       </motion.div>

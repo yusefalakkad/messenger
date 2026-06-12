@@ -9,8 +9,7 @@ import PinnedMessagesBar from '@/components/chat/PinnedMessagesBar';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import SelectionBar from './SelectionBar';
-import { isChatE2E } from '@/lib/e2e';
-import { ShieldCheck, MessageSquareOff } from 'lucide-react';
+import { MessageSquareOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Message } from '@messenger/shared';
 
@@ -66,15 +65,15 @@ export default function ChatWindow() {
     return (
       <div className="flex flex-col h-full relative items-center justify-center text-center px-6">
         {stillLoading ? (
-          <div className="flex flex-col items-center gap-3 text-white/40">
+          <div className="flex flex-col items-center gap-3 text-content/40">
             <div className="w-10 h-10 rounded-full border-2 border-primary-500/40 border-t-primary-500 animate-spin" />
             <p className="text-sm">Загружаем чат...</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 text-white/50 max-w-xs">
-            <MessageSquareOff size={32} className="text-white/40" />
+          <div className="flex flex-col items-center gap-3 text-content/50 max-w-xs">
+            <MessageSquareOff size={32} className="text-content/40" />
             <p className="text-sm">Чат не найден или вас исключили из него.</p>
-            <Link to="/chat" className="text-primary-400 hover:text-primary-300 text-sm font-medium">
+            <Link to="/chat" className="text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 text-sm font-medium">
               ← К списку чатов
             </Link>
           </div>
@@ -86,8 +85,6 @@ export default function ChatWindow() {
   const otherMember = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== user?.id)
     : null;
-
-  const isE2E = isChatE2E(chat);
 
   // Канал: писать могут только owner/admin. Обычному подписчику вместо
   // поля ввода показываем бар с toggle уведомлений.
@@ -112,16 +109,6 @@ export default function ChatWindow() {
       <SelectionBar chatId={chatId} />
       <ChatHeader chat={chat} otherMember={otherMember ?? undefined} />
       <PinnedMessagesBar chatId={chatId} onJump={(id) => requestJump(chatId, id)} />
-
-      {/* E2E-баннер — показывается один раз при открытии зашифрованного чата */}
-      {isE2E && (
-        <div className="flex items-center justify-center gap-1.5 py-1.5 bg-primary-600/10 border-b border-primary-500/20 flex-shrink-0 backdrop-blur-sm">
-          <ShieldCheck size={12} className="text-primary-300" />
-          <span className="text-[11px] text-primary-200/80 select-none">
-            Сообщения защищены сквозным шифрованием
-          </span>
-        </div>
-      )}
 
       {/* Обои чата: фон области сообщений по chat.wallpaper (self-настройка ChatMember) */}
       <div

@@ -6,6 +6,7 @@ import Avatar from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
 import type { Chat, ChatType, Message } from '@messenger/shared';
+import { EASE, listParent, listChild, tap, SPRING } from '@/lib/motion';
 
 interface Props {
   query: string;
@@ -153,94 +154,122 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-      className="absolute inset-0 z-10 bg-dark-surface overflow-y-auto"
+      transition={{ duration: 0.18, ease: EASE.soft }}
+      className="absolute inset-0 z-raised bg-dark-surface overflow-y-auto"
     >
+      {/* Skeleton при загрузке — вместо голого спиннера (shimmer-плейсхолдеры) */}
       {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={20} className="text-white/40 animate-spin" />
+        <div className="pt-2">
+          <div className="px-4 py-2">
+            <div className="skeleton h-3 w-20 rounded-md" />
+          </div>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="list-item">
+              <div className="skeleton w-10 h-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="skeleton h-3.5 rounded-md" style={{ width: `${55 + (i % 3) * 12}%` }} />
+                <div className="skeleton h-2.5 w-1/3 rounded-md" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Премиум пустое состояние — крупная иконка в rounded-2xl с brand-glow */}
       {isEmpty && (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-white/40">
-          <SearchX size={28} />
-          <p className="text-[13px]">Ничего не найдено</p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: EASE.out }}
+          className="flex flex-col items-center justify-center gap-4 px-8 py-20 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-dark-card border border-dark-border flex items-center justify-center shadow-glow-violet">
+            <SearchX size={28} className="text-primary-600 dark:text-primary-300" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[15px] font-semibold text-content/90">Ничего не найдено</p>
+            <p className="text-[13px] text-content/45 max-w-[260px]">
+              Попробуйте изменить запрос или поискать по @username канала
+            </p>
+          </div>
+        </motion.div>
       )}
 
       {!loading && results !== null && results.chats.length > 0 && (
-        <section>
-          <h4 className="px-4 py-2 text-[12px] uppercase tracking-wider text-white/55 font-medium">
+        <motion.section variants={listParent} initial="hidden" animate="visible">
+          <h4 className="px-4 pt-3 pb-1.5 text-[11px] uppercase tracking-wider text-content/45 font-semibold">
             Чаты
           </h4>
           {results.chats.map((chat) => {
             const title = chatTitle(chat, myUserId);
             return (
-              <button
+              <motion.button
+                variants={listChild}
                 key={chat.id}
                 onClick={() => onOpenChat(chat.id)}
                 className="list-item w-full text-left"
               >
                 <Avatar src={chatAvatar(chat, myUserId)} name={title} size="md" />
-                <span className="flex-1 min-w-0 text-[15px] font-semibold text-white/95 truncate">
+                <span className="flex-1 min-w-0 text-[15px] font-semibold text-content/95 truncate">
                   {highlightMatch(title, query)}
                 </span>
-              </button>
+              </motion.button>
             );
           })}
-        </section>
+        </motion.section>
       )}
 
       {!loading && channels.length > 0 && (
-        <section>
-          <h4 className="px-4 py-2 text-[12px] uppercase tracking-wider text-white/55 font-medium">
+        <motion.section variants={listParent} initial="hidden" animate="visible">
+          <h4 className="px-4 pt-3 pb-1.5 text-[11px] uppercase tracking-wider text-content/45 font-semibold">
             Каналы и группы
           </h4>
           {channels.map((channel) => (
-            <div key={channel.id} className="list-item w-full">
+            <motion.div variants={listChild} key={channel.id} className="list-item w-full">
               {channel.avatar ? (
                 <Avatar src={channel.avatar} name={channel.name} size="md" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0 shadow-glow-violet">
                   {channel.type === 'group'
                     ? <Users size={18} className="text-white" />
                     : <Megaphone size={18} className="text-white" />}
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-white/95 truncate">
+                <p className="text-[15px] font-semibold text-content/95 truncate">
                   {highlightMatch(channel.name, query)}
                 </p>
-                <p className="text-[12px] text-white/55 truncate tabular-nums">
+                <p className="text-[12px] text-content/45 truncate tabular-nums">
                   {channel.username ? `@${channel.username} · ` : ''}
                   {subscribersLabel(channel.subscriberCount)}
                 </p>
               </div>
               {channel.isMember ? (
-                <button
+                <motion.button whileTap={tap} transition={SPRING.snappy}
                   onClick={() => onOpenChat(channel.id)}
                   className="btn-ghost btn-sm flex-shrink-0"
                 >
                   Открыть
-                </button>
+                </motion.button>
               ) : (
-                <button
+                <motion.button whileTap={tap} transition={SPRING.snappy}
                   onClick={() => handleSubscribe(channel)}
                   disabled={subscribingId === channel.id}
                   className="btn-primary btn-sm flex-shrink-0"
                 >
-                  Подписаться
-                </button>
+                  {subscribingId === channel.id
+                    ? <Loader2 size={15} className="animate-spin" />
+                    : 'Подписаться'}
+                </motion.button>
               )}
-            </div>
+            </motion.div>
           ))}
-        </section>
+        </motion.section>
       )}
 
       {!loading && results !== null && results.messages.length > 0 && (
-        <section>
-          <h4 className="px-4 py-2 text-[12px] uppercase tracking-wider text-white/55 font-medium">
+        <motion.section variants={listParent} initial="hidden" animate="visible">
+          <h4 className="px-4 pt-3 pb-1.5 text-[11px] uppercase tracking-wider text-content/45 font-semibold">
             Сообщения
           </h4>
           {results.messages.map((msg) => {
@@ -249,7 +278,8 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
               : msg.chat.name ?? msg.sender?.displayName ?? 'Чат';
             const snippet = makeSnippet(msg.content ?? '', query);
             return (
-              <button
+              <motion.button
+                variants={listChild}
                 key={msg.id}
                 onClick={() => onOpenChat(msg.chatId, msg.id)}
                 className="list-item w-full text-left"
@@ -257,21 +287,21 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
                 <Avatar src={msg.sender?.avatar} name={msg.sender?.displayName ?? '?'} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-semibold text-white/95 truncate">
+                    <span className="text-[13px] font-semibold text-content/95 truncate">
                       {chatName}
                     </span>
-                    <span className="text-[12px] text-white/40 flex-shrink-0 tabular-nums">
+                    <span className="text-[12px] text-content/40 flex-shrink-0 tabular-nums">
                       {formatTime(msg.createdAt)}
                     </span>
                   </div>
-                  <p className="text-[13px] leading-[18px] text-white/55 truncate mt-0.5">
+                  <p className="text-[13px] leading-[18px] text-content/55 truncate mt-0.5">
                     {highlightMatch(snippet, query)}
                   </p>
                 </div>
-              </button>
+              </motion.button>
             );
           })}
-        </section>
+        </motion.section>
       )}
     </motion.div>
   );

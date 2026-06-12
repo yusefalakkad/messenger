@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, KeyRound, Lock, User as UserIcon, Loader2, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, KeyRound, Lock, User as UserIcon, Loader2, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { generateKeyPair } from '@/lib/crypto';
 import { cachePlaintext, getCached as getCachedPrivKey } from '@/lib/keyVault';
 import { initSocket } from '@/lib/socket';
+import { SPRING, EASE, tap } from '@/lib/motion';
 import CountryPicker, { DEFAULT_COUNTRY, parsePhoneInput, type Country } from './CountryPicker';
 
 // P1-9: persist deviceId per-browser. Без этого бэк фоллбэчит на новый uuidv4
@@ -319,26 +320,28 @@ export default function PhoneAuthForm() {
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={step}
-        initial={{ opacity: 0, x: 16 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -16 }}
-        transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+        initial={{ opacity: 0, x: 24, filter: 'blur(4px)' }}
+        animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+        exit={{ opacity: 0, x: -24, filter: 'blur(4px)' }}
+        transition={{ duration: 0.3, ease: EASE.soft }}
         className="space-y-5"
       >
         {step === 'phone' && (
           <form onSubmit={handlePhoneSubmit} className="space-y-4">
-            <h2 className="text-white text-xl font-semibold leading-tight">
+            <h2 className="text-content text-xl font-semibold leading-tight">
               Введите ваш номер
             </h2>
-            <p className="text-white/50 text-sm">
+            <p className="text-content/50 text-sm">
               Мы отправим одноразовый код через Telegram.
             </p>
 
             <label className="block">
-              <div className="text-white/55 text-xs mb-1.5">Номер телефона</div>
-              <div className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl pl-2 pr-4 h-14 transition">
+              <div className="text-content/55 text-xs mb-1.5">Номер телефона</div>
+              <div className="flex items-center gap-2 bg-content/[0.04] border border-dark-border rounded-xl pl-2 pr-4 h-14
+                              transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
+                              focus-within:ring-2 focus-within:ring-primary-500/15">
                 <CountryPicker value={country} onChange={setCountry} />
-                <span className="w-px h-6 bg-white/10" aria-hidden />
+                <span className="w-px h-6 bg-content/10" aria-hidden />
                 <input
                   autoFocus
                   inputMode="tel"
@@ -350,12 +353,12 @@ export default function PhoneAuthForm() {
                     if (c.code !== country.code) setCountry(c);
                     setPhone(local);
                   }}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-white text-[15px] placeholder:text-white/30 tabular-nums"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-content text-[15px] placeholder:text-content/30 tabular-nums"
                 />
               </div>
             </label>
 
-            {error && <FieldError message={error} />}
+            <FieldError message={error} />
 
             <BrandSubmit loading={loading} disabled={phone.replace(/\D/g, '').length < 6}>
               Отправить код <ArrowRight size={16} />
@@ -365,44 +368,48 @@ export default function PhoneAuthForm() {
 
         {step === 'link-bot' && tgDeepLink && (
           <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => { setStep('phone'); setTgDeepLink(null); setError(null); }}
-              className="text-white/45 hover:text-white/80 text-xs"
-            >
-              ← Сменить номер
-            </button>
+            <BackButton onClick={() => { setStep('phone'); setTgDeepLink(null); setError(null); }} />
 
-            <h2 className="text-white text-xl font-semibold leading-tight">
+            <h2 className="text-content text-xl font-semibold leading-tight">
               Откройте Dakka-бот в Telegram
             </h2>
-            <p className="text-white/50 text-sm">
-              Это разовое действие. Откройте бота, нажмите <span className="text-white/80">Start</span>,
+            <p className="text-content/50 text-sm">
+              Это разовое действие. Откройте бота, нажмите <span className="text-content/80">Start</span>,
               затем поделитесь номером. Код придёт прямо в этот чат.
             </p>
 
-            <a
+            <motion.a
               href={tgDeepLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full bg-[#229ED9] text-white font-medium
-                         py-3.5 rounded-xl shadow-lg active:scale-[0.98] transition"
+              whileTap={tap}
+              whileHover={{ scale: 1.01 }}
+              transition={SPRING.snappy}
+              className="flex items-center justify-center gap-2 w-full h-12 bg-[#229ED9] text-white font-medium
+                         rounded-xl shadow-[0_10px_30px_-12px_rgba(34,158,217,0.7)] hover:brightness-105 transition-[filter]"
             >
               <Send size={16} /> Открыть Telegram
-            </a>
+            </motion.a>
 
-            <ol className="text-white/55 text-xs space-y-1.5 px-1">
-              <li><span className="text-white/80">1.</span> Telegram откроется — нажмите «Start»</li>
-              <li><span className="text-white/80">2.</span> Бот покажет кнопку «Поделиться номером» — нажмите её</li>
-              <li><span className="text-white/80">3.</span> В чате с ботом появится код</li>
-              <li><span className="text-white/80">4.</span> Вернитесь сюда и нажмите «У меня есть код»</li>
+            <ol className="text-content/55 text-xs space-y-2 rounded-xl bg-content/[0.03] border border-dark-border p-3">
+              {[
+                'Telegram откроется — нажмите «Start»',
+                'Бот покажет кнопку «Поделиться номером» — нажмите её',
+                'В чате с ботом появится код',
+                'Вернитесь сюда и нажмите «У меня есть код»',
+              ].map((t, i) => (
+                <li key={i} className="flex gap-2.5">
+                  <span className="flex-shrink-0 grid place-items-center w-5 h-5 rounded-full bg-primary-500/15
+                                   text-primary-600 dark:text-primary-300 text-[11px] font-semibold tabular-nums">{i + 1}</span>
+                  <span className="pt-0.5 leading-snug">{t}</span>
+                </li>
+              ))}
             </ol>
 
             <button
               type="button"
               onClick={() => setStep('code')}
-              className="w-full bg-brand-gradient text-white font-medium py-3.5 rounded-xl shadow-glow-violet
-                         transition active:scale-[0.98] flex items-center justify-center gap-2"
+              className="btn-primary btn-block"
             >
               У меня есть код <ArrowRight size={16} />
             </button>
@@ -411,18 +418,12 @@ export default function PhoneAuthForm() {
 
         {step === 'code' && (
           <form onSubmit={handleCodeSubmit} className="space-y-4">
-            <button
-              type="button"
-              onClick={() => { setStep('phone'); setCode(''); setError(null); }}
-              className="text-white/45 hover:text-white/80 text-xs"
-            >
-              ← Сменить номер
-            </button>
-            <h2 className="text-white text-xl font-semibold leading-tight">
+            <BackButton onClick={() => { setStep('phone'); setCode(''); setError(null); }} />
+            <h2 className="text-content text-xl font-semibold leading-tight">
               Введите код
             </h2>
-            <p className="text-white/50 text-sm">
-              Мы отправили 6-значный код на <span className="text-white/80">{fullPhone}</span>
+            <p className="text-content/50 text-sm">
+              Мы отправили 6-значный код на <span className="text-content/80 tabular-nums">{fullPhone}</span>
             </p>
 
             {devOtpHint && ((import.meta as any).env?.DEV) && (
@@ -431,22 +432,26 @@ export default function PhoneAuthForm() {
               </div>
             )}
 
+            {/* Крупный моноширинный центрированный код-инпут */}
             <label className="block">
-              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl px-4 py-3.5 transition">
-                <KeyRound size={16} className="text-white/40" />
+              <div className="flex items-center gap-3 bg-content/[0.04] border border-dark-border rounded-xl h-16 px-4
+                              transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
+                              focus-within:ring-2 focus-within:ring-primary-500/15">
+                <KeyRound size={18} className="text-content/35 flex-shrink-0" />
                 <input
                   ref={codeInputRef}
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder="123 456"
+                  placeholder="• • • • • •"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                  className="flex-1 bg-transparent outline-none text-white text-lg tracking-[0.4em] placeholder:text-white/30"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-center text-content text-2xl font-mono
+                             font-semibold tracking-[0.35em] tabular-nums placeholder:text-content/20 placeholder:tracking-[0.2em]"
                 />
               </div>
             </label>
 
-            {error && <FieldError message={error} />}
+            <FieldError message={error} />
 
             <BrandSubmit loading={loading} disabled={code.length < 4}>
               Подтвердить <ArrowRight size={16} />
@@ -456,10 +461,11 @@ export default function PhoneAuthForm() {
               type="button"
               onClick={handleResend}
               disabled={resendIn > 0 || loading}
-              className="block w-full text-center text-xs text-white/55 hover:text-white/80 disabled:text-white/30"
+              className="block w-full text-center text-xs text-content/55 hover:text-content/85 disabled:text-content/30
+                         disabled:cursor-not-allowed transition-colors py-1"
             >
               {resendIn > 0
-                ? `Отправить новый код можно через ${resendIn}s`
+                ? <>Отправить новый код можно через <span className="tabular-nums text-content/70">{resendIn}s</span></>
                 : 'Отправить новый код'}
             </button>
           </form>
@@ -467,26 +473,22 @@ export default function PhoneAuthForm() {
 
         {step === 'password' && (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <button
-              type="button"
-              onClick={() => {
-                // OTP уже консумирован — назад только через новый код.
-                setStep('phone'); setCode(''); setCloudPassword(''); setPasswordToken(null); setError(null);
-              }}
-              className="text-white/45 hover:text-white/80 text-xs"
-            >
-              ← Сменить номер
-            </button>
-            <h2 className="text-white text-xl font-semibold leading-tight">
+            <BackButton onClick={() => {
+              // OTP уже консумирован — назад только через новый код.
+              setStep('phone'); setCode(''); setCloudPassword(''); setPasswordToken(null); setError(null);
+            }} />
+            <h2 className="text-content text-xl font-semibold leading-tight">
               Облачный пароль
             </h2>
-            <p className="text-white/50 text-sm">
+            <p className="text-content/50 text-sm">
               Аккаунт защищён дополнительным паролем. Введите его, чтобы войти.
             </p>
 
             <label className="block">
-              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl px-4 py-3.5 transition">
-                <Lock size={16} className="text-white/40" />
+              <div className="flex items-center gap-3 bg-content/[0.04] border border-dark-border rounded-xl px-4 h-14
+                              transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
+                              focus-within:ring-2 focus-within:ring-primary-500/15">
+                <Lock size={16} className="text-content/40 flex-shrink-0" />
                 <input
                   autoFocus
                   type="password"
@@ -494,12 +496,12 @@ export default function PhoneAuthForm() {
                   placeholder="Пароль"
                   value={cloudPassword}
                   onChange={(e) => setCloudPassword(e.target.value)}
-                  className="flex-1 bg-transparent outline-none text-white text-[15px] placeholder:text-white/30"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-content text-[15px] placeholder:text-content/30"
                 />
               </div>
             </label>
 
-            {error && <FieldError message={error} />}
+            <FieldError message={error} />
 
             <BrandSubmit loading={loading} disabled={cloudPassword.length < 1}>
               Войти <ArrowRight size={16} />
@@ -509,41 +511,45 @@ export default function PhoneAuthForm() {
 
         {step === 'profile' && (
           <form onSubmit={handleProfileSubmit} className="space-y-4">
-            <h2 className="text-white text-xl font-semibold leading-tight">
+            <h2 className="text-content text-xl font-semibold leading-tight">
               Расскажите о себе
             </h2>
-            <p className="text-white/50 text-sm">
+            <p className="text-content/50 text-sm">
               Эти данные увидят люди, с которыми вы переписываетесь.
             </p>
 
             <label className="block">
-              <div className="text-white/55 text-xs mb-1.5">Имя</div>
-              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl px-4 py-3.5 transition">
-                <UserIcon size={16} className="text-white/40" />
+              <div className="text-content/55 text-xs mb-1.5">Имя</div>
+              <div className="flex items-center gap-3 bg-content/[0.04] border border-dark-border rounded-xl px-4 h-14
+                              transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
+                              focus-within:ring-2 focus-within:ring-primary-500/15">
+                <UserIcon size={16} className="text-content/40 flex-shrink-0" />
                 <input
                   autoFocus
                   placeholder="Иван Иванов"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value.slice(0, 64))}
-                  className="flex-1 bg-transparent outline-none text-white placeholder:text-white/30"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-content text-[15px] placeholder:text-content/30"
                 />
               </div>
             </label>
 
             <label className="block">
-              <div className="text-white/55 text-xs mb-1.5">Username — необязательно</div>
-              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.07] focus-within:border-primary-400/50 rounded-xl px-4 py-3.5 transition">
-                <span className="text-white/40">@</span>
+              <div className="text-content/55 text-xs mb-1.5">Username — необязательно</div>
+              <div className="flex items-center gap-3 bg-content/[0.04] border border-dark-border rounded-xl px-4 h-14
+                              transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
+                              focus-within:ring-2 focus-within:ring-primary-500/15">
+                <span className="text-content/40 flex-shrink-0">@</span>
                 <input
                   placeholder="ivan"
                   value={username}
                   onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 32))}
-                  className="flex-1 bg-transparent outline-none text-white placeholder:text-white/30"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-content text-[15px] placeholder:text-content/30"
                 />
               </div>
             </label>
 
-            {error && <FieldError message={error} />}
+            <FieldError message={error} />
 
             <BrandSubmit loading={loading} disabled={displayName.trim().length < 1}>
               Готово <ArrowRight size={16} />
@@ -565,14 +571,40 @@ function BrandSubmit({
   );
 }
 
-function FieldError({ message }: { message: string }) {
+// Единая кнопка «Назад» для шагов: иконка-чип + текст, hit-target, мягкий tap.
+function BackButton({ onClick }: { onClick: () => void }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-rose-300/95 text-xs bg-rose-500/[0.08] border border-rose-500/[0.22] rounded-lg px-3 py-2"
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileTap={tap}
+      transition={SPRING.snappy}
+      className="group -ml-1 inline-flex items-center gap-1.5 h-8 pr-2 pl-1 rounded-lg text-content/45
+                 hover:text-content/85 hover:bg-content/[0.04] focus-visible:outline-none
+                 focus-visible:ring-2 focus-visible:ring-primary-500/30 transition-colors"
     >
-      {message}
-    </motion.div>
+      <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
+      <span className="text-xs">Сменить номер</span>
+    </motion.button>
+  );
+}
+
+function FieldError({ message }: { message: string | null }) {
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.div
+          initial={{ opacity: 0, height: 0, y: -4 }}
+          animate={{ opacity: 1, height: 'auto', y: 0 }}
+          exit={{ opacity: 0, height: 0, y: -4 }}
+          transition={{ duration: 0.22, ease: EASE.out }}
+          className="overflow-hidden"
+        >
+          <div className="text-rose-300/95 text-xs bg-rose-500/[0.08] border border-rose-500/[0.22] rounded-lg px-3 py-2">
+            {message}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

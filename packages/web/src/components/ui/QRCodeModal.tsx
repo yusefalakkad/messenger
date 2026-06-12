@@ -43,7 +43,7 @@ export default function QRCodeModal({ value, title, subtitle, onClose }: QRCodeM
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+      className="fixed inset-0 z-overlay flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
       onClick={onClose}
     >
       <motion.div
@@ -51,10 +51,10 @@ export default function QRCodeModal({ value, title, subtitle, onClose }: QRCodeM
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.92, y: 16, opacity: 0 }}
         transition={{ duration: 0.25, ease: [0.34, 1.3, 0.64, 1] }}
-        className="w-full max-w-xs rounded-xl bg-dark-card border border-dark-border p-6 flex flex-col items-center gap-4"
+        className="relative z-modal w-full max-w-xs rounded-xl bg-dark-card border border-dark-border p-6 flex flex-col items-center gap-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h4 className="text-[15px] font-semibold text-white text-center">{title}</h4>
+        <h4 className="text-[15px] font-semibold text-content text-center">{title}</h4>
 
         {/* QR на белой подложке — иначе сканеры не читают на тёмном фоне */}
         <div className="rounded-lg bg-white p-3">
@@ -76,7 +76,7 @@ export default function QRCodeModal({ value, title, subtitle, onClose }: QRCodeM
         )}
 
         {subtitle && (
-          <p className="text-[13px] text-white/55 truncate max-w-full" title={subtitle}>{subtitle}</p>
+          <p className="text-[13px] text-content/55 truncate max-w-full" title={subtitle}>{subtitle}</p>
         )}
 
         <button type="button" className="btn-secondary btn-block" onClick={copyLink}>

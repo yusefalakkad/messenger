@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { useChatStore } from '@/stores/chat.store';
 import Avatar from '@/components/ui/Avatar';
+import { backdrop, popIn, listParent, listChild, tap, tapSoft, SPRING } from '@/lib/motion';
 import type { Chat } from '@messenger/shared';
 
 interface Props { onClose: () => void; }
@@ -87,39 +88,38 @@ export default function NewGroupModal({ onClose }: Props) {
   };
 
   return (
+    // Подложка — z-overlay
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md"
+      variants={backdrop}
+      initial="hidden" animate="visible" exit="exit"
+      className="fixed inset-0 z-overlay flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Карточка — z-modal */}
       <motion.div
-        initial={{ scale: 0.92, y: 16, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.92, y: 16, opacity: 0 }}
-        transition={{ duration: 0.25, ease: [0.34, 1.3, 0.64, 1] }}
+        variants={popIn}
+        initial="hidden" animate="visible" exit="exit"
         onClick={(e) => e.stopPropagation()}
-        className="glass-card w-full max-w-sm overflow-hidden relative"
+        className="relative z-modal glass-card rounded-2xl shadow-e3 w-full max-w-sm overflow-hidden"
       >
         <div className="absolute -top-20 -right-20 w-56 h-56 bg-spot-violet blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-20 w-56 h-56 bg-spot-pink blur-3xl pointer-events-none opacity-60" />
 
         <div className="relative">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
             <div className="flex items-center gap-2">
-              <Users size={18} className="text-primary-300" />
-              <h2 className="font-semibold">Новая группа</h2>
+              <Users size={18} className="text-primary-600 dark:text-primary-300" />
+              <h3 className="font-semibold">Новая группа</h3>
             </div>
             <motion.button
-              whileTap={{ scale: 0.9 }}
-              whileHover={{ rotate: 90 }}
+              whileTap={tap}
+              transition={SPRING.snappy}
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/[0.07] text-white/60"
+              className="btn-icon btn-icon-sm"
+              aria-label="Закрыть"
             >
-              <X size={18} />
+              <X size={16} />
             </motion.button>
           </div>
 
@@ -137,16 +137,16 @@ export default function NewGroupModal({ onClose }: Props) {
             {/* Публичный хэндл (опционально) — как у каналов */}
             <div>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-sm pointer-events-none z-10">@</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-content/40 text-[15px] pointer-events-none z-raised">@</span>
                 <input
-                  className="input-base w-full !py-2.5 !pl-8"
+                  className="input-base w-full !pl-8"
                   placeholder="username (необязательно)"
                   value={username}
                   onChange={(e) => onUsernameChange(e.target.value)}
                   maxLength={32}
                 />
               </div>
-              <p className={`text-[11px] mt-1.5 px-1 ${usernameTooShort ? 'text-red-400/80' : 'text-white/40'}`}>
+              <p className={`text-[12px] mt-1.5 px-1 ${usernameTooShort ? 'text-red-400/80' : 'text-content/45'}`}>
                 {usernameTooShort
                   ? 'Минимум 5 символов: a-z, 0-9 и _'
                   : 'Публичную группу можно найти в поиске'}
@@ -155,9 +155,9 @@ export default function NewGroupModal({ onClose }: Props) {
 
             {/* Поиск участников */}
             <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 z-10" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-content/30 z-raised" />
               <input
-                className="input-pill w-full !pl-9"
+                className="input-pill w-full"
                 placeholder="Добавить участников..."
                 value={query}
                 onChange={(e) => search(e.target.value)}
@@ -194,45 +194,60 @@ export default function NewGroupModal({ onClose }: Props) {
           </div>
 
           {/* Результаты поиска */}
-          <div className="max-h-52 overflow-y-auto border-t border-white/[0.05]">
+          <div className="max-h-52 overflow-y-auto border-t border-dark-border px-2 py-1">
             {loading && (
-              <div className="flex justify-center py-4">
-                <Loader2 size={18} className="animate-spin text-primary-300" />
+              // Skeleton вместо голого спиннера
+              <div className="space-y-1 px-2 py-1">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-2 py-2">
+                    <div className="skeleton w-9 h-9 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <div className="skeleton h-3 w-28 rounded" />
+                      <div className="skeleton h-2.5 w-16 rounded" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-            {!loading && results.map((u, idx) => {
-              const isSelected = selected.some((s) => s.id === u.id);
-              return (
-                <motion.button
-                  key={u.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.03 }}
-                  whileHover={{ x: 2 }}
-                  onClick={() => toggle(u)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.05]"
-                >
-                  <Avatar src={u.avatar} name={u.displayName} size="sm" />
-                  <div className="text-left flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{u.displayName}</p>
-                    <p className="text-xs text-white/40">@{u.username}</p>
-                  </div>
-                  {isSelected && <Check size={16} className="text-primary-300 flex-shrink-0" />}
-                </motion.button>
-              );
-            })}
+            {!loading && (
+              <motion.div variants={listParent} initial="hidden" animate="visible">
+                {results.map((u) => {
+                  const isSelected = selected.some((s) => s.id === u.id);
+                  return (
+                    <motion.button
+                      key={u.id}
+                      variants={listChild}
+                      onClick={() => toggle(u)}
+                      className="list-item w-full min-h-[48px] text-left"
+                    >
+                      <Avatar src={u.avatar} name={u.displayName} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-medium truncate">{u.displayName}</p>
+                        <p className="text-[12px] text-content/45 truncate">@{u.username}</p>
+                      </div>
+                      {/* Check-индикатор выбранного */}
+                      <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition ${
+                        isSelected ? 'bg-brand-gradient shadow-glow-violet' : 'border border-dark-border'
+                      }`}>
+                        {isSelected && <Check size={13} className="text-white" />}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            )}
             {!loading && query.length > 0 && results.length === 0 && (
-              <p className="text-center text-white/35 text-sm py-4">Пользователи не найдены</p>
+              <p className="text-center text-content/45 text-[13px] py-4">Пользователи не найдены</p>
             )}
           </div>
 
           {/* Создать */}
-          <div className="p-4 border-t border-white/[0.05] space-y-2">
+          <div className="p-4 border-t border-dark-border space-y-2">
             {error && (
-              <p className="text-[11px] text-red-400/90 text-center">{error}</p>
+              <p className="text-[12px] text-red-400/90 text-center">{error}</p>
             )}
             {!error && (!name.trim() || selected.length === 0) && (
-              <p className="text-[11px] text-white/45 text-center">
+              <p className="text-[12px] text-content/45 text-center">
                 {!name.trim() && selected.length === 0
                   ? 'Введите название группы и выберите хотя бы одного участника'
                   : !name.trim()
@@ -241,10 +256,11 @@ export default function NewGroupModal({ onClose }: Props) {
               </p>
             )}
             <motion.button
-              whileTap={{ scale: 0.97 }}
+              whileTap={tapSoft}
+              transition={SPRING.snappy}
               onClick={create}
               disabled={!name.trim() || selected.length === 0 || usernameTooShort || creating}
-              className="btn-primary w-full !py-2.5 flex items-center justify-center gap-2"
+              className="btn-primary btn-block"
             >
               {creating ? (
                 <><Loader2 size={16} className="animate-spin" />Создание...</>

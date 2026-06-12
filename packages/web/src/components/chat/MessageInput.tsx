@@ -10,6 +10,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
+import { SPRING, EASE, tap } from '@/lib/motion';
 import { sendMessage, sendTyping } from '@/lib/socket';
 import { api } from '@/lib/api';
 import { haptic } from '@/lib/native';
@@ -27,7 +28,7 @@ import PollCreateModal from '@/components/chat/PollCreateModal';
 import MediaPreview, { type PendingMedia } from '@/components/media/MediaPreview';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import IconBtn from '@/components/ui/IconBtn';
-import Dropdown, { DropdownItem } from '@/components/ui/Dropdown';
+import Dropdown, { DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
 import MentionAutocomplete from './MentionAutocomplete';
 import type { MessageType } from '@messenger/shared';
 
@@ -808,44 +809,54 @@ export default function MessageInput({ chatId }: Props) {
         onChange={(e) => handleFileChange(e, 'video')} />
 
       {/* ─── Основная панель (8-grid: px-16, py-12, border единый dark-border) ─── */}
-      <div className="flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-3 pb-input">
+      <div className="flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
 
-        {/* Планка «Ответить» */}
+        {/* Планка «Ответить» — surface-1 + brand-полоска слева */}
         <AnimatePresence>
           {replyingTo && !editingMessage && (
             <motion.div
               initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="flex items-center gap-3 bg-dark-hover rounded-xl px-3 py-2 mb-2 border-l-2 border-primary-500 overflow-hidden"
+              transition={{ duration: 0.22, ease: EASE.soft }}
+              className="overflow-hidden"
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-primary-400 font-medium truncate">↩ {replyingTo.sender?.displayName ?? 'Ответить'}</p>
-                <p className="text-xs text-white/50 truncate">
-                  {formatReplyPreview(replyingTo as any) || '📎 Медиафайл'}
-                </p>
+              <div className="flex items-center gap-3 surface-1 rounded-xl pl-0 pr-3 py-2 mb-2 overflow-hidden">
+                <span className="w-[3px] self-stretch rounded-full bg-brand-gradient flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] text-primary-600 dark:text-primary-300 font-medium truncate">↩ {replyingTo.sender?.displayName ?? 'Ответить'}</p>
+                  <p className="text-[12px] text-content/45 truncate">
+                    {formatReplyPreview(replyingTo as any) || '📎 Медиафайл'}
+                  </p>
+                </div>
+                <motion.button whileTap={tap} transition={SPRING.snappy}
+                  onClick={() => setReplyingTo(null)} className="btn-icon btn-icon-sm text-content/45 hover:text-content flex-shrink-0">
+                  <X size={16} />
+                </motion.button>
               </div>
-              <button onClick={() => setReplyingTo(null)} className="text-white/40 hover:text-white flex-shrink-0">
-                <X size={16} />
-              </button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Планка «Редактировать» */}
+        {/* Планка «Редактировать» — surface-1 + brand-полоска слева */}
         <AnimatePresence>
           {editingMessage && (
             <motion.div
               initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="flex items-center gap-3 bg-primary-600/10 rounded-xl px-3 py-2 mb-2 border-l-2 border-primary-500 overflow-hidden"
+              transition={{ duration: 0.22, ease: EASE.soft }}
+              className="overflow-hidden"
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-primary-400 font-medium">✏ Редактирование</p>
-                <p className="text-xs text-white/50 truncate">{editingMessage.content}</p>
+              <div className="flex items-center gap-3 surface-1 rounded-xl pl-0 pr-3 py-2 mb-2 overflow-hidden">
+                <span className="w-[3px] self-stretch rounded-full bg-brand-gradient flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] text-primary-600 dark:text-primary-300 font-medium">✏ Редактирование</p>
+                  <p className="text-[12px] text-content/45 truncate">{editingMessage.content}</p>
+                </div>
+                <motion.button whileTap={tap} transition={SPRING.snappy}
+                  onClick={() => { setEditingMsg(null); setText(''); }} className="btn-icon btn-icon-sm text-content/45 hover:text-content flex-shrink-0">
+                  <X size={16} />
+                </motion.button>
               </div>
-              <button onClick={() => { setEditingMsg(null); setText(''); }} className="text-white/40 hover:text-white flex-shrink-0">
-                <X size={16} />
-              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -855,21 +866,24 @@ export default function MessageInput({ chatId }: Props) {
           {uploading && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="bg-primary-600/10 border border-primary-600/20 rounded-xl px-4 py-2.5 mb-3 overflow-hidden">
-              <div className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 border-2 border-primary-400/50 border-t-primary-400 rounded-full animate-spin flex-shrink-0" />
-                <span className="text-sm text-primary-400 flex-1 min-w-0 truncate">Загрузка медиа...</span>
-                {uploadProgress !== null && (
-                  <span className="text-xs text-primary-300 tabular-nums flex-shrink-0">{uploadProgress}%</span>
-                )}
-                <button onClick={cancelUpload} aria-label="Отменить загрузку"
-                  className="text-white/40 hover:text-white flex-shrink-0 transition-colors">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="mt-2 h-1 rounded-full bg-primary-500/15 overflow-hidden">
-                <div className="h-1 rounded-full bg-primary-500 transition-all duration-200"
-                  style={{ width: `${uploadProgress ?? 0}%` }} />
+              transition={{ duration: 0.22, ease: EASE.soft }}
+              className="overflow-hidden">
+              <div className="surface-1 rounded-xl px-4 py-2.5 mb-2.5 overflow-hidden">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-3.5 h-3.5 border-2 border-primary-400/50 border-t-primary-400 rounded-full animate-spin flex-shrink-0" />
+                  <span className="text-[13px] text-primary-600 dark:text-primary-300 flex-1 min-w-0 truncate">Загрузка медиа...</span>
+                  {uploadProgress !== null && (
+                    <span className="text-[12px] text-primary-600 dark:text-primary-300 tabular-nums flex-shrink-0">{uploadProgress}%</span>
+                  )}
+                  <button onClick={cancelUpload} aria-label="Отменить загрузку"
+                    className="btn-icon btn-icon-sm text-content/45 hover:text-content flex-shrink-0">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="mt-2 h-1 rounded-full bg-content/[0.06] overflow-hidden">
+                  <div className="h-1 rounded-full bg-brand-gradient transition-all duration-200"
+                    style={{ width: `${uploadProgress ?? 0}%` }} />
+                </div>
               </div>
             </motion.div>
           )}
@@ -880,16 +894,19 @@ export default function MessageInput({ chatId }: Props) {
           {failedUpload && !uploading && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 mb-3 overflow-hidden">
-              <span className="text-sm text-red-400 flex-1 min-w-0 truncate">Не удалось загрузить медиа</span>
-              <button onClick={() => failedUpload.retry()}
-                className="px-2.5 py-1 rounded-lg text-[13px] font-medium text-red-300 hover:bg-red-500/15 transition-colors flex-shrink-0">
-                Повторить
-              </button>
-              <button onClick={() => setFailedUpload(null)} aria-label="Закрыть"
-                className="text-white/40 hover:text-white flex-shrink-0 transition-colors">
-                <X size={16} />
-              </button>
+              transition={{ duration: 0.22, ease: EASE.soft }}
+              className="overflow-hidden">
+              <div className="flex items-center gap-2 bg-rose-500/[0.08] border border-rose-500/20 rounded-xl px-4 py-2.5 mb-2.5 overflow-hidden">
+                <span className="text-[13px] text-rose-300 flex-1 min-w-0 truncate">Не удалось загрузить медиа</span>
+                <motion.button whileTap={tap} transition={SPRING.snappy} onClick={() => failedUpload.retry()}
+                  className="px-2.5 h-8 rounded-lg text-[13px] font-medium text-rose-200 hover:bg-rose-500/15 transition-colors flex-shrink-0">
+                  Повторить
+                </motion.button>
+                <button onClick={() => setFailedUpload(null)} aria-label="Закрыть"
+                  className="btn-icon btn-icon-sm text-content/45 hover:text-content flex-shrink-0">
+                  <X size={16} />
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -899,8 +916,11 @@ export default function MessageInput({ chatId }: Props) {
           {uploadError && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 mb-3">
-              <span className="text-sm text-red-400">{uploadError}</span>
+              transition={{ duration: 0.22, ease: EASE.soft }}
+              className="overflow-hidden">
+              <div className="flex items-center gap-2 bg-rose-500/[0.08] border border-rose-500/20 rounded-xl px-4 py-2.5 mb-2.5">
+                <span className="text-[13px] text-rose-300">{uploadError}</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -929,7 +949,7 @@ export default function MessageInput({ chatId }: Props) {
                   icon={<CircleDot size={16} />} label="Видео-кружок"
                   onClick={() => { setShowCircle(true); setShowAttach(false); }}
                 />
-                <div className="my-1 mx-3 border-t border-dark-border" />
+                <DropdownDivider />
                 <DropdownItem
                   icon={<ImageIcon size={16} />} label="Фото из галереи"
                   onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
@@ -938,7 +958,7 @@ export default function MessageInput({ chatId }: Props) {
                   icon={<Film size={16} />} label="Видео-файл"
                   onClick={() => { videoInputRef.current?.click(); setShowAttach(false); }}
                 />
-                <div className="my-1 mx-3 border-t border-dark-border" />
+                <DropdownDivider />
                 <DropdownItem
                   icon={<BarChart3 size={16} />} label="Опрос"
                   onClick={() => { setShowPoll(true); setShowAttach(false); }}
@@ -983,9 +1003,9 @@ export default function MessageInput({ chatId }: Props) {
             )}
           </AnimatePresence>
           <div className={clsx(
-            'rounded-3xl overflow-hidden',
-            'bg-white/[0.04] border border-white/[0.07] backdrop-blur-sm',
-            !isRecording && 'focus-within:border-primary-500/60 focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:bg-white/[0.06]',
+            'rounded-3xl transition-colors duration-200',
+            'bg-content/[0.04] border border-dark-border backdrop-blur-sm',
+            !isRecording && 'focus-within:border-primary-500/50 focus-within:ring-2 focus-within:ring-primary-500/15 focus-within:bg-content/[0.06]',
           )}>
             {/* Обычный ввод текста */}
             {!isRecording && (
@@ -995,7 +1015,7 @@ export default function MessageInput({ chatId }: Props) {
                   <button
                     onClick={() => setShowEmoji((v) => !v)}
                     disabled={uploading}
-                    className="btn-icon btn-icon-sm text-white/40 hover:text-white/80"
+                    className="btn-icon btn-icon-sm text-content/40 hover:text-content/80"
                   >
                     <Smile size={18} />
                   </button>
@@ -1014,7 +1034,7 @@ export default function MessageInput({ chatId }: Props) {
 
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed max-h-[120px] py-1.5"
+                  className="flex-1 bg-transparent text-content placeholder-content/30 outline-none resize-none text-sm leading-relaxed max-h-[120px] py-1.5"
                   placeholder="Сообщение..."
                   rows={1}
                   value={text}
@@ -1042,7 +1062,7 @@ export default function MessageInput({ chatId }: Props) {
                   transition={{ duration: 0.15 }}
                   className={clsx(
                     'flex items-center gap-1.5 flex-shrink-0 select-none whitespace-nowrap',
-                    showCancel ? 'text-red-400' : 'text-white/55',
+                    showCancel ? 'text-red-400' : 'text-content/55',
                   )}
                 >
                   <Trash2 size={14} />
@@ -1063,7 +1083,7 @@ export default function MessageInput({ chatId }: Props) {
                 {/* Таймер */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-[12px] text-white/75 tabular-nums font-medium">{fmt(pttTime)}</span>
+                  <span className="text-[12px] text-content/75 tabular-nums font-medium">{fmt(pttTime)}</span>
                 </div>
 
                 {/* Замок — подсказка потянуть вверх */}
@@ -1072,8 +1092,8 @@ export default function MessageInput({ chatId }: Props) {
                   className="flex flex-col items-center justify-center flex-shrink-0 w-6"
                   title="Потяните вверх для фиксации"
                 >
-                  <span className="text-[10px] leading-none text-white/40">↑</span>
-                  <Lock size={13} className={clsx('transition-colors mt-0.5', lockProgress > 0.5 ? 'text-primary-400' : 'text-white/45')} />
+                  <span className="text-[10px] leading-none text-content/40">↑</span>
+                  <Lock size={13} className={clsx('transition-colors mt-0.5', lockProgress > 0.5 ? 'text-primary-400' : 'text-content/45')} />
                 </motion.div>
               </div>
             )}
@@ -1084,7 +1104,7 @@ export default function MessageInput({ chatId }: Props) {
                 {/* Отмена 36×36 для hit-target ≥ 32 */}
                 <button onClick={() => stopVoicePTT(false)}
                   aria-label="Отменить запись"
-                  className="w-9 h-9 rounded-full bg-dark-hover hover:bg-red-500/20 flex items-center justify-center flex-shrink-0 text-white/70 hover:text-red-300 transition-colors">
+                  className="w-9 h-9 rounded-full bg-dark-hover hover:bg-red-500/20 flex items-center justify-center flex-shrink-0 text-content/70 hover:text-red-300 transition-colors">
                   <Trash2 size={16} />
                 </button>
 
@@ -1099,7 +1119,7 @@ export default function MessageInput({ chatId }: Props) {
                 {/* Таймер */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-[12px] text-primary-200 tabular-nums font-medium">{fmt(pttTime)}</span>
+                  <span className="text-[12px] text-primary-500 dark:text-primary-200 tabular-nums font-medium">{fmt(pttTime)}</span>
                 </div>
               </div>
             )}
@@ -1114,7 +1134,7 @@ export default function MessageInput({ chatId }: Props) {
               title="Медленный режим: подождите перед следующим сообщением"
               className="w-11 h-11 rounded-full border border-dark-border flex items-center justify-center flex-shrink-0 cursor-not-allowed"
             >
-              <span className="text-[11px] tabular-nums text-white/60">{fmtSlow(slowLeft)}</span>
+              <span className="text-[11px] tabular-nums text-content/60">{fmtSlow(slowLeft)}</span>
             </button>
           )}
 
@@ -1128,7 +1148,7 @@ export default function MessageInput({ chatId }: Props) {
               whileHover={{ scale: 1.05 }}
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+              transition={SPRING.snappy}
               className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-brand-gradient text-white shadow-glow-violet"
             >
               <Send size={18} />
@@ -1147,12 +1167,12 @@ export default function MessageInput({ chatId }: Props) {
                 ? (recMode === 'voice' ? 'Зажми для записи, тап — переключить на кружок' : 'Зажми для записи, тап — переключить на голос')
                 : 'Отпусти для отправки / тап — остановить'}
               className={clsx(
-                'w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 select-none touch-none',
+                'w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 select-none touch-none transition-colors duration-200',
                 pttState === 'recording'
-                  ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse-glow'
+                  ? 'bg-rose-500 text-white shadow-e2 shadow-rose-500/40 animate-pulse-glow'
                   : recMode === 'voice'
-                  ? 'bg-white/[0.06] hover:bg-white/[0.1] text-white/65 hover:text-white border border-white/[0.06]'
-                  : 'bg-white/[0.06] hover:bg-white/[0.1] text-primary-300 hover:text-primary-200 border border-white/[0.06]',
+                  ? 'bg-content/[0.06] hover:bg-content/[0.1] text-content/65 hover:text-content border border-dark-border'
+                  : 'bg-content/[0.06] hover:bg-content/[0.1] text-primary-600 dark:text-primary-300 hover:text-primary-500 dark:hover:text-primary-200 border border-dark-border',
                 uploading && 'opacity-40 cursor-not-allowed',
               )}
             >
@@ -1168,6 +1188,7 @@ export default function MessageInput({ chatId }: Props) {
               onClick={() => stopVoicePTT(true)}
               whileTap={{ scale: 0.9 }}
               whileHover={{ scale: 1.05 }}
+              transition={SPRING.snappy}
               className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-brand-gradient text-white shadow-glow-violet"
             >
               <Send size={18} />

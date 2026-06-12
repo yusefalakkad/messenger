@@ -31,7 +31,7 @@ export default function EditHistoryPopover({ history, onClose }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-[400] flex items-center justify-center bg-black/30"
+      className="fixed inset-0 z-overlay flex items-center justify-center bg-black/30"
       onClick={onClose}
     >
       <motion.div
@@ -40,11 +40,11 @@ export default function EditHistoryPopover({ history, onClose }: Props) {
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
         onClick={(e) => e.stopPropagation()}
-        className="max-w-xs w-[calc(100vw-2rem)] rounded-xl bg-dark-card border border-dark-border shadow-e3 p-4"
+        className="relative z-modal max-w-xs w-[calc(100vw-2rem)] rounded-xl bg-dark-card border border-dark-border shadow-e3 p-4"
       >
         <div className="flex items-center justify-between mb-3">
           <span className="flex items-center gap-2 font-semibold text-[13px]">
-            <History size={16} className="text-white/45" />
+            <History size={16} className="text-content/45" />
             История изменений
           </span>
           <button onClick={onClose} className="btn-icon btn-icon-sm" aria-label="Закрыть">
@@ -53,15 +53,15 @@ export default function EditHistoryPopover({ history, onClose }: Props) {
         </div>
 
         {versions.length === 0 ? (
-          <p className="text-[13px] text-white/45">Прошлых версий нет</p>
+          <p className="text-[13px] text-content/45">Прошлых версий нет</p>
         ) : (
           <div className="flex flex-col gap-2.5 max-h-64 overflow-y-auto pr-1">
             {versions.map((v, i) => (
               <div key={`${v.editedAt}-${i}`} className="flex flex-col gap-0.5">
-                <span className="text-[11px] leading-4 text-white/45 tabular-nums">
+                <span className="text-[11px] leading-4 text-content/45 tabular-nums">
                   {formatVersionTime(v.editedAt)}
                 </span>
-                <p className="text-[13px] leading-5 text-white/80 whitespace-pre-wrap break-words">
+                <p className="text-[13px] leading-5 text-content/80 whitespace-pre-wrap break-words">
                   {v.content}
                 </p>
               </div>

@@ -52,11 +52,11 @@ export default function SafetyNumberView({ myPublicKey, theirPublicKey, chatId }
         <ShieldCheck size={18} className={verified ? 'text-green-400' : 'text-primary-400'} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight">Безопасность</p>
-          <p className="text-xs text-white/45 mt-0.5">
+          <p className="text-xs text-content/45 mt-0.5">
             {verified ? 'Ключи сверены' : 'Сверить отпечатки ключей'}
           </p>
         </div>
-        <ChevronDown size={16} className={`text-white/40 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className={`text-content/40 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
       <AnimatePresence initial={false}>
@@ -69,14 +69,14 @@ export default function SafetyNumberView({ myPublicKey, theirPublicKey, chatId }
             className="overflow-hidden"
           >
             <div className="px-4 pb-4 space-y-3">
-              <p className="text-xs text-white/55 leading-relaxed">
+              <p className="text-xs text-content/55 leading-relaxed">
                 Это число должно быть одинаковым у вас и у собеседника. Если совпадают —
                 ключи не были подменены сервером. Сверьте лично, по видеозвонку или сравните QR-коды.
               </p>
 
               {/* Отпечаток */}
               <div className="bg-dark-bg border border-dark-border rounded-2xl p-3">
-                <div className="font-mono text-sm leading-relaxed tracking-wider text-white/90 break-all text-center">
+                <div className="font-mono text-sm leading-relaxed tracking-wider text-content/90 break-all text-center">
                   {number || '...'}
                 </div>
               </div>
@@ -87,7 +87,7 @@ export default function SafetyNumberView({ myPublicKey, theirPublicKey, chatId }
                   <div className="bg-white p-2 rounded-2xl">
                     <img src={qr} alt="QR" className="w-40 h-40" />
                   </div>
-                  <p className="text-[10px] text-white/30 flex items-center gap-1">
+                  <p className="text-[10px] text-content/30 flex items-center gap-1">
                     <QrIcon size={10} /> Сравните QR с устройством собеседника
                   </p>
                 </div>

@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Square, RotateCw, Send, Video as VideoIcon } from 'lucide-react';
+import { SPRING, tap } from '@/lib/motion';
 
 interface Props {
   /** Колбэк после остановки записи. */
@@ -134,36 +135,53 @@ export default function VideoRecorder({ onRecorded, onCancel }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black flex flex-col"
+      className="fixed inset-0 z-overlay bg-black flex flex-col"
     >
       {/* Верхняя панель */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2 z-10">
-        <button
+      <div
+        className="flex items-center justify-between px-4 pt-4 pb-2 z-raised"
+        style={{ paddingTop: 'calc(var(--sat, 0px) + 1rem)' }}
+      >
+        <motion.button
           onClick={() => {
             streamRef.current?.getTracks().forEach((t) => t.stop());
             onCancel();
           }}
-          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+          whileHover={{ scale: 1.06 }}
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md"
           aria-label="Закрыть"
         >
           <X size={18} />
-        </button>
+        </motion.button>
 
         {recording && (
-          <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5"
+          >
+            <motion.span
+              className="w-2 h-2 rounded-full bg-red-500"
+              animate={{ opacity: [1, 0.3, 1], scale: [1, 0.85, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            />
             <span className="text-white text-sm font-medium tabular-nums">{fmt(time)} / 1:00</span>
-          </div>
+          </motion.div>
         )}
 
-        <button
+        <motion.button
           onClick={() => { setFacingUser((f) => { initCamera(!f); return !f; }); }}
           disabled={recording}
-          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center disabled:opacity-40"
+          whileHover={recording ? undefined : { scale: 1.06 }}
+          whileTap={recording ? undefined : tap}
+          transition={SPRING.snappy}
+          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md disabled:opacity-40"
           aria-label="Переключить камеру"
         >
           <RotateCw size={18} />
-        </button>
+        </motion.button>
       </div>
 
       {/* Превью камеры — занимает основное пространство */}
@@ -190,8 +208,8 @@ export default function VideoRecorder({ onRecorded, onCancel }: Props) {
 
         {/* Прогресс-бар на верхней границе превью */}
         {recording && (
-          <div className="absolute top-0 left-0 right-0 h-1 bg-white/10">
-            <div className="h-full bg-gradient-to-r from-primary-500 to-fuchsia-500 transition-all duration-1000 ease-linear" style={{ width: `${progress}%` }} />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 z-raised">
+            <div className="h-full bg-brand-gradient transition-all duration-1000 ease-linear" style={{ width: `${progress}%` }} />
           </div>
         )}
       </div>
@@ -209,36 +227,52 @@ export default function VideoRecorder({ onRecorded, onCancel }: Props) {
       </p>
 
       {/* Нижняя панель управления */}
-      <div className="flex items-center justify-center gap-10 pb-10 pt-2">
+      <div
+        className="flex items-center justify-center gap-10 pb-10 pt-2"
+        style={{ paddingBottom: 'calc(var(--sab, 0px) + 2.5rem)' }}
+      >
         <div className="w-14 h-14" />
 
         {!recording ? (
-          <button
+          <motion.button
             onClick={startRecording}
             disabled={!ready}
-            className="w-20 h-20 rounded-full bg-white/90 hover:bg-white shadow-2xl flex items-center justify-center disabled:opacity-40 transition-transform active:scale-95"
+            whileHover={ready ? { scale: 1.05 } : undefined}
+            whileTap={ready ? tap : undefined}
+            transition={SPRING.snappy}
+            className="w-20 h-20 rounded-full bg-white/90 hover:bg-white shadow-e3 ring-4 ring-white/10 flex items-center justify-center disabled:opacity-40"
             aria-label="Начать запись"
           >
-            <div className="w-14 h-14 rounded-full bg-red-500" />
-          </button>
+            <div className="w-14 h-14 rounded-full bg-red-500 shadow-[0_0_22px_-4px_rgba(239,68,68,0.7)]" />
+          </motion.button>
         ) : (
-          <button
+          <motion.button
             onClick={stopRecording}
-            className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-400 shadow-2xl shadow-red-500/40 flex items-center justify-center transition-transform active:scale-95"
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="relative w-20 h-20 rounded-full bg-red-500 hover:bg-red-400 shadow-e3 shadow-red-500/40 flex items-center justify-center"
             aria-label="Остановить и отправить"
           >
+            <motion.span
+              className="absolute inset-0 rounded-full ring-4 ring-red-500/40"
+              animate={{ scale: [1, 1.18, 1], opacity: [0.6, 0, 0.6] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+            />
             <Square size={26} fill="white" className="text-white" />
-          </button>
+          </motion.button>
         )}
 
         {recording ? (
-          <button
+          <motion.button
             onClick={stopRecording}
-            className="w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-fuchsia-500 text-white shadow-lg flex items-center justify-center"
+            whileHover={{ scale: 1.06 }}
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="w-14 h-14 rounded-full bg-brand-gradient text-white shadow-glow-violet flex items-center justify-center"
             aria-label="Отправить"
           >
             <Send size={20} />
-          </button>
+          </motion.button>
         ) : (
           <div className="w-14 h-14" />
         )}

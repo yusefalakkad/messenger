@@ -9,6 +9,58 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
   --keyboard-height: 0px;
+
+  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) ──────────────────────────────────────────
+     Мягкий «приподнятый» dark — НЕ чёрный, слабо-фиолетовый подмес.
+     Поверхности заданы как RGB-каналы → работает opacity-модификатор
+     (bg-dark-surface/80 и т.п. через <alpha-value> в tailwind.config). */
+  --bg-rgb:      23 21 30;          /* #17151e */
+  --surface-rgb: 31 29 42;          /* #1f1d2a */
+  --card-rgb:    40 37 58;          /* #28253a */
+  --border-rgb:  53 47 74;          /* #352f4a */
+  --hover-rgb:   44 41 64;          /* #2c2940 */
+  --input-rgb:   29 27 41;          /* #1d1b29 */
+  /* Удобные «плоские» алиасы для прямых var(--bg) ссылок (body, html-бутстрап). */
+  --bg:       rgb(var(--bg-rgb));
+  --surface:  rgb(var(--surface-rgb));
+  --card:     rgb(var(--card-rgb));
+  --border:   rgb(var(--border-rgb));
+  --hover:    rgb(var(--hover-rgb));
+  --input:    rgb(var(--input-rgb));
+  --content-rgb: 255 255 255;       /* текст/иконки — белый */
+  --bubble-in: #2c2939;             /* входящий пузырь */
+  --bubble-in-text: #ffffff;
+  --app-bg-image:
+    radial-gradient(1200px 800px at 8% -12%, rgba(124,77,255,0.10), transparent 60%),
+    radial-gradient(1000px 800px at 112% 112%, rgba(255,77,141,0.07), transparent 60%);
+  --selection-bg: rgba(124,77,255,0.4);
+  color-scheme: dark;
+}
+
+/* ─── СВЕТЛАЯ ТЕМА ──────────────────────────────────────────────────────────
+   Тёплый светлый фон (НЕ чисто-белый — мягче для глаз), брендовые засветки
+   приглушены. Текст near-black. Тот же фиолетово-розовый акцент. */
+[data-theme="light"] {
+  --bg-rgb:      244 242 247;       /* #f4f2f7 тёплый светло-серо-сиреневый */
+  --surface-rgb: 255 255 255;       /* sidebar, header — чистый белый */
+  --card-rgb:    255 255 255;       /* карточки */
+  --border-rgb:  230 226 238;       /* #e6e2ee мягкие границы */
+  --hover-rgb:   239 236 245;       /* #efecf5 hover/active */
+  --input-rgb:   240 237 245;       /* #f0edf5 input bg */
+  --bg:       rgb(var(--bg-rgb));
+  --surface:  rgb(var(--surface-rgb));
+  --card:     rgb(var(--card-rgb));
+  --border:   rgb(var(--border-rgb));
+  --hover:    rgb(var(--hover-rgb));
+  --input:    rgb(var(--input-rgb));
+  --content-rgb: 28 24 38;         /* текст — near-black с фиолетовым подтоном */
+  --bubble-in: #ffffff;            /* входящий пузырь — белый с тенью */
+  --bubble-in-text: #1c1826;
+  --app-bg-image:
+    radial-gradient(1200px 800px at 8% -12%, rgba(138,82,255,0.07), transparent 60%),
+    radial-gradient(1000px 800px at 112% 112%, rgba(255,90,143,0.05), transparent 60%);
+  --selection-bg: rgba(138,82,255,0.22);
+  color-scheme: light;
 }
 
 @layer base {
@@ -31,17 +83,16 @@
   }
 
   body {
-    @apply bg-dark-bg text-white antialiased;
+    @apply bg-dark-bg antialiased;
+    color: rgb(var(--content-rgb));
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 20px;
-    /* Мягкий dark с лёгкими ambient-засветками — НЕ пустой чёрный.
-       Засветки уменьшены чтобы не «забивать» интерфейс на новой светлой подложке. */
-    background-color: #17151e;
-    background-image:
-      radial-gradient(1200px 800px at 8% -12%, rgba(124,77,255,0.10), transparent 60%),
-      radial-gradient(1000px 800px at 112% 112%, rgba(255,77,141,0.07), transparent 60%);
+    /* Фон + ambient-засветки берутся из переменных темы. */
+    background-color: var(--bg);
+    background-image: var(--app-bg-image);
     background-attachment: fixed;
+    transition: background-color 0.3s ease;
   }
 
   /* Типографическая иерархия (без @apply — JIT тут не успевает). */
@@ -56,10 +107,10 @@
   /* Скроллбар тонкий, прозрачный */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-white/5 rounded-full transition-colors; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-white/15; }
+  ::-webkit-scrollbar-thumb { @apply bg-content/10 rounded-full transition-colors; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-content/20; }
 
-  ::selection { background-color: rgba(124,77,255,0.4); color: white; }
+  ::selection { background-color: var(--selection-bg); }
 
   /* Плавные переходы для интерактивных элементов по умолчанию */
   button, a, input, textarea, [role="button"] {
@@ -87,12 +138,12 @@
   .glass {
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    @apply bg-dark-surface/75 border border-white/[0.08];
+    @apply bg-dark-surface/75 border border-dark-border;
   }
 
   /* Карточка со стеклом + внутреннее свечение */
   .glass-card {
-    @apply rounded-2xl border border-white/[0.08] bg-white/[0.035];
+    @apply rounded-2xl border border-dark-border bg-content/[0.035];
     backdrop-filter: blur(22px) saturate(160%);
     -webkit-backdrop-filter: blur(22px) saturate(160%);
     box-shadow:
@@ -110,20 +161,30 @@
     -webkit-backdrop-filter: blur(8px);
   }
 
-  /* Message bubbles.
-     out: фирменный градиент, чуть мягче и теплее (ближе к мокапу dakka).
-     in:  solid лёгкий dark-card (не прозрачный) — на новой светлой подложке
-          rgba-полупрозрачные пузыри почти не видны; делаем плотный тон. */
+  /* Message bubbles — премиальная глубина.
+     out: фирменный градиент с внутренним свечением сверху + мягкая цветная тень.
+     in:  плотная тёмная поверхность с тонкой светящейся границей и глубиной. */
   .bubble-out {
-    @apply text-white rounded-msg rounded-br-msg-sm;
-    background: linear-gradient(135deg, #8a52ff 0%, #b94de8 45%, #ff5a8f 100%);
-    box-shadow: 0 8px 24px -12px rgba(154,77,255,0.5);
+    @apply text-white rounded-[22px] rounded-br-[7px];
+    background: linear-gradient(140deg, #8d57ff 0%, #b24ce6 48%, #ff5b8d 100%);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.14) inset,
+      0 10px 28px -14px rgba(154,77,255,0.55),
+      0 2px 6px -2px rgba(0,0,0,0.25);
   }
   .bubble-in {
-    @apply text-white rounded-msg rounded-bl-msg-sm;
-    background: #2a2738;
-    box-shadow: 0 4px 18px -12px rgba(0,0,0,0.5);
+    @apply rounded-[22px] rounded-bl-[7px];
+    color: var(--bubble-in-text);
+    background: var(--bubble-in);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.05) inset,
+      0 6px 20px -14px rgba(0,0,0,0.6),
+      0 1px 3px rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
   }
+  /* Continuation — подряд от того же отправителя: меньше скругление со стороны хвоста. */
+  .bubble-out.is-cont { @apply rounded-tr-[7px]; }
+  .bubble-in.is-cont  { @apply rounded-tl-[7px]; }
 
   /* ─────────────────────────────────────────────
      Input — единые размеры по системе.
@@ -132,15 +193,15 @@
   ───────────────────────────────────────────── */
   .input-base {
     @apply bg-dark-input border border-dark-border rounded-lg h-11 px-4
-           text-white placeholder-white/30 outline-none
+           text-content placeholder:text-content/30 outline-none
            focus:border-primary-500/70 focus:ring-2 focus:ring-primary-500/25
-           focus:bg-white/[0.04] transition;
+           focus:bg-content/[0.04] transition;
     font-size: 15px; line-height: 20px;
   }
   .input-pill {
-    @apply bg-white/[0.04] border border-dark-border rounded-full h-9 pl-9 pr-4
-           placeholder-white/35 text-white outline-none
-           focus:border-primary-500/60 focus:bg-white/[0.06]
+    @apply bg-content/[0.04] border border-dark-border rounded-full h-9 pl-9 pr-4
+           placeholder:text-content/35 text-content outline-none
+           focus:border-primary-500/60 focus:bg-content/[0.06]
            focus:ring-2 focus:ring-primary-500/20 transition;
     font-size: 13px; line-height: 18px;
   }
@@ -175,11 +236,11 @@
   }
 
   .btn-secondary {
-    @apply btn bg-dark-card border border-dark-border text-white/85
-           hover:bg-dark-hover hover:border-white/[0.12];
+    @apply btn bg-dark-card border border-dark-border text-content/85
+           hover:bg-dark-hover hover:border-content/[0.12];
   }
   .btn-ghost {
-    @apply btn bg-transparent text-white/70 hover:text-white hover:bg-white/[0.06];
+    @apply btn bg-transparent text-content/70 hover:text-content hover:bg-content/[0.06];
   }
   .btn-danger {
     @apply btn bg-rose-500/[0.12] border border-rose-500/30 text-rose-200
@@ -192,9 +253,9 @@
   ───────────────────────────────────────────── */
   .btn-icon {
     @apply inline-flex items-center justify-center
-           w-10 h-10 rounded-md text-white/65
-           hover:text-white hover:bg-white/[0.07]
-           active:bg-white/[0.1] active:scale-95
+           w-10 h-10 rounded-md text-content/65
+           hover:text-content hover:bg-content/[0.07]
+           active:bg-content/[0.1] active:scale-95
            disabled:opacity-40 disabled:cursor-not-allowed transition;
   }
   .btn-icon-sm { @apply w-8 h-8 rounded-sm; }
@@ -208,14 +269,14 @@
   .list-item {
     @apply flex items-center gap-3 px-4 py-2 min-h-[56px] rounded-lg
            cursor-pointer transition
-           hover:bg-white/[0.04] active:bg-white/[0.06];
+           hover:bg-content/[0.04] active:bg-content/[0.06];
   }
-  .list-item-active { @apply bg-white/[0.06]; }
+  .list-item-active { @apply bg-content/[0.06]; }
 
   /* Item в выпадающих меню — компактнее списка. */
   .menu-item {
     @apply w-full flex items-center gap-3 px-3 h-10
-           text-white/85 hover:bg-white/[0.06] active:bg-white/[0.09]
+           text-content/85 hover:bg-content/[0.06] active:bg-content/[0.09]
            rounded-sm transition;
     font-size: 13px; line-height: 18px;
   }
@@ -261,7 +322,7 @@
 
   /* Typing indicator dots */
   .typing-dot {
-    @apply w-2 h-2 rounded-full bg-white/60;
+    @apply w-2 h-2 rounded-full bg-content/60;
     animation: pulseDot 1.4s ease-in-out infinite;
   }
   .typing-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -269,7 +330,10 @@
 
   /* Лоадер-скелетон с шиммером */
   .skeleton {
-    background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+    background: linear-gradient(90deg,
+      rgb(var(--content-rgb) / 0.05) 0%,
+      rgb(var(--content-rgb) / 0.10) 50%,
+      rgb(var(--content-rgb) / 0.05) 100%);
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;
     @apply rounded-md;
@@ -291,12 +355,14 @@
   .min-h-safe-bottom { min-height: var(--sab); }
 
   /* Сумма safe-area + клавиатура — для нижней панели ввода в чате */
-  .pb-input { padding-bottom: calc(var(--sab) + var(--keyboard-height)); }
+  /* Нижний отступ панели ввода: базовые 12px + safe-area + высота клавиатуры.
+     База обязательна — на web (--sab=0) без неё панель прилипала к краю экрана. */
+  .pb-input { padding-bottom: calc(0.75rem + var(--sab) + var(--keyboard-height)); }
 
   /* Тонкая разделительная линия с градиентом */
   .divider-grad {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgb(var(--content-rgb) / 0.1), transparent);
   }
 
   /* Световое пятно (как фон) */

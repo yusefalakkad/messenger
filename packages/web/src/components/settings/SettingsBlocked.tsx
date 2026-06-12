@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Loader2, UserX } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import Avatar from '@/components/ui/Avatar';
+import { listParent, listChild, tap, SPRING } from '@/lib/motion';
 
 /**
  * Секция «Чёрный список» — GET /users/me/blocked + разблокировка
@@ -45,40 +47,60 @@ export default function SettingsBlocked() {
   return (
     <div>
       <div className="mb-3 px-1">
-        <span className="text-[12px] uppercase tracking-wider font-semibold text-white/55">Чёрный список</span>
+        <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">Чёрный список</span>
       </div>
 
       {blocked === null ? (
-        <div className="flex justify-center py-8">
-          <Loader2 size={20} className="animate-spin text-white/40" />
+        // Skeleton-плейсхолдеры вместо спиннера
+        <div className="space-y-1">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="list-item cursor-default">
+              <div className="skeleton w-10 h-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="skeleton h-3.5 w-28 rounded" />
+                <div className="skeleton h-2.5 w-20 rounded" />
+              </div>
+              <div className="skeleton h-8 w-28 rounded-lg flex-shrink-0" />
+            </div>
+          ))}
         </div>
       ) : blocked.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-8 text-white/35">
-          <div className="w-12 h-12 rounded-md bg-white/[0.04] border border-dark-border flex items-center justify-center">
-            <UserX size={22} />
+        <div className="flex flex-col items-center gap-3 py-10">
+          <div className="w-16 h-16 rounded-2xl bg-dark-card border border-dark-border shadow-glow-violet flex items-center justify-center text-content/45">
+            <UserX size={26} />
           </div>
-          <span className="text-[13px]">Никто не заблокирован</span>
+          <div className="text-center">
+            <p className="text-[15px] text-content/80 font-medium">Никто не заблокирован</p>
+            <p className="text-[13px] text-content/45 mt-0.5">Заблокированные пользователи появятся здесь</p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-1">
+        <motion.div
+          variants={listParent}
+          initial="hidden"
+          animate="visible"
+          className="space-y-1"
+        >
           {blocked.map((u) => (
-            <div key={u.id} className="list-item cursor-default">
+            <motion.div key={u.id} variants={listChild} className="list-item cursor-default">
               <Avatar src={u.avatar} name={u.displayName} size="md" />
               <div className="flex-1 min-w-0">
                 <div className="text-[15px] font-medium truncate">{u.displayName}</div>
-                {u.username && <div className="text-[12px] text-white/40 truncate">@{u.username}</div>}
+                {u.username && <div className="text-[12px] text-content/40 truncate">@{u.username}</div>}
               </div>
-              <button
+              <motion.button
                 className="btn-ghost btn-sm flex-shrink-0"
+                whileTap={tap}
+                transition={SPRING.snappy}
                 onClick={() => unblock(u)}
                 disabled={busyId === u.id}
               >
                 {busyId === u.id && <Loader2 size={14} className="animate-spin" />}
                 Разблокировать
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

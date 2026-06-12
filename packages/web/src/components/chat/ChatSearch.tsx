@@ -37,16 +37,16 @@ export default function ChatSearch({ chatId, onClose }: Props) {
       className="absolute top-0 left-0 right-0 z-30 bg-dark-surface border-b border-dark-border/60 shadow-2xl shadow-black/40"
     >
       <div className="flex items-center gap-2 px-4 py-3 border-b border-dark-border/40">
-        <Search size={16} className="text-white/40 flex-shrink-0" />
+        <Search size={16} className="text-content/40 flex-shrink-0" />
         <input
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && onClose()}
           placeholder="Поиск сообщений..."
-          className="flex-1 bg-transparent outline-none text-sm placeholder-white/30 text-white"
+          className="flex-1 bg-transparent outline-none text-sm placeholder-content/30 text-content"
         />
-        {loading && <Loader2 size={14} className="text-white/40 animate-spin" />}
+        {loading && <Loader2 size={14} className="text-content/40 animate-spin" />}
         <button onClick={onClose} className="btn-icon btn-icon-sm">
           <X size={16} />
         </button>
@@ -55,7 +55,7 @@ export default function ChatSearch({ chatId, onClose }: Props) {
       {q.trim().length >= 2 && (
         <div className="max-h-[60vh] overflow-y-auto">
           {results.length === 0 && !loading && (
-            <div className="px-4 py-6 text-center text-sm text-white/40">
+            <div className="px-4 py-6 text-center text-sm text-content/40">
               Ничего не найдено
             </div>
           )}
@@ -64,9 +64,9 @@ export default function ChatSearch({ chatId, onClose }: Props) {
               <Avatar src={m.sender?.avatar} name={m.sender?.displayName ?? '?'} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-primary-400 font-medium">{m.sender?.displayName}</p>
-                <p className="text-sm text-white/80 truncate">{highlight(m.content ?? '', q)}</p>
+                <p className="text-sm text-content/80 truncate">{highlight(m.content ?? '', q)}</p>
               </div>
-              <span className="text-xs text-white/30 flex-shrink-0">
+              <span className="text-xs text-content/30 flex-shrink-0">
                 {new Date(m.createdAt).toLocaleDateString('ru', { day: '2-digit', month: 'short' })}
               </span>
             </div>

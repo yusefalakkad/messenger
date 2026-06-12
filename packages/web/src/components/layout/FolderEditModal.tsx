@@ -115,7 +115,7 @@ export default function FolderEditModal({ folderId, onClose }: Props) {
               whileTap={{ scale: 0.9 }}
               whileHover={{ rotate: 90 }}
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/[0.07] text-white/60"
+              className="p-1.5 rounded-lg hover:bg-content/[0.07] text-content/60"
             >
               <X size={18} />
             </motion.button>
@@ -141,12 +141,12 @@ export default function FolderEditModal({ folderId, onClose }: Props) {
           </div>
 
           {/* Список чатов с чекбоксами */}
-          <p className="px-4 pb-1 text-[12px] text-white/40 flex-shrink-0">
+          <p className="px-4 pb-1 text-[12px] text-content/40 flex-shrink-0">
             Чаты в папке: {selectedIds.size}
           </p>
           <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-2">
             {sortedChats.length === 0 && (
-              <p className="text-center text-white/35 text-sm py-6">Нет чатов</p>
+              <p className="text-center text-content/35 text-sm py-6">Нет чатов</p>
             )}
             {sortedChats.map((chat) => {
               const { name: chatName, avatar } = chatDisplay(chat, myUserId);
@@ -158,9 +158,9 @@ export default function FolderEditModal({ folderId, onClose }: Props) {
                   className={`list-item w-full text-left ${selected ? 'list-item-active' : ''}`}
                 >
                   <Avatar src={avatar} name={chatName} size="md" />
-                  <span className="flex-1 min-w-0 truncate text-[15px] text-white/90">{chatName}</span>
+                  <span className="flex-1 min-w-0 truncate text-[15px] text-content/90">{chatName}</span>
                   <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition ${
-                    selected ? 'bg-brand-gradient border-transparent' : 'border-white/20'
+                    selected ? 'bg-brand-gradient border-transparent' : 'border-content/20'
                   }`}>
                     {selected && <Check size={13} className="text-white" />}
                   </span>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { listParent, listChild, tap, SPRING } from '@/lib/motion';
 import { useChatStore } from '@/stores/chat.store';
 import { useFoldersStore } from '@/stores/folders.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -171,7 +172,7 @@ export default function Sidebar() {
 
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate leading-tight">{user?.displayName}</p>
-          <p className="text-white/45 text-[12px] truncate mt-0.5">@{user?.username}</p>
+          <p className="text-content/45 text-[12px] truncate mt-0.5">@{user?.username}</p>
         </div>
 
         <div className="flex items-center gap-1">
@@ -211,7 +212,7 @@ export default function Sidebar() {
       {/* ── Search (44px hit-target — на 8 пиксельных стопов выровнен) ── */}
       <div className="px-4 py-3 flex-shrink-0">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content/40" />
           <input
             className="input-pill w-full"
             placeholder="Поиск чатов..."
@@ -226,33 +227,37 @@ export default function Sidebar() {
 
       {/* ── Archive entry — list-item стиля (h=48px компактный), только на табе «Все» ── */}
       {!activeFolderId && (
-      <button
+      <motion.button
         onClick={() => setShowArchive(true)}
-        className="mx-2 mb-2 flex items-center gap-3 px-3 h-12 rounded-md text-left text-[14px] hover:bg-white/[0.04] active:bg-white/[0.06] transition group flex-shrink-0"
+        whileTap={tap}
+        transition={SPRING.snappy}
+        className="mx-2 mb-1 flex items-center gap-3 px-3 h-12 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
         title="Архивные чаты"
       >
-        <span className="w-9 h-9 rounded-md bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+        <span className="w-9 h-9 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
           <Archive size={16} />
         </span>
-        <span className="flex-1 text-white/85 font-medium">Архив</span>
+        <span className="flex-1 text-content/85 font-medium">Архив</span>
         {archivedCount > 0 && (
-          <span className="text-[12px] font-medium text-white/50 px-2">{archivedCount}</span>
+          <span className="text-[12px] font-medium text-content/50 px-2 tabular-nums">{archivedCount}</span>
         )}
-      </button>
+      </motion.button>
       )}
 
       {/* ── Saved messages entry — «Избранное», только на табе «Все» ── */}
       {!activeFolderId && (
-      <button
+      <motion.button
         onClick={openSaved}
-        className="mx-2 mb-2 flex items-center gap-3 px-3 h-12 rounded-md text-left text-[14px] hover:bg-white/[0.04] active:bg-white/[0.06] transition group flex-shrink-0"
+        whileTap={tap}
+        transition={SPRING.snappy}
+        className="mx-2 mb-1.5 flex items-center gap-3 px-3 h-12 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
         title="Избранное"
       >
-        <span className="w-9 h-9 rounded-md bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
+        <span className="w-9 h-9 rounded-lg bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
           <Bookmark size={16} />
         </span>
-        <span className="flex-1 text-white/85 font-medium">Избранное</span>
-      </button>
+        <span className="flex-1 text-content/85 font-medium">Избранное</span>
+      </motion.button>
       )}
 
       {/* ── Chat list ── */}
@@ -271,40 +276,65 @@ export default function Sidebar() {
             />
           )}
         </AnimatePresence>
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {showGlobalSearch ? null : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center mt-12 px-6 gap-3 text-center">
+            // Премиум пустое состояние — иконка в rounded-2xl с brand-glow + текст + CTA
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-col items-center justify-center mt-16 px-6 gap-4 text-center"
+            >
               <div className="relative">
-                <div className="absolute inset-0 bg-brand-gradient blur-xl opacity-30 rounded-2xl" />
-                <div className="relative w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
-                  <Users size={24} className="text-white/40" />
+                <div className="absolute -inset-2 bg-brand-gradient blur-2xl opacity-25 rounded-[28px]" />
+                <div className="relative w-16 h-16 rounded-2xl bg-dark-card border border-dark-border flex items-center justify-center shadow-e2">
+                  <MessageSquarePlus size={26} className="text-content/55" />
                 </div>
               </div>
-              <p className="text-white/50 text-sm">Здесь пока тихо</p>
-              <button
+              <div className="space-y-1">
+                <p className="text-content/90 text-[15px] font-semibold">Здесь пока тихо</p>
+                <p className="text-content/45 text-[13px] leading-5 max-w-[220px]">
+                  Начните переписку — ваши чаты появятся здесь
+                </p>
+              </div>
+              <motion.button
                 onClick={() => setShowNewChat(true)}
-                className="text-xs font-medium text-gradient hover:opacity-80 transition-opacity"
+                whileTap={tap}
+                whileHover={{ scale: 1.04 }}
+                transition={SPRING.snappy}
+                className="btn-primary btn-sm mt-1"
               >
-                Начать переписку →
-              </button>
-            </div>
+                <MessageSquarePlus size={15} />
+                Начать переписку
+              </motion.button>
+            </motion.div>
           ) : (
-            filtered.map((chat, idx) => (
-              <motion.div
-                key={chat.id}
-                layout="position"
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -24, height: 0 }}
-                transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-              >
-                <ChatListItem
-                  chat={chat}
-                  active={chat.id === chatId}
-                  onClick={() => navigate(`/chat/${chat.id}`)}
-                />
-              </motion.div>
-            ))
+            // Stagger-появление списка чатов
+            <motion.div
+              key="list"
+              variants={listParent}
+              initial="hidden"
+              animate="visible"
+            >
+              <AnimatePresence initial={false}>
+                {filtered.map((chat) => (
+                  <motion.div
+                    key={chat.id}
+                    layout="position"
+                    variants={listChild}
+                    exit={{ opacity: 0, x: -24, height: 0, transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] } }}
+                  >
+                    <ChatListItem
+                      chat={chat}
+                      active={chat.id === chatId}
+                      onClick={() => navigate(`/chat/${chat.id}`)}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

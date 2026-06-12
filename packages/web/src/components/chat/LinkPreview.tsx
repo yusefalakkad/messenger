@@ -79,7 +79,9 @@ export function LinkPreview({ url, isOwn }: LinkPreviewProps) {
       onKeyDown={(e) => {
         if (e.key === 'Enter') window.open(url, '_blank', 'noopener,noreferrer');
       }}
-      className="flex gap-2 mt-1.5 p-2 rounded-lg cursor-pointer hover:bg-white/[0.04] transition-colors duration-200 max-w-full overflow-hidden"
+      className={`flex gap-2 mt-1.5 p-2 rounded-lg cursor-pointer transition-colors duration-200 max-w-full overflow-hidden ${
+        isOwn ? 'hover:bg-white/[0.04]' : 'hover:bg-content/[0.04]'
+      }`}
     >
       {/* Вертикальная полоска-акцент */}
       <div
@@ -91,7 +93,7 @@ export function LinkPreview({ url, isOwn }: LinkPreviewProps) {
         {preview.siteName && (
           <div
             className={`text-xs font-medium truncate ${
-              isOwn ? 'text-white/70' : 'text-primary-300'
+              isOwn ? 'text-white/70' : 'text-primary-600 dark:text-primary-300'
             }`}
           >
             {preview.siteName}
@@ -101,7 +103,7 @@ export function LinkPreview({ url, isOwn }: LinkPreviewProps) {
           {preview.title}
         </div>
         {preview.description && (
-          <div className="text-xs text-white/60 leading-snug line-clamp-2">
+          <div className={`text-xs leading-snug line-clamp-2 ${isOwn ? 'text-white/60' : 'text-content/60'}`}>
             {preview.description}
           </div>
         )}

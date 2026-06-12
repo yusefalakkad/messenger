@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Loader2, TriangleAlert } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import Dialog, { DialogButton } from '@/components/ui/Dialog';
+import { tap, SPRING } from '@/lib/motion';
 
 /**
  * Секция «Опасная зона» — удаление аккаунта (DELETE /users/me, soft-delete).
@@ -49,14 +51,27 @@ export default function SettingsDanger({ passwordSet }: { passwordSet: boolean }
 
   return (
     <div>
-      <div className="mb-3 px-1">
-        <span className="text-[12px] uppercase tracking-wider font-semibold text-white/55">Опасная зона</span>
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 flex-shrink-0">
+          <TriangleAlert size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="mb-0.5">
+            <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">Опасная зона</span>
+          </div>
+          <p className="text-[12px] text-content/45 leading-snug">Удаление аккаунта необратимо стирает профиль и завершает все сессии.</p>
+        </div>
       </div>
 
-      <button className="btn-danger btn-sm w-full" onClick={() => setOpen(true)}>
+      <motion.button
+        className="btn-danger btn-sm w-full"
+        whileTap={tap}
+        transition={SPRING.snappy}
+        onClick={() => setOpen(true)}
+      >
         <TriangleAlert size={15} />
         Удалить аккаунт
-      </button>
+      </motion.button>
 
       <Dialog
         open={open}
@@ -86,7 +101,7 @@ export default function SettingsDanger({ passwordSet }: { passwordSet: boolean }
             />
           )}
           <div>
-            <p className="text-[12px] text-white/40 mb-1.5">
+            <p className="text-[12px] text-content/40 mb-1.5">
               Введите <span className="font-semibold text-rose-300">{CONFIRM_WORD}</span> для подтверждения:
             </p>
             <input

@@ -72,6 +72,10 @@ interface ChatState {
 // дали бы одинаковый seq и второй не сработал бы.
 let jumpSeq = 0;
 
+// Таймеры авто-сброса «печатает…» (ключ `chatId:userId`). Вне стора — это
+// сайд-эффект, не состояние. Защита от залипшего индикатора (P-typing).
+const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export const useChatStore = create<ChatState>((set) => ({
   chats: [],
   activeChatId: null,
@@ -299,8 +303,24 @@ export const useChatStore = create<ChatState>((set) => ({
   setTyping: (chatId, userId, isTyping) =>
     set((s) => {
       const current = new Set(s.typingUsers[chatId] ?? []);
-      if (isTyping) current.add(userId);
-      else current.delete(userId);
+      if (isTyping) {
+        current.add(userId);
+        // Auto-expire: индикатор «печатает…» сбрасывается через 6с, если не пришёл
+        // свежий typing:true. Защищает от «залипания», когда событие typing:false
+        // потерялось (отправитель закрыл вкладку / упал сокет). Telegram-паттерн.
+        const key = `${chatId}:${userId}`;
+        const prev = typingTimers.get(key);
+        if (prev) clearTimeout(prev);
+        typingTimers.set(key, setTimeout(() => {
+          typingTimers.delete(key);
+          useChatStore.getState().setTyping(chatId, userId, false);
+        }, 6000));
+      } else {
+        current.delete(userId);
+        const key = `${chatId}:${userId}`;
+        const prev = typingTimers.get(key);
+        if (prev) { clearTimeout(prev); typingTimers.delete(key); }
+      }
       return { typingUsers: { ...s.typingUsers, [chatId]: current } };
     }),
 

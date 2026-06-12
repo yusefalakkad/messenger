@@ -37,15 +37,15 @@ export default function AddByUsername() {
   return (
     <div className="flex flex-col h-full items-center justify-center text-center px-6">
       {error ? (
-        <div className="flex flex-col items-center gap-3 text-white/50 max-w-xs">
-          <UserX size={32} className="text-white/40" />
+        <div className="flex flex-col items-center gap-3 text-content/50 max-w-xs">
+          <UserX size={32} className="text-content/40" />
           <p className="text-sm">Пользователь не найден.</p>
           <Link to="/" className="btn-ghost btn-sm">
             На главную
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3 text-white/40">
+        <div className="flex flex-col items-center gap-3 text-content/40">
           <div className="w-10 h-10 rounded-full border-2 border-primary-500/40 border-t-primary-500 animate-spin" />
           <p className="text-sm">Ищем пользователя...</p>
         </div>

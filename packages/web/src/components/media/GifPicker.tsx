@@ -4,7 +4,8 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { Search, ImageOff, AlertCircle } from 'lucide-react';
+import { menu } from '@/lib/motion';
 
 const KEY = (import.meta as any).env?.VITE_TENOR_API_KEY as string | undefined;
 
@@ -94,16 +95,20 @@ export default function GifPicker({ onSelect, onClose }: Props) {
     return (
       <motion.div
         ref={ref}
-        initial={{ opacity: 0, scale: 0.95, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 8 }}
-        transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-        className="absolute bottom-full mb-2 left-0 w-[320px] rounded-xl bg-dark-surface border border-dark-border shadow-e3 p-4 flex flex-col items-center gap-3 z-30"
+        variants={menu}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        style={{ transformOrigin: 'bottom left' }}
+        className="absolute bottom-full mb-2 left-0 w-[320px] surface-2 rounded-xl shadow-e3 p-5 flex flex-col items-center gap-3 z-dropdown"
       >
-        <p className="text-[13px] text-white/55 text-center">
-          GIF недоступны: добавьте VITE_TENOR_API_KEY в .env
+        <div className="w-12 h-12 rounded-2xl bg-brand-gradient-soft border border-dark-border flex items-center justify-center shadow-glow-soft">
+          <ImageOff size={22} className="text-content/70" />
+        </div>
+        <p className="text-[13px] text-content/55 text-center leading-5">
+          GIF недоступны — добавьте<br /><code className="text-content/70">VITE_TENOR_API_KEY</code> в .env
         </p>
-        <button className="btn-secondary" onClick={onClose}>
+        <button className="btn-secondary btn-sm" onClick={onClose}>
           Закрыть
         </button>
       </motion.div>
@@ -113,16 +118,17 @@ export default function GifPicker({ onSelect, onClose }: Props) {
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, scale: 0.95, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: 8 }}
-      transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-      className="absolute bottom-full mb-2 left-0 w-[320px] h-[400px] rounded-xl bg-dark-surface border border-dark-border shadow-e3 overflow-hidden flex flex-col z-30"
+      variants={menu}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      style={{ transformOrigin: 'bottom left' }}
+      className="absolute bottom-full mb-2 left-0 w-[320px] h-[400px] surface-2 rounded-xl shadow-e3 overflow-hidden flex flex-col z-dropdown"
     >
       {/* Поиск */}
-      <div className="p-2 border-b border-dark-border">
+      <div className="p-2 border-b border-dark-border flex-shrink-0">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content/40 pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -137,16 +143,29 @@ export default function GifPicker({ onSelect, onClose }: Props) {
       {/* Контент */}
       <div className="flex-1 overflow-y-auto">
         {error ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-[13px] text-white/55">Не удалось загрузить</p>
+          <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-brand-gradient-soft border border-dark-border flex items-center justify-center">
+              <AlertCircle size={22} className="text-content/70" />
+            </div>
+            <p className="text-[13px] text-content/55">Не удалось загрузить</p>
           </div>
         ) : loading && results.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-[13px] text-white/55">Загрузка…</p>
+          // Skeleton-плейсхолдеры вместо голого спиннера
+          <div className="columns-2 gap-1 p-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="skeleton rounded-md w-full mb-1"
+                style={{ height: 70 + (i % 4) * 28 }}
+              />
+            ))}
           </div>
         ) : results.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-[13px] text-white/55">Ничего не найдено</p>
+          <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-brand-gradient-soft border border-dark-border flex items-center justify-center">
+              <Search size={22} className="text-content/70" />
+            </div>
+            <p className="text-[13px] text-content/55">Ничего не найдено</p>
           </div>
         ) : (
           <div className="columns-2 gap-1 p-2">
@@ -158,7 +177,7 @@ export default function GifPicker({ onSelect, onClose }: Props) {
                   alt="GIF"
                   loading="lazy"
                   onClick={() => handlePick(r)}
-                  className="rounded-md w-full mb-1 cursor-pointer hover:opacity-80 transition-opacity"
+                  className="rounded-md w-full mb-1 cursor-pointer ring-1 ring-transparent hover:ring-primary-500/50 hover:brightness-110 transition-all duration-200"
                 />
               ) : null,
             )}

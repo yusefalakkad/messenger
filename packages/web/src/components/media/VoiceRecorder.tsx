@@ -115,7 +115,7 @@ export default function VoiceRecorder({ onRecorded, onCancel }: Props) {
       {/* Cancel */}
       <button
         onClick={() => { stopRecording(false); onCancel(); }}
-        className="w-9 h-9 rounded-full bg-dark-hover flex items-center justify-center text-white/60 hover:text-white flex-shrink-0"
+        className="w-9 h-9 rounded-full bg-dark-hover flex items-center justify-center text-content/60 hover:text-content flex-shrink-0"
       >
         <X size={18} />
       </button>
@@ -134,7 +134,7 @@ export default function VoiceRecorder({ onRecorded, onCancel }: Props) {
       {/* Time */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-sm font-medium tabular-nums text-white/80">{fmt(time)}</span>
+        <span className="text-sm font-medium tabular-nums text-content/80">{fmt(time)}</span>
       </div>
 
       {/* Send */}

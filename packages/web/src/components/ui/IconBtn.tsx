@@ -22,7 +22,7 @@ const IconBtn = forwardRef<HTMLButtonElement, Props>(function IconBtn(
         'btn-icon',
         size === 'sm' && 'btn-icon-sm',
         danger && 'btn-icon-danger',
-        active && 'bg-white/[0.08] text-white',
+        active && 'bg-content/[0.08] text-content',
         className,
       )}
       {...(rest as any)}

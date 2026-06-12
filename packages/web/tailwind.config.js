@@ -1,7 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class',
+  // Тема через атрибут data-theme на <html> (см. lib/theme.ts). Включаем
+  // `dark:`-варианты, привязанные к data-theme="dark" — для точечных правок,
+  // где цвет должен отличаться в светлой теме (напр. акцентный текст на тинте).
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
@@ -26,17 +29,20 @@ export default {
           orange: '#ff8a3d',
           violet: '#7c4dff',
         },
-        // Мягкий «приподнятый» dark — НЕ чёрный. Тон ~245° H, низкая S, слабо-фиолетовый
-        // подмес. Между Linear и iOS dark mode по светлоте. 6 ступеней иерархии:
-        // чем выше элемент, тем светлее тон.
+        // Поверхности — через CSS-переменные (см. index.css :root / [data-theme=light]).
+        // Один и тот же класс bg-dark-bg меняет цвет по теме автоматически.
+        // RGB-канальная форма → работает opacity-модификатор (bg-dark-surface/80).
         dark: {
-          bg:      '#17151e',  // основной фон — мягкая темнота, не black
-          surface: '#1f1d2a',  // sidebar, header
-          card:    '#28253a',  // bubble-in, карточки, ячейки
-          border:  '#352f4a',  // разделители — чуть видимей
-          hover:   '#2c2940',  // hover/active
-          input:   '#1d1b29',  // input bg
+          bg:      'rgb(var(--bg-rgb) / <alpha-value>)',
+          surface: 'rgb(var(--surface-rgb) / <alpha-value>)',
+          card:    'rgb(var(--card-rgb) / <alpha-value>)',
+          border:  'rgb(var(--border-rgb) / <alpha-value>)',
+          hover:   'rgb(var(--hover-rgb) / <alpha-value>)',
+          input:   'rgb(var(--input-rgb) / <alpha-value>)',
         },
+        // Семантический цвет текста/иконок: white в тёмной теме, near-black в светлой.
+        // text-content/70 даёт правильную прозрачность в обеих темах.
+        content: 'rgb(var(--content-rgb) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Roboto', 'sans-serif'],
@@ -54,6 +60,21 @@ export default {
       },
       minHeight:  { 'tap': '44px' },  // hit-target по WCAG
       minWidth:   { 'tap': '44px' },
+      // ─── Z-layer система ───────────────────────────────────────────────────
+      // Единая шкала слоёв — чтобы НИЧЕГО не перекрывалось хаотично.
+      // Используй ТОЛЬКО эти значения через z-{name}.
+      zIndex: {
+        'base':     '0',    // контент в потоке
+        'raised':   '10',   // приподнятые элементы (sticky-бары, бейджи)
+        'header':   '30',   // шапки чата/сайдбара (над контентом и баннерами)
+        'dropdown': '40',   // выпадающие меню, поповеры, пикеры
+        'panel':    '60',   // боковые панели (профиль), selection-bar
+        'overlay':  '100',  // затемнённая подложка модалок
+        'modal':    '110',  // сами модалки/диалоги
+        'sheet':    '120',  // bottom-sheets, schedule
+        'call':     '300',  // оверлей звонков (поверх всего)
+        'toast':    '400',  // тосты-уведомления (самый верх)
+      },
       borderRadius: {
         // Token-набор. Используй ТОЛЬКО эти значения по системе.
         'xs':     '6px',

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { deleteMessage } from '@/lib/socket';
 import { decryptMessage } from '@/lib/e2e';
 import { toast } from '@/lib/toast';
+import { SPRING, tap } from '@/lib/motion';
 
 interface Props { chatId: string; }
 
@@ -80,37 +81,39 @@ export default function SelectionBar({ chatId }: Props) {
       <AnimatePresence>
         {selectedIds.length > 0 && (
           <motion.div
-            initial={{ y: -64, opacity: 0 }}
+            initial={{ y: -72, opacity: 0 }}
             animate={{ y: 0,   opacity: 1 }}
-            exit={{ y: -64, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-            className="absolute top-0 inset-x-0 h-16 z-20 bg-dark-surface/95 backdrop-blur border-b border-dark-border flex items-center gap-1.5 px-3"
+            exit={{ y: -72, opacity: 0 }}
+            transition={SPRING.smooth}
+            className="absolute top-0 inset-x-0 h-16 z-panel bg-dark-surface/95 backdrop-blur-xl border-b border-dark-border shadow-e2 flex items-center gap-1 px-3"
           >
-            <button onClick={clearMessageSelection} className="btn-icon" title="Снять выделение">
+            <motion.button whileTap={tap} transition={SPRING.snappy}
+              onClick={clearMessageSelection} className="btn-icon text-content/70 hover:text-content" title="Снять выделение">
               <X size={18} />
-            </button>
-            <span className="flex-1 text-[15px] font-medium tabular-nums">
+            </motion.button>
+            <span className="flex-1 text-[15px] font-semibold tabular-nums pl-1">
               Выбрано: {selectedIds.length}
             </span>
-            <button
+            <motion.button whileTap={tap} transition={SPRING.snappy}
               onClick={() => void handleCopy()}
               disabled={textMessages.length === 0}
-              className="btn-icon disabled:opacity-40 disabled:pointer-events-none"
+              className="btn-icon text-content/70 hover:text-content disabled:opacity-40 disabled:pointer-events-none"
               title={textMessages.length === 0 ? 'Нет текстовых сообщений' : 'Копировать текст'}
             >
               <Copy size={18} />
-            </button>
-            <button onClick={() => setShowForward(true)} className="btn-icon" title="Переслать">
+            </motion.button>
+            <motion.button whileTap={tap} transition={SPRING.snappy}
+              onClick={() => setShowForward(true)} className="btn-icon text-content/70 hover:text-content" title="Переслать">
               <CornerUpRight size={18} />
-            </button>
-            <button
+            </motion.button>
+            <motion.button whileTap={tap} transition={SPRING.snappy}
               onClick={() => setConfirmDelete(true)}
               disabled={hasForeign}
-              className="btn-icon btn-icon-danger text-rose-400 disabled:opacity-40 disabled:pointer-events-none"
+              className="btn-icon text-rose-400 hover:bg-rose-500/15 disabled:opacity-40 disabled:pointer-events-none"
               title={hasForeign ? 'Удалять можно только свои сообщения' : 'Удалить'}
             >
               <Trash2 size={18} />
-            </button>
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>

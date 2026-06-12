@@ -15,6 +15,7 @@ import SafetyNumberView from './SafetyNumberView';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { useAuthStore } from '@/stores/auth.store';
+import { drawerRight, fadeUp, listParent, listChild, tap, SPRING } from '@/lib/motion';
 import type { Chat, ChatMember } from '@messenger/shared';
 
 /** Русское склонение: 1 подписчик / 2 подписчика / 5 подписчиков. */
@@ -158,32 +159,48 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
   return (
     <>
       <motion.div
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="absolute inset-y-0 right-0 w-full sm:w-80 bg-dark-surface border-l border-dark-border flex flex-col z-30 shadow-2xl"
+        variants={drawerRight}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="absolute inset-y-0 right-0 w-full sm:w-80 bg-dark-surface border-l border-dark-border flex flex-col z-panel shadow-e4"
       >
         {/* Шапка — h-16 единая с ChatHeader/GroupCallView */}
-        <div className="flex items-center gap-3 px-4 h-16 border-b border-dark-border bg-dark-surface/80 backdrop-blur-xl flex-shrink-0">
+        <div className="flex items-center gap-3 px-4 h-16 border-b border-dark-border bg-dark-surface/80 backdrop-blur-xl flex-shrink-0 z-header">
           <h4 className="flex-1 truncate">Профиль</h4>
-          <button
+          <motion.button
             onClick={onClose}
             aria-label="Закрыть профиль"
-            className="w-10 h-10 rounded-md bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center text-white/70 hover:text-white transition-colors flex-shrink-0"
+            whileTap={tap}
+            whileHover={{ scale: 1.04 }}
+            transition={SPRING.snappy}
+            className="btn-icon flex-shrink-0"
           >
             <X size={18} />
-          </button>
+          </motion.button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <motion.div
+          variants={listParent}
+          initial="hidden"
+          animate="visible"
+          className="flex-1 overflow-y-auto"
+        >
           {/* Hero-блок: аватар + имя + статус */}
-          <div className="relative flex flex-col items-center gap-4 px-4 py-8 border-b border-dark-border">
+          <motion.div
+            variants={fadeUp}
+            className="relative flex flex-col items-center gap-4 px-4 pt-9 pb-8 border-b border-dark-border"
+          >
+            {/* Мягкий brand-glow за аватаром */}
+            <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full bg-brand-gradient opacity-[0.12] blur-3xl" aria-hidden />
             {/* QR профиля собеседника — только direct с username */}
             {chat.type === 'direct' && username && (
-              <button
-                className="btn-icon absolute top-3 right-3"
+              <motion.button
+                className="btn-icon absolute top-3 right-3 z-raised"
                 aria-label="QR-код профиля"
+                whileTap={tap}
+                whileHover={{ scale: 1.04 }}
+                transition={SPRING.snappy}
                 onClick={() => setQrData({
                   value: `${window.location.origin}/u/${username}`,
                   title: name ?? `@${username}`,
@@ -191,23 +208,25 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
                 })}
               >
                 <QrCode size={18} />
-              </button>
+              </motion.button>
             )}
-            <Avatar
-              src={avatar}
-              name={name ?? '?'}
-              size="xl"
-              online={chat.type === 'direct' ? isOnline : undefined}
-            />
-            <div className="text-center px-4 min-w-0">
+            <div className="relative">
+              <Avatar
+                src={avatar}
+                name={name ?? '?'}
+                size="xl"
+                online={chat.type === 'direct' ? isOnline : undefined}
+              />
+            </div>
+            <div className="relative text-center px-4 min-w-0">
               <h3 className="leading-tight truncate">{name}</h3>
               {username && (
-                <p className="text-primary-300 text-[14px] mt-1 truncate">@{username}</p>
+                <p className="text-primary-600 dark:text-primary-300 text-[14px] mt-1 truncate">@{username}</p>
               )}
               {otherBio && (
-                <p className="text-[14px] text-white/70 mt-2 leading-snug break-words">{otherBio}</p>
+                <p className="text-[14px] text-content/70 mt-2 leading-snug break-words">{otherBio}</p>
               )}
-              <p className={`text-[12px] leading-4 mt-2 ${isOnline ? 'text-green-400' : 'text-white/45'} tabular-nums`}>
+              <p className={`text-[12px] leading-4 mt-2 ${isOnline ? 'text-green-400' : 'text-content/45'} tabular-nums`}>
                 {chat.type === 'direct'
                   ? (isOnline ? 'в сети' : 'не в сети')
                   : isChannel
@@ -215,10 +234,10 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
                     : `${chat.members.length} участников`}
               </p>
               {isChannel && description && (
-                <p className="text-[14px] text-white/70 mt-3 leading-snug">{description}</p>
+                <p className="text-[14px] text-content/70 mt-3 leading-snug">{description}</p>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Safety number (только для direct-чатов с известными ключами) */}
           {chat.type === 'direct' && myPublicKey && theirPublicKey && (
@@ -230,87 +249,106 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
           )}
 
           {/* Медиа-галерея */}
-          <div className="px-4 py-5">
+          <motion.div variants={fadeUp} className="px-4 py-5">
             <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-[12px] uppercase tracking-wider font-semibold text-white/55">Фото и видео</span>
+              <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">Фото и видео</span>
               {!loading && media.length > 0 && (
-                <span className="text-[12px] text-white/40 tabular-nums">{media.length}</span>
+                <span className="text-[12px] text-content/40 tabular-nums">{media.length}</span>
               )}
             </div>
 
             {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              // Skeleton-плейсхолдеры вместо голого спиннера
+              <div className="grid grid-cols-3 gap-1.5">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} className="skeleton aspect-square rounded-md" />
+                ))}
               </div>
             ) : media.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-white/35">
-                <div className="w-12 h-12 rounded-md bg-white/[0.04] border border-dark-border flex items-center justify-center">
-                  <ImageIcon size={22} />
+              <div className="flex flex-col items-center gap-3 py-12">
+                <div className="w-16 h-16 rounded-2xl bg-dark-card border border-dark-border shadow-glow-violet flex items-center justify-center text-content/45">
+                  <ImageIcon size={26} />
                 </div>
-                <span className="text-[13px]">Нет медиафайлов</span>
+                <div className="text-center">
+                  <p className="text-[15px] text-content/80 font-medium">Пока нет медиа</p>
+                  <p className="text-[13px] text-content/45 mt-0.5">Фото и видео из чата появятся здесь</p>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-1.5">
+              <motion.div
+                variants={listParent}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-3 gap-1.5"
+              >
                 {media.map((item, i) => (
-                  <button
+                  <motion.button
                     key={i}
-                    className="relative aspect-square rounded-md overflow-hidden bg-dark-hover group focus-visible:ring-2 focus-visible:ring-primary-500/60"
+                    variants={listChild}
+                    whileTap={tap}
+                    className="relative aspect-square rounded-md overflow-hidden bg-dark-card group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/60"
                     onClick={() => setViewer({ src: item.url, type: item.type })}
                     aria-label={item.type === 'video' ? 'Открыть видео' : 'Открыть фото'}
                   >
                     <img
                       src={item.thumbnailUrl ?? item.url}
                       alt=""
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      className="w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-110"
                       loading="lazy"
                     />
+                    {/* Затемнение по hover для глубины */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-200 pointer-events-none" />
                     {item.type === 'video' && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-9 h-9 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center shadow-e2">
                           <Film size={15} className="text-white" />
                         </div>
                       </div>
                     )}
-                  </button>
+                  </motion.button>
                 ))}
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
 
           {/* Блокировка собеседника — только direct */}
           {chat.type === 'direct' && otherUserId && (
-            <div className="px-4 pb-6">
+            <motion.div variants={fadeUp} className="px-4 pb-6">
               {blocked ? (
-                <button className="btn-ghost btn-block" onClick={handleUnblock}>
+                <motion.button whileTap={tap} transition={SPRING.snappy} className="btn-ghost btn-block" onClick={handleUnblock}>
                   Разблокировать
-                </button>
+                </motion.button>
               ) : (
-                <button className="btn-danger btn-block" onClick={() => setConfirmBlock(true)}>
+                <motion.button whileTap={tap} transition={SPRING.snappy} className="btn-danger btn-block" onClick={() => setConfirmBlock(true)}>
                   Заблокировать пользователя
-                </button>
+                </motion.button>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* Ссылка-приглашение — канал, owner/admin */}
           {isChannelAdmin && (
-            <div className="px-4 py-5 border-t border-dark-border">
+            <motion.div variants={fadeUp} className="px-4 py-5 border-t border-dark-border">
               <div className="mb-3 px-1">
-                <span className="text-[12px] uppercase tracking-wider font-semibold text-white/55">Ссылка-приглашение</span>
+                <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">Ссылка-приглашение</span>
               </div>
-              <div className="surface-1 px-3 py-2 rounded-md font-mono text-[12px] text-white/80 truncate">
+              <div className="surface-1 px-3 py-2.5 rounded-lg font-mono text-[12px] text-content/80 truncate">
                 {inviteLink ?? '…'}
               </div>
               <div className="flex gap-2 mt-2.5">
-                <button
+                <motion.button
+                  whileTap={tap}
+                  transition={SPRING.snappy}
                   className="btn-ghost btn-sm flex-1"
                   onClick={copyInvite}
                   disabled={!inviteLink}
                 >
                   <Copy size={15} />
                   Копировать
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileTap={tap}
+                  transition={SPRING.snappy}
                   className="btn-ghost btn-sm"
                   aria-label="QR-код приглашения"
                   disabled={!inviteLink}
@@ -321,27 +359,29 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
                   })}
                 >
                   <QrCode size={15} />
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileTap={tap}
+                  transition={SPRING.snappy}
                   className="btn-ghost btn-sm flex-1"
                   onClick={() => setConfirmRegen(true)}
                 >
                   <RefreshCw size={15} />
                   Обновить
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* Отписка — канал, обычный подписчик */}
           {isChannel && myRole === 'member' && (
-            <div className="px-4 pb-6">
-              <button className="btn-danger btn-block" onClick={() => setConfirmLeave(true)}>
+            <motion.div variants={fadeUp} className="px-4 pb-6">
+              <motion.button whileTap={tap} transition={SPRING.snappy} className="btn-danger btn-block" onClick={() => setConfirmLeave(true)}>
                 Отписаться от канала
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           )}
-        </div>
+        </motion.div>
       </motion.div>
 
       {/* Confirm: регенерация ссылки-приглашения */}

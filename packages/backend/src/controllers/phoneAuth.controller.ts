@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { body } from 'express-validator';
 import { v4 as uuidv4 } from 'uuid';
 import { sendSuccess } from '../utils/response';
+import { setRefreshCookie } from '../utils/authCookie';
 import { phoneAuthService } from '../services/phoneAuth.service';
 
 function getDeviceMeta(req: Request) {
@@ -41,6 +42,8 @@ export async function verifyCode(req: Request, res: Response, next: NextFunction
     const { phone, code, publicKey } = req.body;
     const meta = getDeviceMeta(req);
     const result = await phoneAuthService.verifyCode(phone, code, meta, publicKey);
+    // Существующий юзер без 2FA — сразу выдаём сессию, ставим refresh-cookie.
+    if (result.tokens?.refreshToken) setRefreshCookie(res, result.tokens.refreshToken);
     sendSuccess(res, result);
   } catch (err) { next(err); }
 }
@@ -58,6 +61,7 @@ export async function verifyCloudPassword(req: Request, res: Response, next: Nex
     const { passwordToken, password } = req.body;
     const meta = getDeviceMeta(req);
     const result = await phoneAuthService.verifyCloudPassword(passwordToken, password, meta);
+    if (result.tokens?.refreshToken) setRefreshCookie(res, result.tokens.refreshToken);
     sendSuccess(res, result);
   } catch (err) { next(err); }
 }
@@ -83,6 +87,7 @@ export async function completeProfile(req: Request, res: Response, next: NextFun
       { displayName, username, publicKey },
       meta,
     );
+    setRefreshCookie(res, result.refreshToken);
     sendSuccess(res, { user: result.user, tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken, expiresIn: result.expiresIn } });
   } catch (err) { next(err); }
 }

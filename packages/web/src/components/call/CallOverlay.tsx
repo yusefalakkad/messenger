@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, MonitorUp, MonitorOff } from 'lucide-react';
+import { SPRING, backdrop, popIn, tap } from '@/lib/motion';
 import { useCallStore } from '@/stores/call.store';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -492,22 +493,24 @@ export default function CallOverlay() {
     <AnimatePresence>
       {(incoming || active || outgoing) && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          className="fixed inset-0 z-[300] flex items-center justify-center"
+          className="fixed inset-0 z-call flex items-center justify-center p-4"
         >
           {/* Скрытый audio для аудиозвонков (video элемент обрабатывает видеозвонки) */}
           <audio ref={remoteAudioRef} autoPlay playsInline />
 
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          {/* Подложка — отдельный слой с собственным fade, чтобы карточка «дышала» поверх */}
+          <motion.div
+            variants={backdrop} initial="hidden" animate="visible" exit="exit"
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+          />
 
-          <div className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-2xl ${
-            isVideo && active
-              ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg'
-              : 'w-[calc(100vw-2rem)] max-w-sm bg-dark-card border border-dark-border'
-          }`}>
+          <motion.div
+            variants={popIn} initial="hidden" animate="visible" exit="exit"
+            className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-e4 ${
+              isVideo && active
+                ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg'
+                : 'w-full max-w-sm bg-dark-card border border-dark-border'
+            }`}>
 
             {isVideo && active && (
               <>
@@ -516,19 +519,31 @@ export default function CallOverlay() {
 
                 {/* Аватар собеседника когда у него камера выкл / ещё не подключилась.
                     На той же позиции что и видео — заменяет чёрный экран. */}
-                {!remoteVideoActive && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-primary-900/40 via-dark-bg to-dark-bg z-[1]">
-                    <Avatar src={peerAvatar} name={peerName} size="xl" />
-                    <div className="text-center max-w-[260px] px-4">
-                      <p className="text-lg font-semibold truncate">{peerName}</p>
-                      <p className="text-sm text-white/55 mt-1">Камера выключена</p>
-                    </div>
-                  </div>
-                )}
+                <AnimatePresence>
+                  {!remoteVideoActive && (
+                    <motion.div
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-brand-radial bg-dark-bg z-[1]"
+                    >
+                      <div className="rounded-full shadow-glow-violet">
+                        <Avatar src={peerAvatar} name={peerName} size="xl" />
+                      </div>
+                      <div className="text-center max-w-[260px] px-4">
+                        <p className="text-lg font-semibold truncate">{peerName}</p>
+                        <p className="text-[13px] text-white/55 mt-1">Камера выключена</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Локальный PiP. Если СВОЯ камера выключена — показываем мой аватар
                     в этом же окошке (а не прячем — иначе UX ломается). */}
-                <div className="absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 rounded-2xl border-2 border-white/20 z-10 overflow-hidden bg-dark-card">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={SPRING.smooth}
+                  className="absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 rounded-2xl border border-white/15 z-[10] overflow-hidden bg-dark-card shadow-e3"
+                >
                   <video ref={localVideoRef} autoPlay playsInline muted
                     className={`w-full h-full object-cover ${camOff && !sharingScreen ? 'hidden' : ''}`} />
                   {camOff && !sharingScreen && (
@@ -537,14 +552,20 @@ export default function CallOverlay() {
                       <VideoOff size={14} className="text-white/60" />
                     </div>
                   )}
-                </div>
+                </motion.div>
 
-                {sharingScreen && (
-                  <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-medium backdrop-blur-md">
-                    <MonitorUp size={14} />
-                    <span>Вы делитесь экраном</span>
-                  </div>
-                )}
+                <AnimatePresence>
+                  {sharingScreen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                      transition={SPRING.smooth}
+                      className="absolute top-4 left-4 z-[20] flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-medium backdrop-blur-md shadow-e2"
+                    >
+                      <MonitorUp size={14} />
+                      <span>Вы делитесь экраном</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </>
             )}
 
@@ -555,17 +576,17 @@ export default function CallOverlay() {
             }`}>
               {!(isVideo && active) && (
                 <>
-                  <div className="relative">
+                  <div className={`relative rounded-full ${incoming ? 'animate-pulse-glow' : 'shadow-glow-violet'}`}>
                     <Avatar src={peerAvatar} name={peerName} size="xl" />
                     {(outgoing || active) && (
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
                     )}
                   </div>
                   <div className="text-center max-w-[260px]">
-                    <p className="text-lg font-semibold truncate">{peerName}</p>
-                    <p className="text-sm text-white/50">
-                      {incoming && 'Входящий звонок...'}
-                      {outgoing && 'Звоним...'}
+                    <p className="text-xl font-semibold truncate">{peerName}</p>
+                    <p className="text-[13px] text-white/55 mt-1 tabular-nums">
+                      {incoming && 'Входящий звонок…'}
+                      {outgoing && 'Звоним…'}
                       {active && fmt(callTimer)}
                     </p>
                   </div>
@@ -573,69 +594,86 @@ export default function CallOverlay() {
               )}
 
               {isVideo && active && (
-                <p className="text-sm text-white/70 self-center mb-2">{fmt(callTimer)}</p>
+                <p className="text-[13px] text-white/75 self-center mb-2 tabular-nums">{fmt(callTimer)}</p>
               )}
 
-              <div className="flex items-center gap-4 mt-2">
+              <div className="flex items-center justify-center gap-5 mt-2">
                 {incoming && (
                   <>
-                    <button onClick={handleReject}
-                      className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all">
-                      <PhoneOff size={22} className="text-white" />
-                    </button>
-                    <button onClick={handleAccept}
-                      className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center shadow-lg shadow-green-500/30 transition-all">
-                      <Phone size={22} className="text-white" />
-                    </button>
+                    <motion.button onClick={handleReject}
+                      whileTap={tap} whileHover={{ scale: 1.05 }} transition={SPRING.snappy}
+                      title="Отклонить" aria-label="Отклонить звонок"
+                      className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-e3 shadow-red-500/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60">
+                      <PhoneOff size={24} className="text-white" />
+                    </motion.button>
+                    <motion.button onClick={handleAccept}
+                      whileTap={tap} whileHover={{ scale: 1.05 }} transition={SPRING.snappy}
+                      title="Принять" aria-label="Принять звонок"
+                      className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center shadow-e3 shadow-green-500/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/60">
+                      <Phone size={24} className="text-white" />
+                    </motion.button>
                   </>
                 )}
                 {outgoing && (
-                  <button onClick={handleEnd}
-                    className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all">
-                    <PhoneOff size={22} className="text-white" />
-                  </button>
+                  <motion.button onClick={handleEnd}
+                    whileTap={tap} whileHover={{ scale: 1.05 }} transition={SPRING.snappy}
+                    title="Завершить" aria-label="Завершить звонок"
+                    className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-e3 shadow-red-500/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60">
+                    <PhoneOff size={24} className="text-white" />
+                  </motion.button>
                 )}
                 {active && (
                   <>
-                    <button onClick={toggleMute}
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                        muted ? 'bg-red-500/20 border border-red-500/50 text-red-400' : 'bg-dark-hover text-white/60 hover:text-white'
+                    <motion.button onClick={toggleMute}
+                      whileTap={tap} whileHover={{ scale: 1.06 }} transition={SPRING.snappy}
+                      title={muted ? 'Включить микрофон' : 'Выключить микрофон'}
+                      aria-label={muted ? 'Включить микрофон' : 'Выключить микрофон'}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+                        muted ? 'bg-red-500/20 border border-red-500/50 text-red-400' : 'glass text-white/80 hover:text-white'
                       }`}>
-                      {muted ? <MicOff size={18} /> : <Mic size={18} />}
-                    </button>
+                      {muted ? <MicOff size={20} /> : <Mic size={20} />}
+                    </motion.button>
                     {isVideo && (
-                      <button onClick={toggleCam}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                          camOff ? 'bg-red-500/20 border border-red-500/50 text-red-400' : 'bg-dark-hover text-white/60 hover:text-white'
+                      <motion.button onClick={toggleCam}
+                        whileTap={tap} whileHover={{ scale: 1.06 }} transition={SPRING.snappy}
+                        title={camOff ? 'Включить камеру' : 'Выключить камеру'}
+                        aria-label={camOff ? 'Включить камеру' : 'Выключить камеру'}
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+                          camOff ? 'bg-red-500/20 border border-red-500/50 text-red-400' : 'glass text-white/80 hover:text-white'
                         }`}>
-                        {camOff ? <VideoOff size={18} /> : <Video size={18} />}
-                      </button>
+                        {camOff ? <VideoOff size={20} /> : <Video size={20} />}
+                      </motion.button>
                     )}
                     {!isVideo && (
-                      <button className="w-12 h-12 rounded-full bg-dark-hover flex items-center justify-center text-white/60">
-                        <Volume2 size={18} />
+                      <button title="Динамик" aria-label="Динамик"
+                        className="w-14 h-14 rounded-full glass flex items-center justify-center text-white/80">
+                        <Volume2 size={20} />
                       </button>
                     )}
                     {isVideo && (
-                      <button onClick={toggleScreenShare}
+                      <motion.button onClick={toggleScreenShare}
+                        whileTap={tap} whileHover={{ scale: 1.06 }} transition={SPRING.snappy}
                         title={sharingScreen ? 'Остановить показ экрана' : 'Поделиться экраном'}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        aria-label={sharingScreen ? 'Остановить показ экрана' : 'Поделиться экраном'}
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
                           sharingScreen
                             ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400'
-                            : 'bg-dark-hover text-white/60 hover:text-white'
+                            : 'glass text-white/80 hover:text-white'
                         }`}>
-                        {sharingScreen ? <MonitorOff size={18} /> : <MonitorUp size={18} />}
-                      </button>
+                        {sharingScreen ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
+                      </motion.button>
                     )}
-                    <button onClick={handleEnd}
-                      className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 transition-all">
-                      <PhoneOff size={20} className="text-white" />
-                    </button>
+                    <motion.button onClick={handleEnd}
+                      whileTap={tap} whileHover={{ scale: 1.05 }} transition={SPRING.snappy}
+                      title="Завершить" aria-label="Завершить звонок"
+                      className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-e3 shadow-red-500/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60">
+                      <PhoneOff size={22} className="text-white" />
+                    </motion.button>
                   </>
                 )}
               </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -3,8 +3,13 @@ import ReactDOM from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { initNative } from './lib/native';
+import { initTheme } from './lib/theme';
 import { queryClient } from './lib/queryClient';
 import './index.css';
+
+// Тема: применяем сохранённую (dark/light/auto) + подписка на системную смену.
+// index.html уже выставил data-theme до пейнта; здесь — react-runtime + auto-listener.
+initTheme();
 
 // Инициализируем нативные плагины как можно раньше — до первого рендера.
 // На web этот вызов — no-op.

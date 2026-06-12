@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import { Virtuoso, type VirtuosoHandle, type Components } from 'react-virtuoso';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/lib/api';
@@ -15,42 +14,23 @@ interface Props {
   messages: Message[];
 }
 
-// Плоский элемент виртуализированного списка: разделитель даты или сообщение
+// Плоский элемент виртуализированного списка: разделитель даты или сообщение.
+// Группировка: showAvatar — последний в серии (аватар внизу, как iMessage);
+// showName — первый в серии (имя сверху); isCont — продолжение серии (плотнее).
 type ListItem =
   | { kind: 'date'; label: string }
-  | { kind: 'msg'; msg: Message; isOwn: boolean; showAvatar: boolean };
-
-interface ListContext {
-  isTyping: boolean;
-  chatId: string;
-}
-
-// «Дно» с запасом — браузер клампит до реального scrollHeight
-const BOTTOM = 1_000_000_000;
-
-// Header/Footer заменяют py-4 контейнера (px-4 перенесён в обёртки элементов,
-// чтобы скроллбар оставался у края)
-function ListHeader() {
-  return <div className="h-4" />;
-}
-
-function ListFooter({ context }: { context?: ListContext }) {
-  return (
-    <div className="px-4 pb-4">
-      {context?.isTyping && <TypingIndicator chatId={context.chatId} />}
-    </div>
-  );
-}
-
-const listComponents: Components<ListItem, ListContext> = {
-  Header: ListHeader,
-  Footer: ListFooter,
-};
+  | { kind: 'msg'; msg: Message; isOwn: boolean; showAvatar: boolean; showName: boolean; isCont: boolean };
 
 export default function MessageList({ chatId, messages }: Props) {
   const user        = useAuthStore((s) => s.user);
   const typingUsers = useChatStore((s) => s.typingUsers[chatId]);
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  // Имя отправителя над пузырём — только в группах/каналах (в direct избыточно).
+  const isGroupChat = useChatStore((s) => {
+    const c = s.chats.find((x) => x.id === chatId);
+    return c ? c.type !== 'direct' : false;
+  });
+  // Нативный скролл-контейнер (вместо Virtuoso — он давал пустой рендер в проде).
+  const scrollRef = useRef<HTMLDivElement>(null);
   const isTyping    = !!(typingUsers && typingUsers.size > 0);
 
   // ── Jump-to-message ──────────────────────────────────────────────────────────
@@ -76,49 +56,67 @@ export default function MessageList({ chatId, messages }: Props) {
 
   // ── Плоский список: разделители дат + сообщения ─────────────────────────────
   const items = useMemo<ListItem[]>(() => {
+    const live = messages.filter((m) => !m.deletedAt);
     const out: ListItem[] = [];
+    const dateLabel = (m: Message) =>
+      new Date(m.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    // Серия рвётся при: смене отправителя, смене даты, или большом разрыве (>5 мин).
+    const sameSeries = (a: Message, b: Message) => {
+      if (a.senderId !== b.senderId) return false;
+      if (dateLabel(a) !== dateLabel(b)) return false;
+      const gap = Math.abs(new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return gap < 5 * 60 * 1000;
+    };
     let prevDate: string | null = null;
-    let prevSenderId: string | null = null;
-    for (const msg of messages) {
-      if (msg.deletedAt) continue;
-      const label = new Date(msg.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-      if (label !== prevDate) {
-        out.push({ kind: 'date', label });
-        prevDate = label;
-        prevSenderId = null; // новая дата — группировка отправителя начинается заново
-      }
+    for (let i = 0; i < live.length; i++) {
+      const msg = live[i];
+      const label = dateLabel(msg);
+      if (label !== prevDate) { out.push({ kind: 'date', label }); prevDate = label; }
       const isOwn = msg.senderId === user?.id;
-      out.push({ kind: 'msg', msg, isOwn, showAvatar: !isOwn && prevSenderId !== msg.senderId });
-      prevSenderId = msg.senderId;
+      const prev = live[i - 1];
+      const next = live[i + 1];
+      const isCont      = !!prev && sameSeries(prev, msg) && dateLabel(prev) === label;
+      const isLastInSer = !next || !sameSeries(msg, next);
+      const isFirstInSer = !isCont;
+      out.push({
+        kind: 'msg', msg, isOwn,
+        showAvatar: !isOwn && isLastInSer,                  // аватар у последнего в серии
+        showName:   !isOwn && isFirstInSer && isGroupChat,  // имя у первого — только в группах
+        isCont,
+      });
     }
     return out;
-  }, [messages, user?.id]);
+  }, [messages, user?.id, isGroupChat]);
+
+  // Прокрутка к низу контейнера.
+  const scrollToBottomEl = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
 
   // ── Прыжок к сообщению по jumpRequest из store ───────────────────────────────
-  // Индекс ищем в items (плоский список с date-разделителями) — именно его
-  // индексами оперирует Virtuoso. Если сообщения нет в загруженных — догружаем
-  // окрестность через /messages/around; mergeMessages обновит items и эффект
-  // перезапустится сам.
+  // Скроллим к DOM-узлу с data-mid; если сообщения нет в загруженных — догружаем
+  // окрестность через /messages/around (эффект перезапустится после merge).
   useEffect(() => {
     if (!jumpRequest || jumpRequest.chatId !== chatId) return;
     const { messageId, seq } = jumpRequest;
-    const index = items.findIndex((it) => it.kind === 'msg' && it.msg.id === messageId);
-    if (index >= 0) {
-      virtuosoRef.current?.scrollToIndex({ index, align: 'center', behavior: 'smooth' });
+    const node = scrollRef.current?.querySelector(`[data-mid="${messageId}"]`);
+    if (node) {
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
       setHighlightMessage(messageId);
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
       highlightTimerRef.current = setTimeout(() => setHighlightMessage(null), 2000);
       consumeJump();
       return;
     }
-    if (aroundSeqRef.current === seq) return; // уже запросили /around — ждём merge
+    if (aroundSeqRef.current === seq) return;
     aroundSeqRef.current = seq;
     api
       .get(`/chats/${chatId}/messages/around`, { params: { messageId } })
       .then(({ data }) => {
         const around: Message[] = data.data ?? [];
         mergeMessages(chatId, around);
-        // Target удалён/не пришёл — items его не покажут, гасим запрос
         if (!around.some((m) => m.id === messageId && !m.deletedAt)) consumeJump();
       })
       .catch(() => consumeJump());
@@ -129,7 +127,7 @@ export default function MessageList({ chatId, messages }: Props) {
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
   }, []);
 
-  // Сброс состояния при смене чата (Virtuoso ремаунтится через key={chatId})
+  // Сброс состояния при смене чата.
   useEffect(() => {
     initialLoadedRef.current = false;
     prevCountRef.current = 0;
@@ -138,49 +136,47 @@ export default function MessageList({ chatId, messages }: Props) {
     setUnreadBelow(0);
   }, [chatId]);
 
-  // ── Авто-скролл Virtuoso при появлении новых элементов ───────────────────────
-  // P2-10: собственные сообщения ВСЕГДА скроллим вниз. Если юзер их отправил
-  // прокрученный вверх по истории — он ждёт увидеть свой текст, а не бейдж.
-  const followOutput = useCallback((isAtBottom: boolean): 'smooth' | 'auto' | false => {
-    // P2-18: первая партия после открытия чата — мгновенно к низу
-    if (!initialLoadedRef.current) return 'auto';
-    const msgs = messagesRef.current;
-    const last = msgs[msgs.length - 1];
-    const isOwnLast = !!last && last.senderId === user?.id;
-    return isOwnLast || isAtBottom ? 'smooth' : false;
-  }, [user?.id]);
-
-  // Счётчик непрочитанных под кнопкой «вниз»: чужие сообщения, прилетевшие
-  // пока юзер прокручен вверх (скролл для своих/при-низу делает followOutput)
+  // ── Авто-скролл при появлении новых сообщений ────────────────────────────────
+  // Первая партия — мгновенно к низу. Дальше: свои сообщения и «когда внизу» —
+  // плавно к низу; чужие при прокрутке вверх — инкремент unread-бейджа.
   useEffect(() => {
     const prevCount = prevCountRef.current;
     prevCountRef.current = messages.length;
     if (!initialLoadedRef.current) {
       if (messages.length > 0) {
         initialLoadedRef.current = true;
-        virtuosoRef.current?.scrollToIndex({ index: 'LAST', align: 'end', behavior: 'auto' });
+        // requestAnimationFrame — дождаться отрисовки пузырей перед скроллом.
+        requestAnimationFrame(() => scrollToBottomEl('auto'));
       }
       return;
     }
     if (messages.length <= prevCount) return;
     const last = messages[messages.length - 1];
     const isOwnLast = !!last && last.senderId === user?.id;
-    if (!isOwnLast && !atBottomRef.current) setUnreadBelow((n) => n + 1);
-  }, [messages.length, user?.id, messages]);
+    if (isOwnLast || atBottomRef.current) {
+      requestAnimationFrame(() => scrollToBottomEl('smooth'));
+    } else {
+      setUnreadBelow((n) => n + 1);
+    }
+  }, [messages.length, user?.id, messages, scrollToBottomEl]);
 
   useEffect(() => {
-    if (isTyping) virtuosoRef.current?.scrollTo({ top: BOTTOM, behavior: 'smooth' });
-  }, [isTyping]);
+    if (isTyping && atBottomRef.current) requestAnimationFrame(() => scrollToBottomEl('smooth'));
+  }, [isTyping, scrollToBottomEl]);
 
-  // Отслеживаем позицию скролла (порог 120px — как раньше)
-  const handleAtBottomChange = useCallback((atBottom: boolean) => {
+  // Отслеживаем позицию скролла (порог 120px от низа).
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distFromBottom < 120;
     atBottomRef.current = atBottom;
     setShowScrollBtn(!atBottom);
     if (atBottom) setUnreadBelow(0);
   }, []);
 
   const scrollToBottom = () => {
-    virtuosoRef.current?.scrollTo({ top: BOTTOM, behavior: 'smooth' });
+    scrollToBottomEl('smooth');
     setUnreadBelow(0);
   };
 
@@ -204,64 +200,50 @@ export default function MessageList({ chatId, messages }: Props) {
     }
   }, [lastMsg?.id, chatId, user?.id]);
 
-  // ── Рендер элемента ──────────────────────────────────────────────────────────
-  // Без AnimatePresence-exit: виртуализация размонтирует элементы при скролле,
-  // exit-анимации с ней не дружат. px-4 — на обёртке, py вместо my, чтобы
-  // Virtuoso корректно мерил высоту (внешние margin схлопываются).
-  const renderItem = useCallback((_index: number, item: ListItem) => {
+  // ── Рендер одной строки списка ──────────────────────────────────────────────
+  const renderRow = (item: ListItem) => {
     if (item.kind === 'date') {
       return (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-3 py-4 px-4"
-        >
-          <div className="flex-1 divider-grad" />
-          <span className="text-[11px] text-white/40 uppercase tracking-wider font-medium px-2">{item.label}</span>
-          <div className="flex-1 divider-grad" />
-        </motion.div>
+        <div key={`date-${item.label}`} className="flex items-center justify-center py-3 px-4">
+          <span className="text-[11px] text-white/55 font-semibold uppercase tracking-wider
+                       px-3 py-1 rounded-full bg-black/25 backdrop-blur-md border border-white/[0.06]">
+            {item.label}
+          </span>
+        </div>
       );
     }
+    // Continuation — плотнее (2px), новая серия — воздух (10px сверху).
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
-        className="px-4 flow-root"
+      <div
+        key={item.msg.id}
+        data-mid={item.msg.id}
+        className={item.isCont ? 'px-4 pt-0.5 flow-root' : 'px-4 pt-2.5 flow-root'}
       >
         <MessageBubble
           message={item.msg}
           isOwn={item.isOwn}
           showAvatar={item.showAvatar}
+          showName={item.showName}
+          isCont={item.isCont}
           chatId={chatId}
         />
-      </motion.div>
+      </div>
     );
-  }, [chatId]);
-
-  const computeItemKey = useCallback(
-    (_index: number, item: ListItem) => (item.kind === 'msg' ? item.msg.id : `date-${item.label}`),
-    [],
-  );
+  };
 
   return (
     <div className="flex-1 relative overflow-hidden">
-      <Virtuoso<ListItem, ListContext>
-        key={chatId}
-        ref={virtuosoRef}
-        className="h-full"
-        data={items}
-        context={{ isTyping, chatId }}
-        components={listComponents}
-        itemContent={renderItem}
-        computeItemKey={computeItemKey}
-        followOutput={followOutput}
-        atBottomStateChange={handleAtBottomChange}
-        atBottomThreshold={120}
-        increaseViewportBy={{ top: 400, bottom: 200 }}
-        initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
-      />
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto overflow-x-hidden pt-4"
+      >
+        {items.map(renderRow)}
+        {/* Индикатор «печатает…» */}
+        <div className="px-4 pb-4 pt-1">
+          {isTyping && <TypingIndicator chatId={chatId} />}
+        </div>
+      </div>
 
       {/* ── Кнопка «прокрутить вниз» ── */}
       <AnimatePresence>
@@ -277,7 +259,7 @@ export default function MessageList({ chatId, messages }: Props) {
             className="absolute bottom-4 right-4 w-11 h-11 rounded-full glass shadow-glow-soft
                        flex items-center justify-center z-10"
           >
-            <ChevronDown size={20} className="text-white/80" />
+            <ChevronDown size={20} className="text-content/80" />
             {unreadBelow > 0 && (
               <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] rounded-full
                                bg-brand-gradient text-white text-[10px] font-bold flex items-center justify-center px-0.5 shadow-glow-violet">

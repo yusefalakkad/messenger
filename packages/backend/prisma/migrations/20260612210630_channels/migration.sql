@@ -1,5 +1,5 @@
 -- AlterEnum
-ALTER TYPE "ChatType" ADD VALUE 'channel';
+ALTER TYPE "ChatType" ADD VALUE IF NOT EXISTS 'channel';
 
 -- AlterTable
 ALTER TABLE "Chat" ADD COLUMN     "inviteCode" TEXT,

@@ -107,14 +107,14 @@ export default function ChatItemContextMenu({ chat, x, y, onClose }: Props) {
     >
       <div className="py-1">
         <button onClick={togglePin} className="menu-item">
-          <span className="text-primary-300 flex-shrink-0">
+          <span className="text-primary-600 dark:text-primary-300 flex-shrink-0">
             {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
           </span>
           <span>{isPinned ? 'Открепить' : 'Закрепить'}</span>
         </button>
 
         <button onClick={toggleArchive} className="menu-item">
-          <span className="text-primary-300 flex-shrink-0">
+          <span className="text-primary-600 dark:text-primary-300 flex-shrink-0">
             {isArchived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
           </span>
           <span>{isArchived ? 'Разархивировать' : 'Архивировать'}</span>
@@ -126,11 +126,11 @@ export default function ChatItemContextMenu({ chat, x, y, onClose }: Props) {
             onClick={() => setMuteOpen((v) => !v)}
             className="menu-item w-full"
           >
-            <span className="text-primary-300 flex-shrink-0">
+            <span className="text-primary-600 dark:text-primary-300 flex-shrink-0">
               {isMuted ? <BellOff size={16} /> : <Bell size={16} />}
             </span>
             <span className="flex-1 text-left">{isMuted ? 'Уведомления' : 'Без звука'}</span>
-            <ChevronRight size={14} className="text-white/40" />
+            <ChevronRight size={14} className="text-content/40" />
           </button>
 
           {muteOpen && (
@@ -140,7 +140,7 @@ export default function ChatItemContextMenu({ chat, x, y, onClose }: Props) {
               transition={{ duration: 0.14 }}
               className="px-1 pb-1"
             >
-              <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl overflow-hidden">
+              <div className="bg-content/[0.03] border border-content/[0.05] rounded-xl overflow-hidden">
                 {isMuted && (
                   <button
                     onClick={() => doMute(null, 'включены')}

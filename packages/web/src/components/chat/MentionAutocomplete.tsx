@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import Avatar from '@/components/ui/Avatar';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { menu } from '@/lib/motion';
 
 interface Props {
   chatId: string;
@@ -56,31 +57,33 @@ export default function MentionAutocomplete({ chatId, query, onSelect, onClose }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 8 }}
-      transition={{ duration: 0.12 }}
+      variants={menu}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      style={{ transformOrigin: 'bottom center' }}
       ref={listRef}
-      className="absolute bottom-full left-0 right-0 mb-2 mx-2 bg-dark-card border border-dark-border/80 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-20"
+      className="absolute bottom-full left-0 right-0 mb-2 mx-2 surface-2 rounded-2xl shadow-e3 overflow-hidden z-dropdown"
     >
-      <div className="px-3 py-1.5 border-b border-dark-border/40 text-[10px] uppercase tracking-wide text-white/30 font-semibold">
+      {/* Заголовок секции — uppercase-метка */}
+      <div className="px-3 py-2 border-b border-dark-border text-[11px] uppercase tracking-wider text-content/45 font-semibold">
         Упомянуть
       </div>
-      <div className="max-h-64 overflow-y-auto py-1">
+      <div className="max-h-64 overflow-y-auto p-1.5">
         {members.map((u, i) => (
           <button
             key={u.id}
             onMouseEnter={() => setActive(i)}
             onClick={() => onSelect(u.username)}
             className={clsx(
-              'w-full flex items-center gap-2.5 px-3 py-2 transition-colors text-left',
-              i === active ? 'bg-dark-hover' : 'hover:bg-dark-hover/60',
+              'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors duration-150 text-left',
+              i === active ? 'bg-content/[0.07]' : 'hover:bg-content/[0.04]',
             )}
           >
             <Avatar src={u.avatar} name={u.displayName} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate leading-tight">{u.displayName}</p>
-              <p className="text-xs text-white/40 truncate mt-0.5">@{u.username}</p>
+              <p className="text-[15px] font-medium truncate leading-tight">{u.displayName}</p>
+              <p className="text-[13px] text-content/45 truncate mt-0.5">@{u.username}</p>
             </div>
           </button>
         ))}

@@ -13,15 +13,30 @@
     <meta name="apple-mobile-web-app-title" content="Dakka" />
     <link rel="apple-touch-icon" href="/icons/icon-180.png" />
 
-    <!-- Splash background для Capacitor — должен совпадать с dark.bg в tailwind. -->
-    <style>
-      html, body { background-color: #17151e; }
-    </style>
+    <!-- Бутстрап темы ДО первого пейнта: ставит data-theme на <html> и фон,
+         чтобы не было вспышки чужой темы. Должно выполниться синхронно. -->
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem('theme') || 'dark';
+          var actual = m === 'auto'
+            ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+            : (m === 'light' ? 'light' : 'dark');
+          document.documentElement.setAttribute('data-theme', actual);
+          var bg = actual === 'light' ? '#f4f2f7' : '#17151e';
+          document.documentElement.style.backgroundColor = bg;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', bg);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
 
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <title>Dakka</title>
   </head>
-  <body class="bg-dark-bg text-white antialiased">
+  <body class="bg-dark-bg text-content antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

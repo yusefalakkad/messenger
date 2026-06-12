@@ -63,7 +63,7 @@ export default function ScheduleSendSheet({ onPick, onClose }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-sheet flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
@@ -72,7 +72,7 @@ export default function ScheduleSendSheet({ onPick, onClose }: Props) {
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
         onClick={(e) => e.stopPropagation()}
-        className="max-w-sm w-[calc(100vw-2rem)] rounded-xl bg-dark-card border border-dark-border shadow-e3 p-5"
+        className="relative z-sheet max-w-sm w-[calc(100vw-2rem)] rounded-xl bg-dark-card border border-dark-border shadow-e3 p-5"
       >
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-semibold text-[15px]">Отправить позже</h4>
@@ -85,7 +85,7 @@ export default function ScheduleSendSheet({ onPick, onClose }: Props) {
         <div className="flex flex-col gap-0.5">
           {presets.map((p) => (
             <button key={p.label} onClick={() => onPick(p.date())} className="menu-item">
-              <Clock size={16} className="text-white/45" />
+              <Clock size={16} className="text-content/45" />
               {p.label}
             </button>
           ))}

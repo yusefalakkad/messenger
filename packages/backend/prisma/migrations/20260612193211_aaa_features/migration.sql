@@ -1,8 +1,8 @@
 -- AlterEnum
-ALTER TYPE "ChatType" ADD VALUE 'saved';
+ALTER TYPE "ChatType" ADD VALUE IF NOT EXISTS 'saved';
 
 -- AlterEnum
-ALTER TYPE "MessageType" ADD VALUE 'poll';
+ALTER TYPE "MessageType" ADD VALUE IF NOT EXISTS 'poll';
 
 -- AlterTable
 ALTER TABLE "Chat" ADD COLUMN     "messageTtlSeconds" INTEGER;
