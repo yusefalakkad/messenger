@@ -83,6 +83,7 @@ export default function MessageInput({ chatId }: Props) {
   const imageInputRef  = useRef<HTMLInputElement>(null);
   const videoInputRef  = useRef<HTMLInputElement>(null);
   const abortRef       = useRef<AbortController | null>(null); // активная загрузка медиа
+  const circleVideoRef = useRef<HTMLVideoElement>(null);       // live-превью кружка при записи
 
   const ptt = useRef({
     // recording hardware
@@ -101,6 +102,7 @@ export default function MessageInput({ chatId }: Props) {
     locked:        false,
     cancelMode:    false,
     time:          0,
+    isCircle:      false,  // текущая запись — видео-кружок (а не голос)
   });
 
   // ─── Авто-ресайз textarea ────────────────────────────────────────────────────
@@ -381,6 +383,7 @@ export default function MessageInput({ chatId }: Props) {
       d.time        = 0;
       d.locked      = false;
       d.cancelMode  = false;
+      d.isCircle    = false;
 
       mr.start(100);
       setPttState('recording');
@@ -471,6 +474,122 @@ export default function MessageInput({ chatId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
 
+  // ─── PTT: видео-кружок (как в Telegram) ──────────────────────────────────────
+  // Тот же жест, что у голоса: зажал → пишет, потянул вверх → зафиксировал,
+  // влево → отмена, отпустил → отправка. Live-превью в кружке над кнопкой.
+
+  const startCirclePTT = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 480, aspectRatio: 1, facingMode: 'user' },
+        audio: true,
+      });
+      const d = ptt.current;
+      d.stream     = stream;
+      d.chunks     = [];
+      d.time       = 0;
+      d.locked     = false;
+      d.cancelMode = false;
+      d.isCircle   = true;
+      if (circleVideoRef.current) {
+        circleVideoRef.current.srcObject = stream;
+        circleVideoRef.current.play().catch(() => {});
+      }
+      const mime = [
+        'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus',
+        'video/webm', 'video/mp4',
+      ].find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      mr.ondataavailable = (e) => { if (e.data.size > 0) ptt.current.chunks.push(e.data); };
+      d.recorder = mr;
+      mr.start(100);
+      setPttState('recording');
+      setPttTime(0);
+      setLockProgress(0);
+      setShowCancel(false);
+      d.timer = setInterval(() => {
+        d.time++;
+        setPttTime(d.time);
+        if (d.time >= 60) stopCirclePTT(true); // лимит кружка — 60с
+      }, 1000);
+    } catch {
+      // камера/микрофон недоступны
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stopCirclePTT = useCallback(async (send: boolean) => {
+    const d = ptt.current;
+    if (!d.recorder || d.recorder.state === 'inactive') return;
+    if (d.timer) { clearInterval(d.timer); d.timer = null; }
+    const duration = d.time;
+
+    // Стоп-кадр для превью кружка в чате.
+    let thumb = '';
+    try {
+      const v = circleVideoRef.current;
+      if (v && v.videoWidth) {
+        const c = document.createElement('canvas');
+        c.width = 400; c.height = 400;
+        c.getContext('2d')?.drawImage(v, 0, 0, 400, 400);
+        thumb = c.toDataURL('image/jpeg', 0.7);
+      }
+    } catch { /* превью не критично */ }
+
+    d.recorder.onstop = async () => {
+      const blob = new Blob(d.chunks, { type: d.recorder?.mimeType || 'video/webm' });
+      d.stream?.getTracks().forEach((t) => t.stop());
+      d.stream = null;
+      if (circleVideoRef.current) circleVideoRef.current.srcObject = null;
+
+      if (send && blob.size > 1000) {
+        const form = new FormData();
+        form.append('file', blob, 'circle.webm');
+        form.append('duration', String(Math.max(1, duration)));
+        const doUpload = async () => {
+          setFailedUpload(null);
+          setUploading(true);
+          try {
+            let thumbnailUrl: string | undefined;
+            if (thumb) {
+              try {
+                const res = await fetch(thumb);
+                const tb  = await res.blob();
+                const tf  = new FormData();
+                tf.append('file', tb, 'thumb.jpg');
+                const { data: td } = await api.post('/media/upload/image', tf);
+                thumbnailUrl = td.data.url;
+              } catch { /* превью не критично */ }
+            }
+            const m = await uploadWithProgress(form, 'circle');
+            sendMessage({
+              chatId, type: 'circle',
+              mediaData: { url: m.url, thumbnailUrl, mimeType: m.mimeType, size: m.size, duration: Math.max(1, duration) },
+            });
+          } catch (err) {
+            if (isAbortError(err)) return;
+            console.error('Circle upload failed', err);
+            setFailedUpload({ form, retry: doUpload });
+          } finally { setUploading(false); setUploadProgress(null); }
+        };
+        await doUpload();
+      }
+    };
+
+    d.recorder.stop();
+    d.locked = false;
+    setPttState('idle');
+    setPttTime(0);
+    setLockProgress(0);
+    setShowCancel(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, uploadWithProgress]);
+
+  /** Останавливает активную запись (голос ИЛИ кружок) по флагу isCircle. */
+  const stopActivePTT = useCallback((send: boolean) => {
+    if (ptt.current.isCircle) stopCirclePTT(send); else stopVoicePTT(send);
+  }, [stopCirclePTT, stopVoicePTT]);
+
   // ─── PTT: фиксация ───────────────────────────────────────────────────────────
 
   const lockPTT = useCallback(() => {
@@ -493,12 +612,12 @@ export default function MessageInput({ chatId }: Props) {
       d.pressTimer = null; // таймер сработал — это долгое нажатие
       haptic.medium();
       if (recMode === 'circle') {
-        setShowCircle(true);
+        startCirclePTT(); // инлайн-запись кружка с тем же жестом, что и голос
       } else {
         startVoicePTT();
       }
     }, 180);
-  }, [recMode, startVoicePTT, pttState]);
+  }, [recMode, startVoicePTT, startCirclePTT, pttState]);
 
   const onRecBtnMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     if (pttState !== 'recording') return;
@@ -534,9 +653,9 @@ export default function MessageInput({ chatId }: Props) {
     // Долгое нажатие завершилось
     if (pttState === 'locked') return; // в фиксации не останавливаем
     if (pttState === 'recording') {
-      stopVoicePTT(!d.cancelMode && !showCancel);
+      stopActivePTT(!d.cancelMode && !showCancel);
     }
-  }, [pttState, showCancel, stopVoicePTT]);
+  }, [pttState, showCancel, stopActivePTT]);
 
   // ─── Видео-кружок ────────────────────────────────────────────────────────────
 
@@ -809,7 +928,24 @@ export default function MessageInput({ chatId }: Props) {
         onChange={(e) => handleFileChange(e, 'video')} />
 
       {/* ─── Основная панель (8-grid: px-16, py-12, border единый dark-border) ─── */}
-      <div className="flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
+      <div className="relative flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
+
+        {/* ── Live-превью видео-кружка (как в Telegram) ──
+            Всегда в DOM (ref стабилен для srcObject), показывается только при
+            записи кружка. Зеркалим как селфи. */}
+        <div className={clsx(
+          'absolute bottom-full right-3 mb-3 z-dropdown pointer-events-none transition-all duration-200 ease-spring',
+          isRecording && recMode === 'circle' ? 'opacity-100 scale-100' : 'opacity-0 scale-50 hidden',
+        )}>
+          <div className="relative w-44 h-44 rounded-full overflow-hidden border-[3px] border-rose-500 shadow-e4 bg-black">
+            <video ref={circleVideoRef} autoPlay playsInline muted
+              className="w-full h-full object-cover -scale-x-100" />
+            <div className="absolute bottom-2 inset-x-0 flex items-center justify-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-[11px] text-white tabular-nums font-medium bg-black/45 px-1.5 py-0.5 rounded-full">{fmt(pttTime)}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Планка «Ответить» — surface-1 + brand-полоска слева */}
         <AnimatePresence>
@@ -1102,7 +1238,7 @@ export default function MessageInput({ chatId }: Props) {
             {pttState === 'locked' && (
               <div className="flex items-center gap-2 px-3 h-11">
                 {/* Отмена 36×36 для hit-target ≥ 32 */}
-                <button onClick={() => stopVoicePTT(false)}
+                <button onClick={() => stopActivePTT(false)}
                   aria-label="Отменить запись"
                   className="w-9 h-9 rounded-full bg-dark-hover hover:bg-red-500/20 flex items-center justify-center flex-shrink-0 text-content/70 hover:text-red-300 transition-colors">
                   <Trash2 size={16} />
@@ -1185,7 +1321,7 @@ export default function MessageInput({ chatId }: Props) {
           {/* Зафиксировано → градиентная кнопка отправки */}
           {!hasText && pttState === 'locked' && (
             <motion.button
-              onClick={() => stopVoicePTT(true)}
+              onClick={() => stopActivePTT(true)}
               whileTap={{ scale: 0.9 }}
               whileHover={{ scale: 1.05 }}
               transition={SPRING.snappy}
