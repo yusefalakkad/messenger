@@ -14,7 +14,8 @@ export function getStoredMode(): ThemeMode {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v === 'dark' || v === 'light' || v === 'auto') return v;
   } catch { /* инкогнито */ }
-  return 'dark';
+  // По умолчанию — auto: подхватываем системную тему ОС (как Telegram/iOS).
+  return 'auto';
 }
 
 /** Разрешает 'auto' в фактическую тему по системной настройке. */
@@ -51,6 +52,10 @@ export function applyTheme(mode: ThemeMode): void {
     unsuppressRaf = requestAnimationFrame(() => {
       unsuppressRaf = requestAnimationFrame(() => root.classList.remove('theme-switching'));
     });
+    // Подстраховка: если вкладка в фоне — rAF не вызывается и глушилка «залипает»
+    // (переходы навсегда выключены = ощущение «зависшего» экрана). Таймер снимет
+    // класс в любом случае.
+    setTimeout(() => root.classList.remove('theme-switching'), 200);
   } else {
     root.classList.remove('theme-switching');
   }

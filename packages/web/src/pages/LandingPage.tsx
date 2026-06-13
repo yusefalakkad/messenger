@@ -1,14 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import {
+  motion, AnimatePresence, useMotionValue, useSpring, useTransform,
+  useScroll, useMotionTemplate,
+} from 'framer-motion';
 import DakkaIcon from '@/components/ui/DakkaIcon';
 import {
   ShieldCheck, Phone, Mic, Video as VideoIcon, Smile, Lock, Globe,
-  ArrowRight, Play, Apple, Smartphone, Sparkles,
+  ArrowRight, Play, Apple, Smartphone, Sparkles, Heart, Check, ChevronDown,
 } from 'lucide-react';
 
 /**
- * Главная — редакторская типографика, тёмный фон, ambient-блики, скрин телефона справа.
+ * Главная — редакторская типографика + ОБЪЁМНЫЙ 3D-телефон с живой перепиской,
+ * влетающий брендовый луч со взрывом за телефоном, скролл-луч вдоль страницы,
+ * курсор-glow и magnetic-карточки. Полностью тема-aware (text-content / dark-*).
  * Видна только неавторизованным; авторизованных роутер уводит в ChatPage.
  */
 export default function LandingPage() {
@@ -35,17 +40,16 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-dark-bg text-white overflow-x-hidden">
+    <div className="relative min-h-screen bg-dark-bg text-content overflow-x-hidden">
       <AmbientGlows />
+      <CursorGlow />
+      <ScrollBeam />
 
       <Header onSignIn={() => navigate('/auth')} />
 
       <Hero
         onPrimary={() => navigate('/auth')}
-        onDemo={() => {
-          const el = document.getElementById('demo');
-          el?.scrollIntoView({ behavior: 'smooth' });
-        }}
+        onDemo={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
       />
 
       <FeatureGrid />
@@ -59,7 +63,45 @@ export default function LandingPage() {
   );
 }
 
-// ─── Ambient floating gradient blurs ──────────────────────────────────────────
+// ─── Курсор-glow: брендовое пятно следует за мышью (десктоп) ──────────────────
+
+function CursorGlow() {
+  const x = useMotionValue(-1000);
+  const y = useMotionValue(-1000);
+  const sx = useSpring(x, { stiffness: 90, damping: 20 });
+  const sy = useSpring(y, { stiffness: 90, damping: 20 });
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, [x, y]);
+  const bg = useMotionTemplate`radial-gradient(460px circle at ${sx}px ${sy}px, rgba(124,77,255,0.14), rgba(255,77,141,0.06) 40%, transparent 70%)`;
+  return <motion.div aria-hidden className="fixed inset-0 z-0 pointer-events-none hidden md:block" style={{ background: bg }} />;
+}
+
+// ─── Скролл-луч: вертикальная брендовая линия заполняется по мере прокрутки ────
+
+function ScrollBeam() {
+  const { scrollYProgress } = useScroll();
+  const h = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
+  const glowY = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
+  return (
+    <div className="fixed left-5 top-0 bottom-0 w-px z-10 pointer-events-none hidden lg:block">
+      <div className="absolute inset-0 bg-content/10" />
+      <motion.div
+        style={{ height: h }}
+        className="absolute top-0 left-0 w-full bg-gradient-to-b from-accent-violet via-accent-pink to-accent-orange"
+      />
+      {/* светящаяся голова луча */}
+      <motion.div
+        style={{ top: glowY }}
+        className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-accent-pink shadow-[0_0_16px_4px_rgba(255,77,141,0.7)]"
+      />
+    </div>
+  );
+}
+
+// ─── Ambient floating gradient blurs (в светлой теме приглушены) ──────────────
 
 function AmbientGlows() {
   return (
@@ -67,17 +109,17 @@ function AmbientGlows() {
       <motion.div
         animate={{ x: [0, 30, 0], y: [0, 20, 0], scale: [1, 1.08, 1] }}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-accent-violet/30 blur-3xl"
+        className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-accent-violet/15 dark:bg-accent-violet/30 blur-3xl"
       />
       <motion.div
         animate={{ x: [0, -25, 0], y: [0, -15, 0], scale: [1, 1.05, 1] }}
         transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute top-1/3 -right-40 w-[640px] h-[640px] rounded-full bg-accent-pink/25 blur-3xl"
+        className="absolute top-1/3 -right-40 w-[640px] h-[640px] rounded-full bg-accent-pink/12 dark:bg-accent-pink/25 blur-3xl"
       />
       <motion.div
         animate={{ x: [0, 18, 0], y: [0, -10, 0] }}
         transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute bottom-0 left-1/3 w-[440px] h-[440px] rounded-full bg-accent-orange/20 blur-3xl"
+        className="absolute bottom-0 left-1/3 w-[440px] h-[440px] rounded-full bg-accent-orange/10 dark:bg-accent-orange/20 blur-3xl"
       />
     </div>
   );
@@ -87,28 +129,28 @@ function AmbientGlows() {
 
 function Header({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <header className="relative z-10 px-6 lg:px-12 py-6 flex items-center justify-between max-w-[1480px] mx-auto">
+    <header className="relative z-20 px-6 lg:px-12 py-6 flex items-center justify-between max-w-[1480px] mx-auto">
       <div className="flex items-center gap-2.5">
         <DakkaIcon size={40} className="drop-shadow-[0_6px_18px_rgba(154,77,255,0.45)]" />
         <span className="text-xl font-semibold tracking-tight">Dakka</span>
       </div>
 
-      <nav className="hidden md:flex items-center gap-9 text-sm text-white/70">
-        <a href="#features"  className="hover:text-white transition">Возможности</a>
-        <a href="#privacy"   className="hover:text-white transition">Приватность</a>
-        <a href="#download"  className="hover:text-white transition">Загрузить</a>
+      <nav className="hidden md:flex items-center gap-9 text-sm text-content/60">
+        <a href="#features" className="hover:text-content transition">Возможности</a>
+        <a href="#privacy"  className="hover:text-content transition">Приватность</a>
+        <a href="#download" className="hover:text-content transition">Загрузить</a>
       </nav>
 
       <div className="flex items-center gap-3">
         <button
           onClick={onSignIn}
-          className="hidden sm:inline-flex text-sm text-white/75 hover:text-white px-3 py-2 rounded-lg transition"
+          className="hidden sm:inline-flex text-sm text-content/70 hover:text-content px-3 py-2 rounded-lg transition"
         >
           Войти
         </button>
         <button
           onClick={onSignIn}
-          className="text-sm text-white/95 bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.09] px-4 py-2 rounded-xl transition"
+          className="text-sm text-content bg-content/[0.06] hover:bg-content/[0.10] border border-content/[0.10] px-4 py-2 rounded-xl transition"
         >
           Скачать
         </button>
@@ -121,45 +163,39 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
 
 function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void }) {
   return (
-    <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-8 lg:pt-16 pb-16 lg:pb-24">
-      <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16 items-center">
+    <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-6 lg:pt-10 pb-16 lg:pb-20">
+      <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
         {/* ─── Left: typography hero ─── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
-          className="space-y-8"
+          className="space-y-8 text-center lg:text-left"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
-            className="inline-flex items-center gap-2 text-xs text-white/65 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5"
+            className="inline-flex items-center gap-2 text-xs text-content/65 bg-content/[0.05] border border-content/[0.09] rounded-full px-3 py-1.5"
           >
             <Sparkles size={12} className="text-accent-pink" />
             E2E-шифрование по умолчанию · бесплатно
           </motion.div>
 
-          {/* HUGE typography */}
-          <h1 className="font-extrabold leading-[0.92] tracking-[-0.04em] text-[13vw] sm:text-[11vw] lg:text-[8vw] xl:text-[128px]">
-            <span className="block text-white">
-              ПИШИ<span className="text-white/70">.</span>
+          {/* HUGE typography — выровнено по базовой линии, читается в обеих темах */}
+          <h1 className="font-extrabold leading-[0.9] tracking-[-0.04em] text-[15vw] sm:text-[12vw] lg:text-[7.4vw] xl:text-[112px]">
+            <span className="block text-content">
+              ПИШИ<span className="text-content/35">.</span>
             </span>
             <span
               className="block bg-clip-text text-transparent"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, #ff4d8d 0%, #ff8a3d 100%)',
-              }}
+              style={{ backgroundImage: 'linear-gradient(90deg, #ff4d8d 0%, #ff8a3d 100%)' }}
             >
               ГОВОРИ<span className="text-accent-pink/80">.</span>
             </span>
             <span
               className="block bg-clip-text text-transparent"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, #7c4dff 0%, #34e0d0 100%)',
-              }}
+              style={{ backgroundImage: 'linear-gradient(90deg, #7c4dff 0%, #34e0d0 100%)' }}
             >
               ЖИВИ<span className="text-accent-violet/80">.</span>
             </span>
@@ -169,7 +205,7 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35 }}
-            className="text-white/55 text-lg max-w-md leading-relaxed"
+            className="text-content/60 text-lg max-w-md mx-auto lg:mx-0 leading-relaxed"
           >
             Мессенджер, в котором каждое сообщение дышит. Реакции, голос, видео —
             в одном живом холсте.
@@ -179,25 +215,25 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="flex flex-col sm:flex-row gap-3"
+            className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
           >
             <button
               onClick={onPrimary}
-              className="group inline-flex items-center justify-center gap-2 bg-brand-gradient hover:opacity-95 active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium shadow-glow-violet"
+              className="group inline-flex items-center justify-center gap-2 bg-brand-gradient hover:opacity-95 active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium text-white shadow-glow-violet"
             >
               Скачать бесплатно
               <ArrowRight size={18} className="opacity-0 group-hover:opacity-100 -ml-1 group-hover:ml-0 transition-all" />
             </button>
             <button
               onClick={onDemo}
-              className="inline-flex items-center justify-center gap-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.09] active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium"
+              className="inline-flex items-center justify-center gap-2 bg-content/[0.05] hover:bg-content/[0.09] border border-content/[0.10] active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium"
             >
               <Play size={16} fill="currentColor" /> Смотреть демо
             </button>
           </motion.div>
         </motion.div>
 
-        {/* ─── Right: phone mockup ─── */}
+        {/* ─── Right: объёмный живой телефон + влетающий луч ─── */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 30 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -205,117 +241,334 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
           className="relative mx-auto lg:mx-0"
           id="demo"
         >
-          <PhoneMockup />
+          <LivePhone />
         </motion.div>
       </div>
+
+      <ScrollHint onClick={onDemo} />
     </section>
   );
 }
 
-// ─── Phone mockup with sample chat ────────────────────────────────────────────
+// ─── Подсказка-скролл: пульсирующая стрелка вниз ──────────────────────────────
 
-function PhoneMockup() {
+function ScrollHint({ onClick }: { onClick: () => void }) {
+  const { scrollY } = useScroll();
+  const opacity = useTransform(scrollY, [0, 160], [1, 0]);
   return (
-    <div className="relative w-[300px] sm:w-[340px] mx-auto">
-      {/* glow behind phone */}
+    <motion.button
+      onClick={onClick}
+      style={{ opacity }}
+      className="hidden lg:flex absolute left-1/2 -translate-x-1/2 bottom-2 flex-col items-center gap-1 text-content/45 hover:text-content/80 transition-colors"
+      aria-label="Листайте вниз"
+    >
+      <span className="text-[11px] tracking-wide uppercase">Листайте</span>
+      <motion.span
+        animate={{ y: [0, 6, 0] }}
+        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <ChevronDown size={20} />
+      </motion.span>
+    </motion.button>
+  );
+}
+
+// ─── Влетающий луч + взрыв за телефоном (один раз на загрузке) ────────────────
+
+function IntroBeam() {
+  const [phase, setPhase] = useState<'fly' | 'burst' | 'done'>('fly');
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('burst'), 950);
+    const t2 = setTimeout(() => setPhase('done'), 1900);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  if (phase === 'done') return null;
+
+  return (
+    <div className="absolute inset-0 -z-10 pointer-events-none overflow-visible">
+      {/* комета летит из верхнего-левого угла к центру телефона */}
+      {phase === 'fly' && (
+        <motion.div
+          initial={{ left: '-60%', top: '-50%', opacity: 0, scale: 0.5 }}
+          animate={{ left: '50%', top: '50%', opacity: 1, scale: 1 }}
+          transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute"
+        >
+          <div className="relative -translate-x-1/2 -translate-y-1/2">
+            {/* хвост кометы */}
+            <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-40 h-1.5 origin-right rotate-[28deg] rounded-full bg-gradient-to-l from-accent-pink/90 to-transparent blur-[2px]" />
+            {/* ядро */}
+            <div className="w-10 h-10 rounded-full bg-brand-gradient blur-md opacity-95" />
+            <div className="absolute inset-0 w-10 h-10 rounded-full bg-white/80 blur-[6px] scale-50" />
+          </div>
+        </motion.div>
+      )}
+
+      {/* взрыв в центре (за телефоном — свет выбивается по краям силуэта) */}
+      {phase === 'burst' && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <motion.div
+            initial={{ scale: 0, opacity: 0.85 }}
+            animate={{ scale: 7, opacity: 0 }}
+            transition={{ duration: 0.9, ease: 'easeOut' }}
+            className="w-28 h-28 rounded-full bg-brand-gradient blur-2xl"
+          />
+          <motion.div
+            initial={{ scale: 0.2, opacity: 0.9 }}
+            animate={{ scale: 4, opacity: 0 }}
+            transition={{ duration: 0.75, ease: 'easeOut' }}
+            className="absolute inset-0 w-28 h-28 rounded-full border-2 border-accent-pink/70"
+          />
+          {/* искры */}
+          {Array.from({ length: 12 }).map((_, i) => {
+            const ang = (i / 12) * Math.PI * 2;
+            const dist = 150 + (i % 3) * 30;
+            return (
+              <motion.span
+                key={i}
+                initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                animate={{ x: Math.cos(ang) * dist, y: Math.sin(ang) * dist, opacity: 0, scale: 0.4 }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full bg-accent-pink shadow-[0_0_8px_rgba(255,77,141,0.8)]"
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Объёмный живой телефон: переписка по кругу + 3D-наклон + блик ────────────
+
+type ScriptMsg =
+  | { id: number; kind: 'in' | 'out'; text: string }
+  | { id: number; kind: 'voice' };
+
+const SCRIPT: ScriptMsg[] = [
+  { id: 0, kind: 'in',  text: 'Видел новый Dakka? Интерфейс просто 🔥' },
+  { id: 1, kind: 'out', text: 'Да! Живые реакции и стекло — топ' },
+  { id: 2, kind: 'voice' },
+  { id: 3, kind: 'in',  text: 'созвон вечером? 🎧' },
+];
+
+const TIMELINE: Array<{ at: number; type: 'typing' | 'msg' | 'react' | 'reset'; i?: number }> = [
+  { at: 500,  type: 'typing' },
+  { at: 1500, type: 'msg',   i: 0 },
+  { at: 2600, type: 'msg',   i: 1 },
+  { at: 3500, type: 'react', i: 0 },
+  { at: 4300, type: 'typing' },
+  { at: 5300, type: 'msg',   i: 2 },
+  { at: 6500, type: 'msg',   i: 3 },
+  { at: 9000, type: 'reset' },
+];
+
+function LivePhone() {
+  const [shown,   setShown]   = useState<number[]>([]);
+  const [typing,  setTyping]  = useState(false);
+  const [reacted, setReacted] = useState(false);
+
+  // 3D-наклон от мыши (объём + параллакс).
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const rotX = useSpring(useTransform(my, [-0.5, 0.5], [12, -12]),  { stiffness: 120, damping: 18 });
+  const rotY = useSpring(useTransform(mx, [-0.5, 0.5], [-16, 16]),  { stiffness: 120, damping: 18 });
+  // Блик-«стекло» едет по экрану вслед за наклоном.
+  const sheenX = useTransform(mx, [-0.5, 0.5], ['20%', '80%']);
+  const sheen = useMotionTemplate`linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.10) ${sheenX}, transparent 70%)`;
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set((e.clientX - r.left) / r.width - 0.5);
+    my.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const onMouseLeave = () => { mx.set(0); my.set(0); };
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const run = () => {
+      setShown([]); setTyping(false); setReacted(false);
+      for (const ev of TIMELINE) {
+        timers.push(setTimeout(() => {
+          if (ev.type === 'typing') setTyping(true);
+          else if (ev.type === 'msg') { setTyping(false); setShown((s) => [...s, ev.i!]); }
+          else if (ev.type === 'react') setReacted(true);
+          else if (ev.type === 'reset') run();
+        }, ev.at));
+      }
+    };
+    run();
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div className="relative w-[290px] sm:w-[330px] mx-auto" style={{ perspective: 1100 }}>
+      {/* свечение под телефоном */}
       <div className="absolute inset-0 -inset-x-12 bg-accent-pink/20 blur-3xl rounded-full" />
+      <IntroBeam />
 
       <motion.div
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
         animate={{ y: [0, -10, 0] }}
         transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        className="relative rounded-[44px] bg-[#0a0814] border border-white/[0.08] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)] overflow-hidden"
-        style={{ aspectRatio: '0.49' }}
+        style={{ rotateX: rotX, rotateY: rotY, transformStyle: 'preserve-3d' }}
+        className="relative rounded-[46px] p-[3px] bg-gradient-to-br from-white/20 via-white/5 to-transparent shadow-[0_40px_90px_-20px_rgba(0,0,0,0.75)]"
       >
-        {/* notch */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30" />
+        {/* корпус */}
+        <div className="relative rounded-[44px] bg-[#0a0814] border border-white/[0.06] overflow-hidden">
+          <div className="aspect-[0.49] flex flex-col" style={{ transform: 'translateZ(0.1px)' }}>
+            {/* notch (приподнят в 3D) */}
+            <div
+              className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"
+              style={{ transform: 'translateZ(24px)' }}
+            />
 
-        {/* status bar */}
-        <div className="absolute top-0 left-0 right-0 px-6 pt-4 flex justify-between items-center text-[11px] text-white/85 z-20">
-          <span className="font-medium">9:41</span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-2 rounded-sm border border-white/60" />
-          </span>
-        </div>
+            {/* status bar */}
+            <div className="absolute top-0 left-0 right-0 px-6 pt-4 flex justify-between items-center text-[11px] text-white/85 z-20">
+              <span className="font-medium">9:41</span>
+              <span className="w-3 h-2 rounded-sm border border-white/60" />
+            </div>
 
-        {/* chat content */}
-        <div className="absolute inset-0 pt-16 px-4 pb-4 flex flex-col">
-          {/* peer header */}
-          <div className="flex items-center gap-3 pb-3 border-b border-white/[0.06]">
-            <button className="text-white/50 text-lg">‹</button>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center text-xs font-semibold">
-              МК
+            {/* peer header */}
+            <div className="flex items-center gap-3 px-4 pt-14 pb-3 border-b border-white/[0.06]">
+              <button className="text-white/50 text-lg leading-none">‹</button>
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center text-xs font-semibold text-white">
+                МК
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-white">Майя</div>
+                <div className="text-[10px] text-accent-pink/85">{typing ? 'печатает…' : 'в сети'}</div>
+              </div>
+              <VideoIcon size={16} className="text-white/55" />
             </div>
-            <div className="flex-1">
-              <div className="text-sm font-medium">Майя</div>
-              <div className="text-[10px] text-accent-pink/85">в сети</div>
+
+            {/* messages */}
+            <div className="flex-1 flex flex-col justify-end gap-2 px-4 py-3 overflow-hidden">
+              <AnimatePresence>
+                {shown.map((i) => {
+                  const m = SCRIPT[i];
+                  if (m.kind === 'voice') {
+                    return (
+                      <motion.div
+                        key={m.id}
+                        layout
+                        initial={{ opacity: 0, y: 14, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                        className="self-start flex items-center gap-2 bg-white/[0.06] border border-white/[0.06] rounded-2xl rounded-bl-md px-3 py-2 max-w-[72%]"
+                      >
+                        <span className="w-6 h-6 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
+                          <Play size={11} fill="white" className="text-white" />
+                        </span>
+                        <LiveWaveform />
+                        <span className="text-[10px] text-white/70 tabular-nums">0:12</span>
+                      </motion.div>
+                    );
+                  }
+                  return (
+                    <motion.div
+                      key={m.id}
+                      layout
+                      initial={{ opacity: 0, y: 14, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                      className={
+                        m.kind === 'out'
+                          ? 'relative self-end bg-brand-gradient text-white rounded-2xl rounded-br-md px-3 py-2 text-[12px] max-w-[74%] shadow-glow-pink'
+                          : 'relative self-start bg-white/[0.06] text-white/95 rounded-2xl rounded-bl-md px-3 py-2 text-[12px] max-w-[74%] border border-white/[0.05]'
+                      }
+                    >
+                      {m.text}
+                      {m.id === 0 && (
+                        <AnimatePresence>
+                          {reacted && (
+                            <motion.span
+                              initial={{ scale: 0, y: 4 }}
+                              animate={{ scale: 1, y: 0 }}
+                              transition={{ type: 'spring', stiffness: 500, damping: 16 }}
+                              className="absolute -bottom-2.5 -right-1 flex items-center gap-0.5 bg-[#1a1726] border border-white/10 rounded-full pl-1 pr-1.5 py-0.5 shadow-lg"
+                            >
+                              <Heart size={9} fill="#ff4d8d" className="text-accent-pink" />
+                              <span className="text-[9px] text-white/80">1</span>
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      )}
+                    </motion.div>
+                  );
+                })}
+
+                {typing && (
+                  <motion.div
+                    key="typing"
+                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    className="self-start flex items-center gap-1 bg-white/[0.06] border border-white/[0.05] rounded-2xl rounded-bl-md px-3 py-2.5"
+                  >
+                    {[0, 1, 2].map((d) => (
+                      <motion.span
+                        key={d}
+                        animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: d * 0.18 }}
+                        className="w-1.5 h-1.5 rounded-full bg-white/70"
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <VideoIcon size={16} className="text-white/55" />
+
+            {/* composer */}
+            <div className="px-4 pb-5 pt-1 flex items-center gap-2">
+              <button className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/55 flex-shrink-0">+</button>
+              <div className="flex-1 h-9 rounded-full bg-white/[0.04] border border-white/[0.06] px-4 flex items-center text-[12px] text-white/35">
+                Сообщение
+              </div>
+              <button className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center flex-shrink-0">
+                <Mic size={14} fill="white" className="text-white" />
+              </button>
+            </div>
           </div>
 
-          {/* messages */}
-          <div className="flex-1 flex flex-col gap-2 mt-3 overflow-hidden">
-            <Bubble own={false}>Видел новый Dakka? Интерфейс просто 🔥</Bubble>
-
-            <Bubble own={true} gradient>Да! Живые реакции и стекло — топ</Bubble>
-
-            {/* voice */}
-            <div className="self-end flex items-center gap-2 bg-brand-gradient rounded-2xl px-3 py-2 max-w-[68%]">
-              <Play size={12} fill="white" className="text-white" />
-              <Waveform />
-              <span className="text-[10px] text-white/85">0:12</span>
-            </div>
-
-            <Bubble own={false}>созвон вечером? 🎧</Bubble>
-          </div>
-
-          {/* composer */}
-          <div className="mt-3 flex items-center gap-2">
-            <button className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/55">
-              +
-            </button>
-            <div className="flex-1 h-9 rounded-full bg-white/[0.04] border border-white/[0.06] px-4 flex items-center text-[12px] text-white/35">
-              Сообщение
-            </div>
-            <button className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center">
-              <Mic size={14} fill="white" className="text-white" />
-            </button>
-          </div>
+          {/* стеклянный блик поверх экрана (едет за наклоном) */}
+          <motion.div aria-hidden className="absolute inset-0 pointer-events-none rounded-[44px]" style={{ background: sheen }} />
         </div>
       </motion.div>
     </div>
   );
 }
 
-function Bubble({ children, own, gradient }: { children: React.ReactNode; own: boolean; gradient?: boolean }) {
-  const cls = own
-    ? gradient
-      ? 'self-end bg-brand-gradient text-white rounded-2xl rounded-br-md px-3 py-2 text-[12px] max-w-[72%] shadow-glow-pink'
-      : 'self-end bg-white/[0.08] text-white rounded-2xl rounded-br-md px-3 py-2 text-[12px] max-w-[72%]'
-    : 'self-start bg-white/[0.05] text-white/95 rounded-2xl rounded-bl-md px-3 py-2 text-[12px] max-w-[72%] border border-white/[0.05]';
-  return <div className={cls}>{children}</div>;
-}
-
-function Waveform() {
+// Анимированная волна голосового — бегущие столбики
+function LiveWaveform() {
   const bars = [3, 8, 5, 11, 7, 13, 6, 10, 4, 9, 6, 11];
   return (
     <div className="flex items-center gap-[2px] flex-1">
       {bars.map((h, i) => (
-        <div key={i} className="w-[2px] bg-white/85 rounded-full" style={{ height: h }} />
+        <motion.div
+          key={i}
+          animate={{ scaleY: [1, 0.45, 1] }}
+          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.07, ease: 'easeInOut' }}
+          className="w-[2px] bg-white/85 rounded-full origin-center"
+          style={{ height: h }}
+        />
       ))}
     </div>
   );
 }
 
-// ─── Feature grid ─────────────────────────────────────────────────────────────
+// ─── Feature grid (magnetic-наклон карточек к курсору) ────────────────────────
 
 function FeatureGrid() {
   const items = [
-    { icon: Lock,        title: 'E2E по умолчанию',     desc: 'ECDH P-256 + AES-256-GCM. Только вы и собеседник видите содержимое.' },
-    { icon: Mic,         title: 'Голосовые сообщения',  desc: 'Жмёшь и говоришь — мгновенно, с волной и автостопом.' },
-    { icon: VideoIcon,   title: 'Звонки и видео',       desc: 'Один-на-один + групповые до 8. Без задержек, через свой TURN/SFU.' },
-    { icon: Smile,       title: 'Живые реакции',        desc: 'Эмодзи, ответы, цитаты, пересылка — всё под пальцем.' },
-    { icon: Phone,       title: 'По номеру',            desc: 'Вход одним кодом через Telegram. Никаких паролей.' },
-    { icon: Globe,       title: 'Web, iOS, Android',    desc: 'Один аккаунт, бесшовная синхронизация между устройствами.' },
+    { icon: Lock,      title: 'E2E по умолчанию',    desc: 'ECDH P-256 + AES-256-GCM. Только вы и собеседник видите содержимое.' },
+    { icon: Mic,       title: 'Голосовые сообщения', desc: 'Жмёшь и говоришь — мгновенно, с волной и автостопом.' },
+    { icon: VideoIcon, title: 'Звонки и видео',      desc: 'Один-на-один + групповые до 8. Без задержек, через свой TURN/SFU.' },
+    { icon: Smile,     title: 'Живые реакции',       desc: 'Эмодзи, ответы, цитаты, пересылка — всё под пальцем.' },
+    { icon: Phone,     title: 'По номеру',           desc: 'Вход одним кодом через Telegram. Никаких паролей.' },
+    { icon: Globe,     title: 'Web, iOS, Android',   desc: 'Один аккаунт, бесшовная синхронизация между устройствами.' },
   ];
   return (
     <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
@@ -327,23 +580,43 @@ function FeatureGrid() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
         {items.map((it, i) => (
-          <motion.div
-            key={it.title}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-40px' }}
-            transition={{ duration: 0.55, delay: i * 0.05, ease: [0.32, 0.72, 0, 1] }}
-            className="group p-6 rounded-2xl bg-white/[0.025] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.10] transition"
-          >
-            <div className="w-11 h-11 rounded-xl bg-brand-gradient-soft border border-white/[0.07] flex items-center justify-center mb-4 group-hover:scale-110 transition">
+          <TiltCard key={it.title} index={i}>
+            <div className="w-11 h-11 rounded-xl bg-brand-gradient-soft border border-content/[0.08] flex items-center justify-center mb-4 transition group-hover:scale-110">
               <it.icon size={18} className="text-accent-pink" />
             </div>
             <div className="text-base font-medium mb-1.5">{it.title}</div>
-            <div className="text-sm text-white/55 leading-relaxed">{it.desc}</div>
-          </motion.div>
+            <div className="text-sm text-content/55 leading-relaxed">{it.desc}</div>
+          </TiltCard>
         ))}
       </div>
     </section>
+  );
+}
+
+// Карточка с magnetic-наклоном к курсору (интерактив этого «уровня»)
+function TiltCard({ children, index }: { children: React.ReactNode; index: number }) {
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const rx = useSpring(useTransform(my, [-0.5, 0.5], [6, -6]),  { stiffness: 200, damping: 20 });
+  const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-6, 6]),  { stiffness: 200, damping: 20 });
+  const onMove = (e: React.MouseEvent) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set((e.clientX - r.left) / r.width - 0.5);
+    my.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  return (
+    <motion.div
+      onMouseMove={onMove}
+      onMouseLeave={() => { mx.set(0); my.set(0); }}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.55, delay: index * 0.05, ease: [0.32, 0.72, 0, 1] }}
+      style={{ rotateX: rx, rotateY: ry, transformStyle: 'preserve-3d', perspective: 700 }}
+      className="group p-6 rounded-2xl bg-content/[0.025] border border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12] transition-colors"
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -359,19 +632,19 @@ function PrivacySection() {
           viewport={{ once: true }}
           transition={{ duration: 0.7 }}
         >
-          <div className="inline-flex items-center gap-2 text-xs text-accent-violet/90 bg-accent-violet/[0.10] border border-accent-violet/[0.20] rounded-full px-3 py-1.5 mb-6">
+          <div className="inline-flex items-center gap-2 text-xs text-accent-violet bg-accent-violet/[0.12] border border-accent-violet/[0.22] rounded-full px-3 py-1.5 mb-6">
             <ShieldCheck size={12} /> Приватность
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[0.95] mb-6">
             Ваши слова —<br />
             только <span className="bg-clip-text text-transparent bg-brand-gradient">ваши</span>.
           </h2>
-          <p className="text-white/55 text-lg leading-relaxed max-w-md">
+          <p className="text-content/60 text-lg leading-relaxed max-w-md">
             Сообщения шифруются ещё на устройстве. Сервер видит только зашифрованный текст
             и не может его прочитать. Ключи лежат в Keychain / Keystore — никогда не покидают телефон.
           </p>
 
-          <div className="mt-8 space-y-3 text-sm text-white/65">
+          <div className="mt-8 space-y-3 text-sm text-content/70">
             {[
               'P-256 ECDH + AES-256-GCM, bit-perfect между Web/iOS/Android',
               'TURN с эфемерными HMAC-credentials, TTL 10 минут',
@@ -379,7 +652,9 @@ function PrivacySection() {
               'Двухфакторная защита через TOTP (Google Authenticator)',
             ].map((line) => (
               <div key={line} className="flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent-pink" />
+                <span className="w-5 h-5 rounded-full bg-accent-pink/15 flex items-center justify-center flex-shrink-0">
+                  <Check size={11} className="text-accent-pink" />
+                </span>
                 {line}
               </div>
             ))}
@@ -393,7 +668,7 @@ function PrivacySection() {
           transition={{ duration: 0.7, delay: 0.1 }}
           className="relative"
         >
-          <div className="relative p-8 rounded-3xl bg-white/[0.03] border border-white/[0.07] overflow-hidden">
+          <div className="relative p-8 rounded-3xl bg-content/[0.03] border border-content/[0.08] overflow-hidden">
             <div className="absolute -inset-1 bg-brand-gradient-soft blur-2xl pointer-events-none" />
             <div className="relative flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow-violet">
@@ -401,11 +676,11 @@ function PrivacySection() {
               </div>
               <div>
                 <div className="text-2xl font-semibold">Сквозное шифрование</div>
-                <div className="text-sm text-white/55">включено для всех чатов</div>
+                <div className="text-sm text-content/55">включено для всех чатов</div>
               </div>
             </div>
 
-            <div className="relative mt-7 p-4 rounded-xl bg-dark-bg/60 border border-white/[0.05] font-mono text-[11px] text-white/70 leading-relaxed">
+            <div className="relative mt-7 p-4 rounded-xl bg-black/40 border border-white/[0.06] font-mono text-[11px] text-white/70 leading-relaxed">
               <span className="text-accent-pink">{'> '}</span>encrypted: <span className="text-accent-orange">true</span><br/>
               <span className="text-accent-pink">{'> '}</span>algo: <span className="text-accent-orange">'ECDH-P256+AES-GCM'</span><br/>
               <span className="text-accent-pink">{'> '}</span>nonce: <span className="text-white/40">12 bytes</span><br/>
@@ -430,25 +705,9 @@ function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
       />
 
       <div className="grid sm:grid-cols-3 gap-4 mt-12">
-        <DownloadCard
-          icon={Apple}
-          title="iPhone & iPad"
-          sub="iOS 16.4+"
-          onClick={onSignIn}
-        />
-        <DownloadCard
-          icon={Smartphone}
-          title="Android"
-          sub="Android 8+"
-          onClick={onSignIn}
-        />
-        <DownloadCard
-          icon={Globe}
-          title="Web"
-          sub="Браузер — прямо здесь"
-          onClick={onSignIn}
-          highlight
-        />
+        <DownloadCard icon={Apple}      title="iPhone & iPad" sub="iOS 16.4+"           onClick={onSignIn} />
+        <DownloadCard icon={Smartphone} title="Android"       sub="Android 8+"          onClick={onSignIn} />
+        <DownloadCard icon={Globe}      title="Web"           sub="Браузер — прямо здесь" onClick={onSignIn} highlight />
       </div>
     </section>
   );
@@ -460,22 +719,24 @@ function DownloadCard({
   icon: typeof Apple; title: string; sub: string; onClick: () => void; highlight?: boolean;
 }) {
   return (
-    <button
+    <motion.button
       onClick={onClick}
-      className={`group relative text-left p-6 rounded-2xl border transition overflow-hidden
+      whileHover={{ y: -4 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+      className={`group relative text-left p-6 rounded-2xl border transition-colors overflow-hidden
         ${highlight
-          ? 'bg-brand-gradient-soft border-white/[0.12] hover:border-white/[0.20]'
-          : 'bg-white/[0.025] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.10]'
+          ? 'bg-brand-gradient-soft border-content/[0.14] hover:border-content/[0.22]'
+          : 'bg-content/[0.025] border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12]'
         }`}
     >
       {highlight && <div className="absolute -top-1 -right-1 text-[10px] bg-brand-gradient text-white px-2 py-0.5 rounded-bl-lg rounded-tr-lg">сейчас</div>}
-      <Icon size={32} className="mb-4 text-white/85 group-hover:scale-110 transition" />
+      <Icon size={32} className="mb-4 text-content/85 group-hover:scale-110 transition" />
       <div className="text-base font-medium mb-1">{title}</div>
-      <div className="text-sm text-white/55">{sub}</div>
+      <div className="text-sm text-content/55">{sub}</div>
       <div className="flex items-center gap-1 mt-3 text-xs text-accent-pink opacity-0 group-hover:opacity-100 transition">
         Открыть <ArrowRight size={12} />
       </div>
-    </button>
+    </motion.button>
   );
 }
 
@@ -483,21 +744,21 @@ function DownloadCard({
 
 function Footer() {
   return (
-    <footer className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-12 border-t border-white/[0.05]">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/40">
+    <footer className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-12 border-t border-content/[0.07]">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-content/45">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-brand-gradient flex items-center justify-center">
             <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
               <path d="M4 8C4 6.9 4.9 6 6 6h20c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H18l-4 4-2-4H6c-1.1 0-2-.9-2-2V8z" fill="white"/>
             </svg>
           </div>
-          <span className="text-white/65 font-medium">Dakka</span>
+          <span className="text-content/70 font-medium">Dakka</span>
           <span>· 2026</span>
         </div>
         <div className="flex items-center gap-6">
-          <a href="#" className="hover:text-white/70 transition">Условия</a>
-          <a href="#" className="hover:text-white/70 transition">Конфиденциальность</a>
-          <a href="mailto:hello@akkdmsg.online" className="hover:text-white/70 transition">Связаться</a>
+          <a href="#" className="hover:text-content/80 transition">Условия</a>
+          <a href="#" className="hover:text-content/80 transition">Конфиденциальность</a>
+          <a href="mailto:hello@akkdmsg.online" className="hover:text-content/80 transition">Связаться</a>
         </div>
       </div>
     </footer>
@@ -515,13 +776,13 @@ function SectionHeader({ chip, title, sub }: { chip: string; title: string; sub:
       transition={{ duration: 0.6 }}
       className="text-center max-w-2xl mx-auto"
     >
-      <div className="inline-flex items-center gap-2 text-xs text-white/60 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5 mb-5">
+      <div className="inline-flex items-center gap-2 text-xs text-content/60 bg-content/[0.05] border border-content/[0.09] rounded-full px-3 py-1.5 mb-5">
         {chip}
       </div>
       <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[0.95] mb-5">
         {title}
       </h2>
-      <p className="text-white/55 text-lg leading-relaxed">{sub}</p>
+      <p className="text-content/60 text-lg leading-relaxed">{sub}</p>
     </motion.div>
   );
 }

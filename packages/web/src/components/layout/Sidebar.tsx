@@ -237,8 +237,8 @@ export default function Sidebar() {
         className="mx-2 mb-1 flex items-center gap-3 px-3 h-12 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
         title="Архивные чаты"
       >
-        <span className="w-9 h-9 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
-          <Archive size={16} />
+        <span className="w-10 h-10 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+          <Archive size={18} />
         </span>
         <span className="flex-1 text-content/85 font-medium">Архив</span>
         {archivedCount > 0 && (
@@ -256,8 +256,8 @@ export default function Sidebar() {
         className="mx-2 mb-1.5 flex items-center gap-3 px-3 h-12 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
         title="Избранное"
       >
-        <span className="w-9 h-9 rounded-lg bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
-          <Bookmark size={16} />
+        <span className="w-10 h-10 rounded-lg bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
+          <Bookmark size={18} />
         </span>
         <span className="flex-1 text-content/85 font-medium">Избранное</span>
       </motion.button>

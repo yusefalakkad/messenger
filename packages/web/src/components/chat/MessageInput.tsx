@@ -1130,7 +1130,7 @@ export default function MessageInput({ chatId }: Props) {
           {/* ── Кнопка прикрепить (скрыта при записи) ── */}
           {!isRecording && (
             <div className="relative flex-shrink-0">
-              <IconBtn onClick={() => setShowAttach(!showAttach)} disabled={uploading} active={showAttach}>
+              <IconBtn className="btn-icon-lg" onClick={() => setShowAttach(!showAttach)} disabled={uploading} active={showAttach}>
                 <Paperclip size={20} />
               </IconBtn>
 

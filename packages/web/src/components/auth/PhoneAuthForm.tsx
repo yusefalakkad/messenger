@@ -354,7 +354,7 @@ export default function PhoneAuthForm() {
                               transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
                               focus-within:ring-2 focus-within:ring-primary-500/15">
                 <CountryPicker value={country} onChange={setCountry} />
-                <span className="w-px h-6 bg-content/10" aria-hidden />
+                <span className="w-px h-7 self-center bg-content/20 rounded-full flex-shrink-0" aria-hidden />
                 <input
                   autoFocus
                   inputMode="tel"

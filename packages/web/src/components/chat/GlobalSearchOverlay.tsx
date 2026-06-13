@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Megaphone, SearchX, Users } from 'lucide-react';
+import { Loader2, Megaphone, SearchX, Users, MessageSquarePlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import Avatar from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/auth.store';
@@ -33,6 +33,16 @@ interface ChannelSearchResult {
   subscriberCount: number;
   isMember: boolean;
   type?: ChatType; // 'channel' | 'group' — для иконки-фолбэка
+}
+
+// Ответ GET /users/search — люди по @username / имени / телефону
+interface UserResult {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatar: string | null;
+  bio: string | null;
+  publicKey: string | null;
 }
 
 // Плюрализация: 1 подписчик, 2 подписчика, 5 подписчиков
@@ -90,7 +100,9 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
   const myUserId = useAuthStore((s) => s.user?.id);
   const [results, setResults] = useState<SearchResults | null>(null);
   const [channels, setChannels] = useState<ChannelSearchResult[]>([]);
+  const [users, setUsers] = useState<UserResult[]>([]);
   const [subscribingId, setSubscribingId] = useState<string | null>(null);
+  const [startingUserId, setStartingUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -98,6 +110,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
     if (!q) {
       setResults(null);
       setChannels([]);
+      setUsers([]);
       setLoading(false);
       return;
     }
@@ -105,10 +118,11 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
     setLoading(true);
     // Дебаунс 300мс; AbortController отменяет in-flight запросы при смене query
     const handle = setTimeout(async () => {
-      // Параллельно: чаты+сообщения и публичные каналы
-      const [searchRes, channelsRes] = await Promise.allSettled([
+      // Параллельно: чаты+сообщения, публичные каналы и люди по @username
+      const [searchRes, channelsRes, usersRes] = await Promise.allSettled([
         api.get('/search', { params: { q, limit: 30 }, signal: ctrl.signal }),
         api.get('/channels/search', { params: { q }, signal: ctrl.signal }),
+        api.get('/users/search', { params: { q }, signal: ctrl.signal }),
       ]);
       if (ctrl.signal.aborted) return;
       if (searchRes.status === 'fulfilled') {
@@ -120,6 +134,11 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
       setChannels(
         channelsRes.status === 'fulfilled'
           ? ((channelsRes.value.data?.data ?? []) as ChannelSearchResult[])
+          : [],
+      );
+      setUsers(
+        usersRes.status === 'fulfilled'
+          ? ((usersRes.value.data?.data ?? []) as UserResult[])
           : [],
       );
       setLoading(false);
@@ -145,9 +164,31 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
     }
   };
 
+  // Старт личного чата по найденному человеку: создаём/открываем direct.
+  const handleOpenUser = async (u: UserResult) => {
+    setStartingUserId(u.id);
+    try {
+      const { data } = await api.post('/chats/direct', { targetUserId: u.id });
+      const chat = data?.data as Chat;
+      if (chat) useChatStore.getState().addChat(chat);
+      onOpenChat(chat?.id ?? u.id);
+    } catch {
+      // не удалось — оставляем строку, можно повторить
+    } finally {
+      setStartingUserId(null);
+    }
+  };
+
+  // Дедуп: не показываем в «Люди» тех, с кем уже есть личный чат (они в «Чаты»).
+  const knownPeerIds = new Set<string>();
+  results?.chats.forEach((c) => {
+    if (c.type === 'direct') c.members?.forEach((m) => { if (m.userId !== myUserId) knownPeerIds.add(m.userId); });
+  });
+  const freshUsers = users.filter((u) => !knownPeerIds.has(u.id));
+
   const isEmpty = !loading && results !== null
     && results.chats.length === 0 && results.messages.length === 0
-    && channels.length === 0;
+    && channels.length === 0 && freshUsers.length === 0;
 
   return (
     <motion.div
@@ -212,6 +253,43 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
                 <Avatar src={chatAvatar(chat, myUserId)} name={title} size="md" />
                 <span className="flex-1 min-w-0 text-[15px] font-semibold text-content/95 truncate">
                   {highlightMatch(title, query)}
+                </span>
+              </motion.button>
+            );
+          })}
+        </motion.section>
+      )}
+
+      {!loading && freshUsers.length > 0 && (
+        <motion.section variants={listParent} initial="hidden" animate="visible">
+          <h4 className="px-4 pt-3 pb-1.5 text-[11px] uppercase tracking-wider text-content/45 font-semibold">
+            Люди
+          </h4>
+          {freshUsers.map((u) => {
+            const title = u.displayName ?? u.username ?? 'Пользователь';
+            return (
+              <motion.button
+                variants={listChild}
+                key={u.id}
+                onClick={() => handleOpenUser(u)}
+                disabled={startingUserId === u.id}
+                className="list-item w-full text-left"
+              >
+                <Avatar src={u.avatar} name={title} size="md" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold text-content/95 truncate">
+                    {highlightMatch(title, query)}
+                  </p>
+                  {u.username && (
+                    <p className="text-[12px] text-content/45 truncate">
+                      {highlightMatch(`@${u.username}`, query)}
+                    </p>
+                  )}
+                </div>
+                <span className="flex items-center gap-1.5 flex-shrink-0 text-primary-600 dark:text-primary-300">
+                  {startingUserId === u.id
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <MessageSquarePlus size={18} />}
                 </span>
               </motion.button>
             );
