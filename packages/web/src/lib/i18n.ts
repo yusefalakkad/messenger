@@ -24,16 +24,24 @@ export function getStoredLang(): Lang {
   return sys.startsWith('en') ? 'en' : 'ru';
 }
 
+const initialLang = getStoredLang();
 i18n.use(initReactI18next).init({
   resources: { ru: { translation: ru }, en: { translation: en } },
-  lng: getStoredLang(),
+  lng: initialLang,
   fallbackLng: 'ru',
   interpolation: { escapeValue: false }, // React сам экранирует
 });
 
+// <html lang> — для screen reader'ов и корректной типографики/переносов.
+function applyHtmlLang(lng: Lang): void {
+  try { document.documentElement.setAttribute('lang', lng); } catch { /* SSR */ }
+}
+applyHtmlLang(initialLang);
+
 export function setLang(lng: Lang): void {
   try { localStorage.setItem(STORAGE_KEY, lng); } catch { /* */ }
   void i18n.changeLanguage(lng);
+  applyHtmlLang(lng);
 }
 
 export default i18n;

@@ -36,6 +36,9 @@ export default function Dialog({ open, onClose, title, description, children, fo
             variants={popIn}
             initial="hidden" animate="visible" exit="exit"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             className={clsx(
               'relative z-modal glass-card rounded-2xl shadow-e3 overflow-hidden',
               size === 'sm' && 'w-full max-w-sm',

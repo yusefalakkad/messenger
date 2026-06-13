@@ -9,12 +9,17 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const IconBtn = forwardRef<HTMLButtonElement, Props>(function IconBtn(
-  { className, size = 'md', danger, active, children, ...rest },
+  { className, size = 'md', danger, active, children, title, 'aria-label': ariaLabel, ...rest },
   ref,
 ) {
+  // Доступность: у иконочных кнопок нет текста — даём screen reader'у имя.
+  // Если aria-label не задан явно, берём из title.
+  const label = ariaLabel ?? title;
   return (
     <motion.button
       ref={ref}
+      title={title}
+      aria-label={label}
       whileTap={{ scale: 0.92 }}
       whileHover={{ scale: 1.06 }}
       transition={{ type: 'spring', stiffness: 500, damping: 28 }}
