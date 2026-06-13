@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image as ImageIcon, Film, Copy, RefreshCw, QrCode } from 'lucide-react';
+import { X, Image as ImageIcon, Film, Copy, RefreshCw, QrCode, Crown, ShieldCheck, ShieldPlus, UserMinus } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import Dialog, { DialogButton } from '@/components/ui/Dialog';
 import QRCodeModal from '@/components/ui/QRCodeModal';
@@ -15,6 +15,7 @@ import SafetyNumberView from './SafetyNumberView';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { useAuthStore } from '@/stores/auth.store';
+import { useChatStore } from '@/stores/chat.store';
 import { drawerRight, fadeUp, listParent, listChild, tap, SPRING } from '@/lib/motion';
 import type { Chat, ChatMember } from '@messenger/shared';
 
@@ -156,6 +157,41 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
     }
   };
 
+  // ─── Управление участниками (группы/каналы) ─────────────────────────────────
+  const isGroupOrChannel = chat.type === 'group' || chat.type === 'channel';
+  const canManage  = isGroupOrChannel && (myRole === 'owner' || myRole === 'admin');
+  const isOwner    = myRole === 'owner';
+  const updateChat = useChatStore((s) => s.updateChat);
+  // Активные участники, отсортированные: owner → admins → members.
+  const sortedMembers = isGroupOrChannel
+    ? [...chat.members].sort((a, b) => {
+        const rank = (r: string) => (r === 'owner' ? 0 : r === 'admin' ? 1 : 2);
+        return rank(a.role) - rank(b.role);
+      })
+    : [];
+
+  const setMemberRole = async (targetId: string, role: 'admin' | 'member') => {
+    try {
+      await api.patch(`/chats/${chat.id}/members/${targetId}/role`, { role });
+      updateChat(chat.id, {
+        members: chat.members.map((m) => (m.userId === targetId ? { ...m, role } : m)),
+      });
+      toast.success(role === 'admin' ? 'Назначен админом' : 'Снят с админов');
+    } catch {
+      toast.error('Не удалось изменить роль');
+    }
+  };
+
+  const kickMember = async (targetId: string) => {
+    try {
+      await api.delete(`/chats/${chat.id}/members/${targetId}`);
+      updateChat(chat.id, { members: chat.members.filter((m) => m.userId !== targetId) });
+      toast.success('Участник исключён');
+    } catch {
+      toast.error('Не удалось исключить');
+    }
+  };
+
   return (
     <>
       <motion.div
@@ -246,6 +282,60 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
               theirPublicKey={theirPublicKey}
               chatId={chat.id}
             />
+          )}
+
+          {/* ── Участники / подписчики (группы и каналы) ── */}
+          {isGroupOrChannel && (
+            <motion.div variants={fadeUp} className="px-4 py-5 border-t border-dark-border">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[12px] uppercase tracking-wider font-semibold text-content/55">
+                  {isChannel ? 'Подписчики' : 'Участники'}
+                </span>
+                <span className="text-[12px] text-content/40 tabular-nums">{sortedMembers.length}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {sortedMembers.map((m) => {
+                  const isMe = m.userId === myUserId;
+                  // owner меняет роли всем (кроме себя); admin может только исключать member'ов.
+                  const canPromote = isOwner && !isMe && m.role === 'member';
+                  const canDemote  = isOwner && !isMe && m.role === 'admin';
+                  const canKick    = canManage && !isMe && m.role !== 'owner'
+                    && !(myRole === 'admin' && m.role === 'admin');
+                  return (
+                    <div key={m.userId} className="flex items-center gap-3 px-1 py-2 rounded-lg hover:bg-content/[0.04] transition-colors">
+                      <Avatar src={m.user.avatar} name={m.user.displayName ?? m.user.username ?? '?'} size="sm"
+                        online={m.user.status === 'online'} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium truncate">
+                          {m.user.displayName ?? m.user.username}{isMe && ' (вы)'}
+                        </p>
+                        {m.user.username && <p className="text-[12px] text-content/45 truncate">@{m.user.username}</p>}
+                      </div>
+                      {m.role === 'owner' && <Crown size={15} className="text-amber-400 flex-shrink-0" aria-label="Владелец" />}
+                      {m.role === 'admin' && <ShieldCheck size={15} className="text-primary-500 dark:text-primary-300 flex-shrink-0" aria-label="Админ" />}
+                      {canPromote && (
+                        <button onClick={() => setMemberRole(m.userId, 'admin')} title="Назначить админом"
+                          aria-label="Назначить админом" className="btn-icon btn-icon-sm text-content/55 hover:text-primary-500 flex-shrink-0">
+                          <ShieldPlus size={16} />
+                        </button>
+                      )}
+                      {canDemote && (
+                        <button onClick={() => setMemberRole(m.userId, 'member')} title="Снять с админов"
+                          aria-label="Снять с админов" className="btn-icon btn-icon-sm text-content/55 hover:text-amber-400 flex-shrink-0">
+                          <ShieldCheck size={16} />
+                        </button>
+                      )}
+                      {canKick && (
+                        <button onClick={() => kickMember(m.userId)} title="Исключить"
+                          aria-label="Исключить" className="btn-icon btn-icon-sm text-content/55 hover:text-rose-400 flex-shrink-0">
+                          <UserMinus size={16} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
           )}
 
           {/* Медиа-галерея */}

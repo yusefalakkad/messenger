@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { config } from '../config';
 import { verifyAccessToken } from '../utils/jwt';
 import { prisma } from '../lib/prisma';
@@ -27,6 +28,24 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     pingTimeout: 60000,
     pingInterval: 25000,
   });
+
+  // Горизонтальное масштабирование: Redis pub/sub adapter, чтобы события
+  // (message:new, user:status, звонки) доставлялись между НЕСКОЛЬКИМИ инстансами
+  // бэка. Без него на 2+ серверах юзеры на разных нодах не видят сообщения друг
+  // друга. Отдельные клиенты pub/sub — требование adapter'а (sub блокируется на
+  // subscribe). Падение adapter'а не должно ронять старт — оборачиваем.
+  try {
+    const pubClient = redis.duplicate();
+    const subClient = redis.duplicate();
+    pubClient.on('error', (err) => logger.error('Redis pub error', { err: err.message }));
+    subClient.on('error', (err) => logger.error('Redis sub error', { err: err.message }));
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Socket.io Redis adapter enabled');
+  } catch (err) {
+    logger.error('Socket.io Redis adapter failed — running single-instance', {
+      err: (err as Error).message,
+    });
+  }
 
   // ─── Authentication middleware ──────────────────────────────────────────────
 

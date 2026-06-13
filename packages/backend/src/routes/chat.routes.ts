@@ -744,6 +744,47 @@ router.delete('/:chatId/members/:targetUserId',
   },
 );
 
+// PATCH /chats/:chatId/members/:targetUserId/role — назначить/снять админа.
+// Только owner. Нельзя менять роль owner'а и свою.
+router.patch('/:chatId/members/:targetUserId/role',
+  requireAuth,
+  validate([
+    param('chatId').notEmpty(),
+    param('targetUserId').notEmpty(),
+    body('role').isIn(['admin', 'member']),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req as AuthRequest;
+      const { chatId, targetUserId } = req.params;
+      const { role } = req.body as { role: 'admin' | 'member' };
+
+      const me = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId } },
+      });
+      if (!me || me.leftAt) throw new AppError(403, 'FORBIDDEN', 'Not a member');
+      if (me.role !== 'owner') throw new AppError(403, 'OWNER_ONLY', 'Only the owner can change roles');
+      if (targetUserId === userId) throw new AppError(400, 'CANNOT_CHANGE_OWN_ROLE', 'Cannot change own role');
+
+      const target = await prisma.chatMember.findUnique({
+        where: { chatId_userId: { chatId, userId: targetUserId } },
+      });
+      if (!target || target.leftAt) throw new AppError(404, 'NOT_FOUND', 'Member not found');
+      if (target.role === 'owner') throw new AppError(403, 'CANNOT_CHANGE_OWNER', 'Cannot change owner role');
+
+      await prisma.chatMember.update({
+        where: { chatId_userId: { chatId, userId: targetUserId } },
+        data: { role },
+      });
+
+      const io = req.app.get('io') as SocketServer | undefined;
+      if (io) io.to(`chat:${chatId}`).emit('chat:member-role', { chatId, userId: targetUserId, role });
+
+      sendSuccess(res, { userId: targetUserId, role });
+    } catch (err) { next(err); }
+  },
+);
+
 // POST /chats/:chatId/mute — toggle mute, until=null отключает mute
 router.post('/:chatId/mute',
   requireAuth,
