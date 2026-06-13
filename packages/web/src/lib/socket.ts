@@ -38,7 +38,12 @@ export function initSocket(): Socket {
 
   socket = io(SOCKET_URL, {
     auth: { token },
-    transports: ['websocket'],
+    // Сначала websocket (эффективнее), но с откатом на polling. Без отката
+    // ws-only обрывал realtime-синхронизацию, если апгрейд не проходил —
+    // например в десктоп-приложении (через локальный прокси) или за прокси/CDN,
+    // которые режут WebSocket. Polling идёт обычным HTTP и работает всегда.
+    transports: ['websocket', 'polling'],
+    tryAllTransports: true,
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 10,

@@ -120,6 +120,18 @@ export default function PhoneAuthForm() {
     if (step === 'code') codeInputRef.current?.focus();
   }, [step]);
 
+  // Авто-подтверждение как в Telegram: как только введён полный 6-значный код —
+  // сразу проверяем, не дожидаясь кнопки. Ref не даёт зациклиться (один и тот же
+  // код повторно не отправляем; новый/изменённый — отправится снова).
+  const autoSubmittedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (step !== 'code') { autoSubmittedRef.current = null; return; }
+    if (code.length === 6 && !loading && autoSubmittedRef.current !== code) {
+      autoSubmittedRef.current = code;
+      handleCodeSubmit();
+    }
+  }, [code, step, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Шаг 1: запрос кода ─────────────────────────────────────────────────────
   async function handlePhoneSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -188,8 +200,9 @@ export default function PhoneAuthForm() {
   }
 
   // ── Шаг 2: проверка кода ──────────────────────────────────────────────────
-  async function handleCodeSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCodeSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
     try {

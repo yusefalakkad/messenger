@@ -11,6 +11,17 @@ import './index.css';
 // index.html уже выставил data-theme до пейнта; здесь — react-runtime + auto-listener.
 initTheme();
 
+// Десктоп (Electron, macOS): окно без рамки (hiddenInset) — системные кнопки
+// «светофор» рисуются в левом-верхнем углу поверх контента и налезали на аватар
+// в шапке. Добавляем перетаскиваемую полоску-титлбар сверху и сдвигаем контент
+// вниз (html.is-desktop в index.css), чтобы кнопки жили в своём «баре».
+if ((window as { dakkaDesktop?: { isDesktop?: boolean } }).dakkaDesktop?.isDesktop) {
+  document.documentElement.classList.add('is-desktop');
+  const bar = document.createElement('div');
+  bar.className = 'desktop-titlebar';
+  document.body.appendChild(bar);
+}
+
 // Инициализируем нативные плагины как можно раньше — до первого рендера.
 // На web этот вызов — no-op.
 initNative().catch((err) => console.error('[native] init failed', err));

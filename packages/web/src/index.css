@@ -74,6 +74,25 @@ html.theme-switching *::after {
   transition: none !important;
 }
 
+/* ─── Десктоп-титлбар (Electron, macOS) ───────────────────────────────────────
+   Окно frameless: сдвигаем контент вниз на высоту бара, а сам бар делаем
+   перетаскиваемым (двигать окно). Системные кнопки «светофор» живут в этой
+   полосе и больше не налезают на аватар в шапке. */
+html.is-desktop #root { padding-top: 30px; }
+.desktop-titlebar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 30px;
+  z-index: 50;                 /* выше контента, ниже модалок/оверлеев */
+  -webkit-app-region: drag;    /* тянем окно за эту полосу */
+}
+/* Интерактив внутри драг-зоны (на всякий случай) кликается, а не тянет окно. */
+html.is-desktop button,
+html.is-desktop a,
+html.is-desktop input,
+html.is-desktop textarea,
+html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
+
 @layer base {
   * {
     box-sizing: border-box;
