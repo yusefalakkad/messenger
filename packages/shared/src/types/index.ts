@@ -107,7 +107,7 @@ export interface ChatFolder {
 
 export interface ChatMember {
   userId: string;
-  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatar' | 'status' | 'publicKey'>;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatar' | 'status' | 'lastSeenAt' | 'publicKey'>;
   role: 'owner' | 'admin' | 'member';
   joinedAt: Date;
   // Per-chat E2E session key (encrypted with member's public key)

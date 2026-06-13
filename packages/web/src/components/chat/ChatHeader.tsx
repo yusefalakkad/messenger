@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, ChevronLeft, Users, Timer, Hourglass, Palette, Bookmark } from 'lucide-react';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { clsx } from 'clsx';
 import { AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
@@ -78,7 +80,7 @@ export default function ChatHeader({ chat, otherMember }: Props) {
       ? `${chat.members.length} участников`
       : isChannel
         ? `${chat.members.length} ${pluralRu(chat.members.length, 'подписчик', 'подписчика', 'подписчиков')}`
-        : isOnline ? 'в сети' : 'не в сети';
+        : formatLastSeen(isOnline, otherMember?.user.lastSeenAt);
 
   const peerId = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== myUserId)?.userId
@@ -329,6 +331,17 @@ export default function ChatHeader({ chat, otherMember }: Props) {
       </AnimatePresence>
     </>
   );
+}
+
+// «в сети» / «был(а) в сети 11 часов назад» — как в Telegram.
+// Если lastSeenAt пуст (юзер скрыл «последний раз» или мы его не получили) — «не в сети».
+function formatLastSeen(online: boolean, lastSeenAt?: Date | string | null): string {
+  if (online) return 'в сети';
+  if (!lastSeenAt) return 'не в сети';
+  const d = new Date(lastSeenAt);
+  if (Number.isNaN(d.getTime())) return 'не в сети';
+  if (Date.now() - d.getTime() < 60_000) return 'был(а) в сети только что';
+  return `был(а) в сети ${formatDistanceToNowStrict(d, { locale: ru, addSuffix: false })} назад`;
 }
 
 // Русская плюрализация: 1 подписчик, 2 подписчика, 5 подписчиков.

@@ -248,12 +248,16 @@ export function initSocket(): Socket {
     getChatStore().expireMessages(chatId, messageIds);
   });
 
-  socket.on('user:status', ({ userId, status }: WSServerEvents['user:status']) => {
+  socket.on('user:status', ({ userId, status, lastSeenAt }: WSServerEvents['user:status']) => {
     useChatStore.setState((s) => ({
       chats: s.chats.map((chat) => ({
         ...chat,
         members: chat.members.map((m) =>
-          m.userId === userId ? { ...m, user: { ...m.user, status } } : m,
+          m.userId === userId
+            // lastSeenAt обновляем (чтобы «был в сети N назад» был точным); если
+            // в событии его нет — сохраняем прежнее.
+            ? { ...m, user: { ...m.user, status, lastSeenAt: lastSeenAt ?? m.user.lastSeenAt } }
+            : m,
         ),
       })),
     }));
