@@ -31,6 +31,9 @@ interface AuthState {
 
   setAuth: (user: AuthUser, accessToken: string, privateKey?: string) => void;
   setAccessToken: (token: string) => void;
+  /** Обновить данные пользователя (напр. свежий signed avatar URL с /auth/me),
+   *  не трогая токен/ключ. */
+  setUser: (user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -46,6 +49,8 @@ export const useAuthStore = create<AuthState>()(
         set({ user, accessToken, privateKey: privateKey ?? null, isAuthenticated: true }),
 
       setAccessToken: (accessToken) => set({ accessToken }),
+
+      setUser: (user) => set((s) => (s.user ? { user } : {})),
 
       logout: () => {
         clearKeyCache();

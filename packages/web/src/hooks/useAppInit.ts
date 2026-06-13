@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
-import { refreshAccessToken } from '@/lib/api';
+import { api, refreshAccessToken } from '@/lib/api';
 import { initSocket, disconnectSocket } from '@/lib/socket';
 import { setupPush } from '@/lib/push';
 import { registerPushNotifications } from '@/lib/native';
@@ -40,6 +40,13 @@ export function useAppInit(): boolean {
           // Токен есть — просто подключаем сокет
           initSocket();
         }
+        // Свежий профиль с /auth/me: signed avatar URL живёт 24ч и персистится
+        // в localStorage — на следующей сессии токен протухал → аватарка ломалась.
+        // Тянем актуальные данные (с новым signed URL) и обновляем стор.
+        api.get('/auth/me').then(({ data }) => {
+          const me = data?.data;
+          if (!cancelled && me?.id) useAuthStore.getState().setUser(me);
+        }).catch(() => { /* офлайн / 401 уже обработан interceptor'ом */ });
         // Подписка на push — в фоне, не блокирует UI.
         // Native (iOS) — APNs через Capacitor; Web — стандартный VAPID/SW.
         const user = useAuthStore.getState().user;
