@@ -4,8 +4,12 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { initNative } from './lib/native';
 import { initTheme } from './lib/theme';
+import { initSentry } from './lib/sentry';
 import { queryClient } from './lib/queryClient';
 import './index.css';
+
+// Мониторинг ошибок (no-op без VITE_SENTRY_DSN).
+initSentry();
 
 // Тема: применяем сохранённую (dark/light/auto) + подписка на системную смену.
 // index.html уже выставил data-theme до пейнта; здесь — react-runtime + auto-listener.

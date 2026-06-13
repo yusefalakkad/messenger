@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import './instrument'; // Sentry init — ДО express (авто-инструментирование). No-op без SENTRY_DSN.
+import * as Sentry from '@sentry/node';
 import http from 'http';
 import express from 'express';
 import helmet from 'helmet';
@@ -98,6 +100,10 @@ async function bootstrap(): Promise<void> {
 
   // API routes
   app.use('/api', apiRoutes);
+
+  // Sentry: перехват ошибок роутов (после маршрутов, до нашего errorHandler).
+  // No-op без SENTRY_DSN.
+  Sentry.setupExpressErrorHandler(app);
 
   // Error handlers (must be last)
   app.use(notFound);
