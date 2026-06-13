@@ -79,25 +79,44 @@ function CursorGlow() {
   return <motion.div aria-hidden className="fixed inset-0 z-0 pointer-events-none hidden md:block" style={{ background: bg }} />;
 }
 
-// ─── Скролл-луч: вертикальная брендовая линия заполняется по мере прокрутки ────
+// ─── Скролл-луч: вьющаяся брендовая лента, прорисовывается по мере прокрутки ───
+// Длинный извивающийся путь вдоль левого края — «луч путешествует» вниз по странице.
+
+// Извивающийся путь в фикс-вьюпорте (viewBox 100×800 ≈ высота экрана, без растяжения).
+const BEAM_PATH = 'M55 -10 C 96 90, 8 180, 52 280 C 96 380, 6 460, 50 560 C 94 650, 12 730, 56 810';
 
 function ScrollBeam() {
   const { scrollYProgress } = useScroll();
-  const h = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
-  const glowY = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
+  const smooth = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 });
+  const pathRef = useRef<SVGPathElement>(null);
+  const [len, setLen] = useState(900);
+  useEffect(() => { if (pathRef.current) setLen(pathRef.current.getTotalLength()); }, []);
+  // offset = len (скрыт) → 0 (полностью прорисован) по мере скролла
+  const dashoffset = useTransform(smooth, [0, 1], [len, 0]);
   return (
-    <div className="fixed left-5 top-0 bottom-0 w-px z-10 pointer-events-none hidden lg:block">
-      <div className="absolute inset-0 bg-content/10" />
-      <motion.div
-        style={{ height: h }}
-        className="absolute top-0 left-0 w-full bg-gradient-to-b from-accent-violet via-accent-pink to-accent-orange"
+    <svg
+      aria-hidden
+      className="fixed left-0 top-0 h-screen w-[100px] z-0 pointer-events-none hidden lg:block"
+      viewBox="0 0 100 800" fill="none"
+    >
+      <defs>
+        <linearGradient id="dakkaBeam" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#7c4dff" />
+          <stop offset="50%" stopColor="#ff4d8d" />
+          <stop offset="100%" stopColor="#ff8a3d" />
+        </linearGradient>
+      </defs>
+      {/* тусклый «рельс» */}
+      <path d={BEAM_PATH} stroke="rgb(var(--content-rgb) / 0.07)" strokeWidth="2" />
+      {/* светящийся луч — прорисовывается по мере прокрутки */}
+      <motion.path
+        ref={pathRef}
+        d={BEAM_PATH}
+        stroke="url(#dakkaBeam)" strokeWidth="2.5" strokeLinecap="round"
+        strokeDasharray={len}
+        style={{ strokeDashoffset: dashoffset, filter: 'drop-shadow(0 0 5px rgba(255,77,141,0.5))' }}
       />
-      {/* светящаяся голова луча */}
-      <motion.div
-        style={{ top: glowY }}
-        className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-accent-pink shadow-[0_0_16px_4px_rgba(255,77,141,0.7)]"
-      />
-    </div>
+    </svg>
   );
 }
 
@@ -226,7 +245,7 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
             </button>
             <button
               onClick={onDemo}
-              className="inline-flex items-center justify-center gap-2 bg-content/[0.05] hover:bg-content/[0.09] border border-content/[0.10] active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium"
+              className="inline-flex items-center justify-center gap-2 bg-content/[0.09] hover:bg-content/[0.14] border border-content/[0.18] active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium"
             >
               <Play size={16} fill="currentColor" /> Смотреть демо
             </button>
@@ -259,7 +278,7 @@ function ScrollHint({ onClick }: { onClick: () => void }) {
     <motion.button
       onClick={onClick}
       style={{ opacity }}
-      className="hidden lg:flex absolute left-1/2 -translate-x-1/2 bottom-2 flex-col items-center gap-1 text-content/45 hover:text-content/80 transition-colors"
+      className="hidden lg:flex absolute left-1/2 -translate-x-1/2 bottom-2 flex-col items-center gap-1 text-content/60 hover:text-content transition-colors"
       aria-label="Листайте вниз"
     >
       <span className="text-[11px] tracking-wide uppercase">Листайте</span>
@@ -278,8 +297,8 @@ function ScrollHint({ onClick }: { onClick: () => void }) {
 function IntroBeam() {
   const [phase, setPhase] = useState<'fly' | 'burst' | 'done'>('fly');
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('burst'), 950);
-    const t2 = setTimeout(() => setPhase('done'), 1900);
+    const t1 = setTimeout(() => setPhase('burst'), 1150);
+    const t2 = setTimeout(() => setPhase('done'), 2100);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
@@ -290,9 +309,14 @@ function IntroBeam() {
       {/* комета летит из верхнего-левого угла к центру телефона */}
       {phase === 'fly' && (
         <motion.div
-          initial={{ left: '-60%', top: '-50%', opacity: 0, scale: 0.5 }}
-          animate={{ left: '50%', top: '50%', opacity: 1, scale: 1 }}
-          transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ left: '-60%', top: '-45%', opacity: 0, scale: 0.5 }}
+          animate={{
+            left:    ['-60%', '32%', '-6%', '50%'],
+            top:     ['-45%', '6%', '44%', '50%'],
+            opacity: [0, 1, 1, 1],
+            scale:   [0.5, 1, 1, 1],
+          }}
+          transition={{ duration: 1.15, ease: 'easeInOut', times: [0, 0.4, 0.72, 1] }}
           className="absolute"
         >
           <div className="relative -translate-x-1/2 -translate-y-1/2">
@@ -361,7 +385,7 @@ const TIMELINE: Array<{ at: number; type: 'typing' | 'msg' | 'react' | 'reset'; 
   { at: 4300, type: 'typing' },
   { at: 5300, type: 'msg',   i: 2 },
   { at: 6500, type: 'msg',   i: 3 },
-  { at: 9000, type: 'reset' },
+  // переписка проигрывается ОДИН раз и остаётся на экране (без зацикливания).
 ];
 
 function LivePhone() {
@@ -729,7 +753,6 @@ function DownloadCard({
           : 'bg-content/[0.025] border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12]'
         }`}
     >
-      {highlight && <div className="absolute -top-1 -right-1 text-[10px] bg-brand-gradient text-white px-2 py-0.5 rounded-bl-lg rounded-tr-lg">сейчас</div>}
       <Icon size={32} className="mb-4 text-content/85 group-hover:scale-110 transition" />
       <div className="text-base font-medium mb-1">{title}</div>
       <div className="text-sm text-content/55">{sub}</div>
