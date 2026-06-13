@@ -44,3 +44,4 @@ google-services.json
 
 # Electron desktop build output
 apps/desktop/release/
+apps/desktop/renderer/

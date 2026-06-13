@@ -1,52 +1,61 @@
 # Dakka — десктоп для macOS
 
-Нативное окно вокруг развёрнутого веб-клиента Dakka (Electron). Своё окно в стиле
-macOS, dock-значок, разрешения на микрофон/камеру для звонков, внешние ссылки
-открываются в системном браузере.
+Полноценное нативное приложение (Electron), как Telegram Desktop: интерфейс
+**зашит внутрь** приложения и грузится мгновенно с локального адреса, а к серверу
+(`akkdmsg.online`) идут только запросы данных. Это НЕ «окно с сайтом».
+
+## Как устроено
+
+Внутри приложения поднимается крошечный локальный сервер, который:
+- отдаёт собранный SPA из `renderer/` (с fallback на `index.html` для роутинга);
+- прозрачно проксирует `/api` и `/socket.io` на боевой сервер.
+
+Renderer видит всё как «свой origin» (`http://127.0.0.1`), поэтому cookie,
+авторизация и WebRTC (звонки, камера, микрофон) работают **без изменений в бэке**.
+См. [main.js](main.js).
 
 ## Запуск (разработка)
 
 ```bash
 cd apps/desktop
 npm install
-npm start
+npm start                 # соберёт фронт и откроет приложение (прод-сервер)
 ```
 
-По умолчанию открывается прод: `https://akkdmsg.online`.
-Чтобы открыть локальную разработку:
+К локальному бэку (для разработки):
 
 ```bash
-MESSENGER_URL=http://localhost:5173 npm start
+MESSENGER_URL=http://localhost:4000 npm start
 ```
+
+> `npm start` каждый раз пересобирает фронт. Если фронт уже собран (`npm run bundle`),
+> можно быстрее: `npm run start:nobundle`.
 
 ## Сборка .dmg (установщик)
 
 ```bash
 cd apps/desktop
 npm install
-npm run dist:mac          # arm64 + x64 (.dmg в apps/desktop/release/)
+npm run dist:mac          # arm64 + x64 → apps/desktop/release/
 # или один универсальный бинарь:
 npm run dist:mac:universal
 ```
 
-Готовый `Dakka-1.0.0.dmg` появится в `apps/desktop/release/`. Открыть → перетащить
-**Dakka** в **Applications**.
+Готовый `Dakka-1.0.0.dmg` появится в `apps/desktop/release/`. Открыть →
+перетащить **Dakka** в **Applications**.
 
 > ⚠️ Сборка не подписана (нет Apple Developer-сертификата). При первом запуске
-> macOS покажет «приложение от неустановленного разработчика» — открыть через
-> **System Settings → Privacy & Security → Open Anyway**, либо правый клик по
-> приложению → **Open**. Для распространения без предупреждений нужны подпись
-> (`codesign`) и нотаризация (`notarytool`) с Apple Developer ID.
+> macOS скажет «приложение от неустановленного разработчика» — правый клик по
+> приложению → **Open**, либо **System Settings → Privacy & Security → Open Anyway**.
+> Для распространения без предупреждений нужны подпись (`codesign`) и нотаризация
+> (`notarytool`) с Apple Developer ID.
 
-## Как это устроено
+## Обновление
 
-Это «тонкая» обёртка: окно грузит сайт `akkdmsg.online`, поэтому десктоп всегда
-показывает ту же версию, что и веб — отдельная пересборка приложения при
-обновлении фронта не нужна. Конфигурация — в [package.json](package.json)
-(блок `build`, electron-builder) и [main.js](main.js).
+Фронт **зашит** в приложение, поэтому при изменениях UI нужно пересобрать `.dmg`
+(`npm run dist:mac`) и переустановить. Серверная часть (бэкенд) обновляется отдельно
+на сервере — приложение подхватит её автоматически, т.к. данные тянутся с
+`akkdmsg.online`.
 
-Если позже захотите **офлайн-бандл** фронта внутрь приложения (грузить локальные
-файлы вместо URL) — собрать `packages/web` с `VITE_API_URL=https://akkdmsg.online/api`,
-кластерить `dist/` в `files`, и в `main.js` заменить `loadURL(APP_URL)` на
-`loadFile('dist/index.html')`. Потребуется включить CORS на бэке для origin
-приложения.
+Сменить целевой сервер можно переменной `MESSENGER_URL` (по умолчанию
+`https://akkdmsg.online`).

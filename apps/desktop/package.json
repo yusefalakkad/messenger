@@ -1,14 +1,19 @@
 {
   "name": "dakka-desktop",
   "version": "1.0.0",
-  "description": "Dakka — десктоп-приложение для macOS (Electron-обёртка)",
+  "description": "Dakka — нативное десктоп-приложение для macOS (Electron + bundled SPA)",
   "private": true,
   "main": "main.js",
   "author": "Dakka",
   "scripts": {
-    "start": "electron .",
-    "dist:mac": "electron-builder --mac",
-    "dist:mac:universal": "electron-builder --mac --universal"
+    "bundle": "cd ../../packages/web && npm run build && cd ../../apps/desktop && rm -rf renderer && cp -R ../../packages/web/dist renderer",
+    "start": "npm run bundle && electron .",
+    "start:nobundle": "electron .",
+    "dist:mac": "npm run bundle && electron-builder --mac",
+    "dist:mac:universal": "npm run bundle && electron-builder --mac --universal"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
   },
   "devDependencies": {
     "electron": "^31.7.6",
@@ -24,7 +29,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "assets/icon.png"
+      "assets/icon.png",
+      "renderer/**/*"
     ],
     "mac": {
       "category": "public.app-category.social-networking",
