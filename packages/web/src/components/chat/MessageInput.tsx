@@ -52,6 +52,7 @@ export default function MessageInput({ chatId }: Props) {
   const [showGif,      setShowGif]      = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false); // drag-and-drop overlay
   const [uploading,    setUploading]    = useState(false);
   const [uploadError,  setUploadError]  = useState<string | null>(null);
   // Прогресс активной загрузки (0..100) и упавшая загрузка для «Повторить»
@@ -84,6 +85,7 @@ export default function MessageInput({ chatId }: Props) {
   const videoInputRef  = useRef<HTMLInputElement>(null);
   const abortRef       = useRef<AbortController | null>(null); // активная загрузка медиа
   const circleVideoRef = useRef<HTMLVideoElement>(null);       // live-превью кружка при записи
+  const dragCounter    = useRef(0);                            // dragenter/leave баланс (вложенные элементы)
 
   const ptt = useRef({
     // recording hardware
@@ -760,6 +762,47 @@ export default function MessageInput({ chatId }: Props) {
     e.target.value = '';
   };
 
+  // ─── Drag & drop файла в окно чата ───────────────────────────────────────────
+  const handleDroppedFile = useCallback((file: File) => {
+    const isVideo = file.type.startsWith('video');
+    const isImage = file.type.startsWith('image');
+    if (!isImage && !isVideo) {
+      toast.error('Можно перетаскивать только фото и видео');
+      return;
+    }
+    if (isVideo && file.size > 100 * 1024 * 1024) {
+      setUploadError('Видео слишком большое (макс. 100 МБ)');
+      setTimeout(() => setUploadError(null), 3000);
+      return;
+    }
+    setPendingMedia({ file, type: isVideo ? 'video' : 'image', previewUrl: URL.createObjectURL(file) });
+  }, []);
+
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
+    const onEnter = (e: DragEvent) => { if (hasFiles(e)) { e.preventDefault(); dragCounter.current++; setIsDraggingFile(true); } };
+    const onOver  = (e: DragEvent) => { if (hasFiles(e)) e.preventDefault(); };
+    const onLeave = (e: DragEvent) => { if (hasFiles(e)) { dragCounter.current--; if (dragCounter.current <= 0) { dragCounter.current = 0; setIsDraggingFile(false); } } };
+    const onDrop  = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragCounter.current = 0;
+      setIsDraggingFile(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleDroppedFile(file);
+    };
+    window.addEventListener('dragenter', onEnter);
+    window.addEventListener('dragover', onOver);
+    window.addEventListener('dragleave', onLeave);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragenter', onEnter);
+      window.removeEventListener('dragover', onOver);
+      window.removeEventListener('dragleave', onLeave);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, [handleDroppedFile]);
+
   const handleMediaSend = useCallback(async (caption?: string, viewOnce?: boolean) => {
     if (!pendingMedia) return;
     const { file, type, previewUrl } = pendingMedia;
@@ -877,6 +920,27 @@ export default function MessageInput({ chatId }: Props) {
 
   return (
     <>
+      {/* ── Drag & drop: оверлей «отпустите чтобы отправить» ── */}
+      <AnimatePresence>
+        {isDraggingFile && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-overlay flex items-center justify-center bg-dark-bg/80 backdrop-blur-sm pointer-events-none"
+          >
+            <div className="flex flex-col items-center gap-4 px-10 py-12 rounded-3xl border-2 border-dashed border-primary-400/60 bg-brand-gradient-soft">
+              <div className="w-16 h-16 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow-violet">
+                <ImageIcon size={28} className="text-white" />
+              </div>
+              <div className="text-center">
+                <p className="text-[17px] font-semibold">Отпустите, чтобы отправить</p>
+                <p className="text-[13px] text-content/55 mt-1">Фото или видео</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Fullscreen overlays */}
       <AnimatePresence>
         {showCircle && (
