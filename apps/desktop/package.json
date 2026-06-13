@@ -38,6 +38,7 @@
       "icon": "assets/icon.png",
       "identity": null,
       "target": [
+        { "target": "zip", "arch": ["arm64"] },
         { "target": "dmg", "arch": ["arm64"] }
       ],
       "darkModeSupport": true,
