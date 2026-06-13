@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { copySensitive } from '@/lib/sensitiveClipboard';
 import { getStoredMode, setMode, type ThemeMode } from '@/lib/theme';
+import { useTranslation } from 'react-i18next';
+import { getStoredLang, setLang, type Lang } from '@/lib/i18n';
 import IconBtn from '@/components/ui/IconBtn';
 import QRCodeModal from '@/components/ui/QRCodeModal';
 import SettingsPrivacy from '@/components/settings/SettingsPrivacy';
@@ -104,45 +106,80 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ─── Внешний вид: переключатель темы (Тёмная / Светлая / Авто) ────────────────
 // Сегментированный контрол с «пилюлей»-подсветкой активного режима.
-const THEME_OPTIONS: { mode: ThemeMode; label: string; Icon: typeof Moon }[] = [
-  { mode: 'dark',  label: 'Тёмная',  Icon: Moon },
-  { mode: 'light', label: 'Светлая', Icon: Sun },
-  { mode: 'auto',  label: 'Авто',    Icon: Monitor },
+const THEME_OPTIONS: { mode: ThemeMode; key: string; Icon: typeof Moon }[] = [
+  { mode: 'dark',  key: 'settings.themeDark',  Icon: Moon },
+  { mode: 'light', key: 'settings.themeLight', Icon: Sun },
+  { mode: 'auto',  key: 'settings.themeAuto',  Icon: Monitor },
+];
+
+const LANG_OPTIONS: { lang: Lang; label: string }[] = [
+  { lang: 'ru', label: 'Русский' },
+  { lang: 'en', label: 'English' },
 ];
 
 function AppearanceSection() {
+  const { t } = useTranslation();
   const [mode, setLocalMode] = useState<ThemeMode>(() => getStoredMode());
+  const [lang, setLocalLang] = useState<Lang>(() => getStoredLang());
 
   const choose = (m: ThemeMode) => {
     setLocalMode(m);
     setMode(m); // применяет data-theme + сохраняет в localStorage
   };
+  const chooseLang = (l: Lang) => {
+    setLocalLang(l);
+    setLang(l); // меняет язык i18next + сохраняет
+  };
 
   return (
-    <div className="relative grid grid-cols-3 gap-1 p-1 rounded-xl bg-content/[0.05] border border-dark-border">
-      {THEME_OPTIONS.map(({ mode: m, label, Icon }) => {
-        const active = mode === m;
-        return (
-          <button
-            key={m}
-            onClick={() => choose(m)}
-            className="relative flex flex-col items-center justify-center gap-1.5 h-16 rounded-lg
-                       text-content/60 transition-colors hover:text-content/90"
-          >
-            {active && (
-              <motion.span
-                layoutId="theme-pill"
-                transition={SPRING.snappy}
-                className="absolute inset-0 rounded-lg bg-brand-gradient shadow-glow-violet"
-              />
-            )}
-            <span className={`relative z-10 flex flex-col items-center gap-1.5 ${active ? 'text-white' : ''}`}>
-              <Icon size={20} />
-              <span className="text-[12px] font-medium">{label}</span>
-            </span>
-          </button>
-        );
-      })}
+    <div className="space-y-3">
+      <div className="relative grid grid-cols-3 gap-1 p-1 rounded-xl bg-content/[0.05] border border-dark-border">
+        {THEME_OPTIONS.map(({ mode: m, key, Icon }) => {
+          const active = mode === m;
+          return (
+            <button
+              key={m}
+              onClick={() => choose(m)}
+              className="relative flex flex-col items-center justify-center gap-1.5 h-16 rounded-lg
+                         text-content/60 transition-colors hover:text-content/90"
+            >
+              {active && (
+                <motion.span
+                  layoutId="theme-pill"
+                  transition={SPRING.snappy}
+                  className="absolute inset-0 rounded-lg bg-brand-gradient shadow-glow-violet"
+                />
+              )}
+              <span className={`relative z-10 flex flex-col items-center gap-1.5 ${active ? 'text-white' : ''}`}>
+                <Icon size={20} />
+                <span className="text-[12px] font-medium">{t(key)}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Язык интерфейса */}
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] text-content/60 flex-1">{t('settings.language')}</span>
+        <div className="relative grid grid-cols-2 gap-1 p-1 rounded-lg bg-content/[0.05] border border-dark-border">
+          {LANG_OPTIONS.map(({ lang: l, label }) => {
+            const active = lang === l;
+            return (
+              <button key={l} onClick={() => chooseLang(l)}
+                className={`relative px-3 h-8 rounded-md text-[13px] font-medium transition-colors ${
+                  active ? 'text-white' : 'text-content/60 hover:text-content/90'
+                }`}>
+                {active && (
+                  <motion.span layoutId="lang-pill" transition={SPRING.snappy}
+                    className="absolute inset-0 rounded-md bg-brand-gradient shadow-glow-violet" />
+                )}
+                <span className="relative z-10">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

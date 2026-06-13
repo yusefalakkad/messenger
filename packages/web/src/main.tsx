@@ -5,6 +5,7 @@ import App from './App';
 import { initNative } from './lib/native';
 import { initTheme } from './lib/theme';
 import { initSentry } from './lib/sentry';
+import './lib/i18n'; // инициализация i18n (язык из localStorage/системы)
 import { queryClient } from './lib/queryClient';
 import './index.css';
 
