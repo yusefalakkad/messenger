@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate --schema packages/backend/prisma/schema.prisma
+
+      - name: Build shared types
+        run: npm run build --workspace=packages/shared
+
+      - name: Typecheck backend
+        run: npx tsc --noEmit -p packages/backend
+
+      - name: Typecheck web
+        run: npx tsc --noEmit -p packages/web
+
+      - name: Test (web)
+        run: npm test --workspace=packages/web
+
+      - name: Test (backend)
+        run: npm test --workspace=packages/backend
+
+      - name: Build web
+        run: npm run build --workspace=packages/web
