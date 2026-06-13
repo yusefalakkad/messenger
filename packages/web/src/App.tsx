@@ -11,6 +11,7 @@ const ChatPage      = lazy(() => import('@/pages/ChatPage'));
 const LandingPage   = lazy(() => import('@/pages/LandingPage'));
 const CallOverlay   = lazy(() => import('@/components/call/CallOverlay'));
 const GroupCallView = lazy(() => import('@/components/call/GroupCallView'));
+const CommandPalette = lazy(() => import('@/components/ui/CommandPalette'));
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -90,6 +91,8 @@ export default function App() {
         {isAuthenticated && <CallOverlay />}
         {/* Групповые звонки через LiveKit SFU — независимый канал от 1-на-1 */}
         {isAuthenticated && <GroupCallView />}
+        {/* ⌘K командная палитра — быстрый переход в чат + действия */}
+        {isAuthenticated && <CommandPalette />}
       </Suspense>
     </BrowserRouter>
   );
