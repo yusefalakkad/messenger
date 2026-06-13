@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, MonitorUp, MonitorOff } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, MonitorUp, MonitorOff, Minimize2, Maximize2 } from 'lucide-react';
 import { SPRING, backdrop, popIn, tap } from '@/lib/motion';
 import { useCallStore } from '@/stores/call.store';
 import { useChatStore } from '@/stores/chat.store';
@@ -64,7 +64,13 @@ export default function CallOverlay() {
   const [camOff,    setCamOff]    = useState(false);
   const [callTimer, setCallTimer] = useState(0);
   const [sharingScreen, setSharingScreen] = useState(false);
+  // Свёрнутый звонок: оверлей превращается в пилюлю в углу, звонок продолжается
+  // (медиа-элементы остаются в DOM — аудио/видео не прерываются).
+  const [minimized, setMinimized] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Свёрнутость сбрасываем, когда звонка нет (входящий не показываем свёрнутым).
+  useEffect(() => { if (!active) setMinimized(false); }, [active]);
 
   // Сохраняем исходный камера-трек, чтобы вернуть его после остановки шеринга.
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -493,7 +499,9 @@ export default function CallOverlay() {
     <AnimatePresence>
       {(incoming || active || outgoing) && (
         <motion.div
-          className="fixed inset-0 z-call flex items-center justify-center p-4"
+          className={minimized
+            ? 'fixed bottom-4 left-4 z-call pointer-events-none'
+            : 'fixed inset-0 z-call flex items-center justify-center p-4'}
         >
           {/* Скрытый audio для аудиозвонков (video элемент обрабатывает видеозвонки) */}
           <audio ref={remoteAudioRef} autoPlay playsInline />
@@ -501,13 +509,16 @@ export default function CallOverlay() {
           {/* Подложка — отдельный слой с собственным fade, чтобы карточка «дышала» поверх */}
           <motion.div
             variants={backdrop} initial="hidden" animate="visible" exit="exit"
-            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            className={`absolute inset-0 bg-black/80 backdrop-blur-md ${minimized ? 'hidden' : ''}`}
           />
 
           <motion.div
             variants={popIn} initial="hidden" animate="visible" exit="exit"
-            className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-e4 ${
-              isVideo && active
+            onClick={minimized ? () => setMinimized(false) : undefined}
+            className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-e4 pointer-events-auto ${
+              minimized
+                ? `${isVideo && active ? 'w-56 h-72' : 'w-64'} bg-dark-card border border-dark-border cursor-pointer`
+                : isVideo && active
                 ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg'
                 : 'w-full max-w-sm bg-dark-card border border-dark-border'
             }`}>
@@ -542,7 +553,7 @@ export default function CallOverlay() {
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={SPRING.smooth}
-                  className="absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 rounded-2xl border border-white/15 z-[10] overflow-hidden bg-dark-card shadow-e3"
+                  className={`absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 rounded-2xl border border-white/15 z-[10] overflow-hidden bg-dark-card shadow-e3 ${minimized ? 'hidden' : ''}`}
                 >
                   <video ref={localVideoRef} autoPlay playsInline muted
                     className={`w-full h-full object-cover ${camOff && !sharingScreen ? 'hidden' : ''}`} />
@@ -569,7 +580,7 @@ export default function CallOverlay() {
               </>
             )}
 
-            <div className={`relative z-10 flex flex-col items-center p-8 gap-4 ${
+            <div className={`relative z-10 flex flex-col items-center p-8 gap-4 ${minimized ? 'hidden' : ''} ${
               isVideo && active
                 ? 'mt-auto w-full bg-gradient-to-t from-black/80 to-transparent pt-16 pb-8'
                 : 'w-full'
@@ -663,6 +674,12 @@ export default function CallOverlay() {
                         {sharingScreen ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
                       </motion.button>
                     )}
+                    <motion.button onClick={() => setMinimized(true)}
+                      whileTap={tap} whileHover={{ scale: 1.06 }} transition={SPRING.snappy}
+                      title="Свернуть звонок" aria-label="Свернуть звонок"
+                      className="w-14 h-14 rounded-full glass flex items-center justify-center text-white/80 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
+                      <Minimize2 size={20} />
+                    </motion.button>
                     <motion.button onClick={handleEnd}
                       whileTap={tap} whileHover={{ scale: 1.05 }} transition={SPRING.snappy}
                       title="Завершить" aria-label="Завершить звонок"
@@ -673,6 +690,33 @@ export default function CallOverlay() {
                 )}
               </div>
             </div>
+
+            {/* ── Свёрнутая пилюля: компактный футер поверх (звонок продолжается) ── */}
+            {minimized && (
+              <div className={`z-20 flex items-center gap-2 p-3 ${
+                isVideo && active
+                  ? 'absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 to-transparent pt-8'
+                  : 'w-full'
+              }`}>
+                {!(isVideo && active) && <Avatar src={peerAvatar} name={peerName} size="sm" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium truncate text-white">{peerName}</p>
+                  <p className="text-[11px] text-white/65 tabular-nums">
+                    {active ? fmt(callTimer) : outgoing ? 'Звоним…' : '…'}
+                  </p>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setMinimized(false); }}
+                  title="Развернуть" aria-label="Развернуть звонок"
+                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-white/85 hover:text-white flex-shrink-0">
+                  <Maximize2 size={16} />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleEnd(); }}
+                  title="Завершить" aria-label="Завершить звонок"
+                  className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white flex-shrink-0">
+                  <PhoneOff size={16} />
+                </button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
