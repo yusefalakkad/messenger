@@ -122,7 +122,8 @@ function ParticipantTile({ participant, isLocal, chatId }: TileProps) {
           autoPlay
           playsInline
           muted={isLocal}
-          className="absolute inset-0 w-full h-full object-cover"
+          // Своё видео — селфи-зеркало (как в Zoom/FaceTime); чужие — как есть.
+          className={`absolute inset-0 w-full h-full object-cover ${isLocal ? '-scale-x-100' : ''}`}
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-brand-radial bg-dark-card">

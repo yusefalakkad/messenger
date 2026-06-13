@@ -556,7 +556,7 @@ export default function CallOverlay() {
                   className={`absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 rounded-2xl border border-white/15 z-[10] overflow-hidden bg-dark-card shadow-e3 ${minimized ? 'hidden' : ''}`}
                 >
                   <video ref={localVideoRef} autoPlay playsInline muted
-                    className={`w-full h-full object-cover ${camOff && !sharingScreen ? 'hidden' : ''}`} />
+                    className={`w-full h-full object-cover ${camOff && !sharingScreen ? 'hidden' : ''} ${sharingScreen ? '' : '-scale-x-100'}`} />
                   {camOff && !sharingScreen && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-primary-700/30 to-dark-card">
                       <Avatar src={myAvatar} name={myName} size="md" />
