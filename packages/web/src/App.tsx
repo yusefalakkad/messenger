@@ -101,7 +101,13 @@ export default function App() {
 function GuestRoot() {
   const path = window.location.pathname;
   const isHome = path === '/' || path === '';
-  if (isHome) return <LandingPage />;
+  // В десктоп-приложении (Electron) рекламный лендинг с кнопкой «Скачать» не
+  // нужен — приложение уже установлено. Гостя сразу ведём на экран входа.
+  const isDesktop = !!(window as { dakkaDesktop?: { isDesktop?: boolean } }).dakkaDesktop?.isDesktop;
+  if (isHome) {
+    if (isDesktop) return <Navigate to="/auth" replace />;
+    return <LandingPage />;
+  }
   const from = path + window.location.search + window.location.hash;
   return <Navigate to="/auth" replace state={{ from }} />;
 }
