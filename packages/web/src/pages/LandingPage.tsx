@@ -48,6 +48,8 @@ export default function LandingPage() {
       <DownloadSection onSignIn={() => navigate('/auth')} />
 
       <Footer />
+
+      <ScrollDownButton />
     </div>
   );
 }
@@ -246,35 +248,66 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
           initial={{ opacity: 0, scale: 0.95, y: 30 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.85, ease: [0.32, 0.72, 0, 1] }}
-          className="relative mx-auto lg:mx-0"
+          className="relative mx-auto"
           id="demo"
         >
           <LivePhone />
         </motion.div>
       </div>
-
-      <ScrollHint onClick={onDemo} />
     </section>
   );
 }
 
-// ─── Подсказка-скролл: пульсирующая стрелка вниз ──────────────────────────────
+// ─── Кнопка «вниз»: постоянная, по центру, ведёт к следующей секции ────────────
+// Видна на всех секциях, прячется только у самого низа страницы.
 
-function ScrollHint({ onClick }: { onClick: () => void }) {
-  const { scrollY } = useScroll();
-  const opacity = useTransform(scrollY, [0, 160], [1, 0]);
+function ScrollDownButton() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const onScroll = () => {
+      // max — сколько вообще можно прокрутить. Пока < 100 (страница ещё не стала
+      // скроллируемой — landing-scroll применяется отдельным эффектом), кнопку НЕ
+      // прячем, иначе она «залипнет» скрытой. Прячем только у самого низа.
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setHidden(max > 100 && window.scrollY >= max - 80);
+    };
+    onScroll();
+    // повторный замер после раскладки/применения landing-scroll
+    const raf = requestAnimationFrame(onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  const goNext = () => {
+    const els = ['features', 'privacy', 'download']
+      .map((id) => document.getElementById(id))
+      .filter(Boolean) as HTMLElement[];
+    const next = els.find((el) => el.getBoundingClientRect().top > 80);
+    if (next) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+  };
+
+  // Всегда в DOM, фейдим по hidden (без AnimatePresence — надёжнее при StrictMode).
+  // opacity через style не трогает transform → центрирование -translate-x-1/2 живёт.
   return (
     <motion.button
-      onClick={onClick}
-      style={{ opacity }}
-      className="hidden lg:flex fixed left-1/2 -translate-x-1/2 bottom-6 z-20 flex-col items-center gap-1.5 text-content/70 hover:text-content transition-colors"
-      aria-label="Листайте вниз"
+      onClick={goNext}
+      animate={{ opacity: hidden ? 0 : 1 }}
+      transition={{ duration: 0.3 }}
+      style={{ pointerEvents: hidden ? 'none' : 'auto' }}
+      className="hidden lg:flex fixed left-1/2 -translate-x-1/2 bottom-6 z-30 flex-col items-center gap-1.5 text-content/70 hover:text-content transition-colors"
+      aria-label="Листать вниз"
     >
       <span className="text-[11px] tracking-wide uppercase">Листайте</span>
       <motion.span
         animate={{ y: [0, 6, 0] }}
         transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-        className="w-10 h-10 rounded-full border border-content/20 bg-content/[0.07] backdrop-blur-sm flex items-center justify-center shadow-e2"
+        className="w-11 h-11 rounded-full border border-content/25 bg-content/[0.08] backdrop-blur-md flex items-center justify-center shadow-e2"
       >
         <ChevronDown size={20} />
       </motion.span>
@@ -386,8 +419,8 @@ function LivePhone() {
   // 3D-наклон от мыши (объём + параллакс).
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
-  const rotX = useSpring(useTransform(my, [-0.5, 0.5], [10, -10]),  { stiffness: 150, damping: 20 });
-  const rotY = useSpring(useTransform(mx, [-0.5, 0.5], [-14, 14]),  { stiffness: 150, damping: 20 });
+  const rotX = useSpring(useTransform(my, [-0.5, 0.5], [5, -5]),  { stiffness: 150, damping: 22 });
+  const rotY = useSpring(useTransform(mx, [-0.5, 0.5], [-8, 8]),  { stiffness: 150, damping: 22 });
 
   const onMouseMove = (e: React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -427,13 +460,19 @@ function LivePhone() {
         style={{ rotateX: rotX, rotateY: rotY, transformStyle: 'preserve-3d' }}
         className="relative rounded-[46px] p-[3px] bg-gradient-to-br from-white/20 via-white/5 to-transparent shadow-[0_40px_90px_-20px_rgba(0,0,0,0.75)]"
       >
+        {/* боковые кнопки iPhone — mute + громкость слева, питание справа */}
+        <span aria-hidden className="absolute -left-[2px] top-[17%] w-[3px] h-6 rounded-l bg-black/55" />
+        <span aria-hidden className="absolute -left-[2px] top-[26%] w-[3px] h-9 rounded-l bg-black/50" />
+        <span aria-hidden className="absolute -left-[2px] top-[37%] w-[3px] h-9 rounded-l bg-black/50" />
+        <span aria-hidden className="absolute -right-[2px] top-[24%] w-[3px] h-16 rounded-r bg-black/50" />
+
         {/* корпус */}
         <div className="relative rounded-[44px] bg-[#0a0814] border border-white/[0.06] overflow-hidden">
           <div className="aspect-[0.49] flex flex-col" style={{ transform: 'translateZ(0.1px)' }}>
-            {/* notch (приподнят в 3D) */}
+            {/* Dynamic Island — по центру, лёгкая глубина (без перекоса) */}
             <div
-              className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"
-              style={{ transform: 'translateZ(24px)' }}
+              className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full z-30"
+              style={{ transform: 'translateZ(6px)' }}
             />
 
             {/* status bar */}
@@ -582,7 +621,7 @@ function FeatureGrid() {
     { icon: Globe,     title: 'Web, iOS, Android',   desc: 'Один аккаунт, бесшовная синхронизация между устройствами.' },
   ];
   return (
-    <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
+    <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <SectionHeader
         chip="Возможности"
         title="Всё для живого общения"
@@ -635,7 +674,7 @@ function TiltCard({ children, index }: { children: React.ReactNode; index: numbe
 
 function PrivacySection() {
   return (
-    <section id="privacy" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
+    <section id="privacy" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <div className="grid lg:grid-cols-2 gap-14 items-center">
         <motion.div
           initial={{ opacity: 0, x: -30 }}
@@ -708,7 +747,7 @@ function PrivacySection() {
 
 function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20">
+    <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <SectionHeader
         chip="Загрузить"
         title="Везде, где вы есть"
