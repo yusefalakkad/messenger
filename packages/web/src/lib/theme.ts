@@ -27,38 +27,18 @@ function resolve(mode: ThemeMode): 'dark' | 'light' {
   return mode;
 }
 
-let unsuppressRaf = 0;
-
-/** Применяет тему к документу + обновляет meta theme-color (status bar). */
+/** Применяет тему к документу + обновляет meta theme-color (status bar).
+ *  Смена data-theme = мгновенный репейнт. Фон body НЕ анимируется (см. index.css:
+ *  убран transition на background-color), иначе 300мс анимации фона форсили бы
+ *  пере-композицию всех backdrop-filter (модалка/сайдбар/инпут) каждый кадр —
+ *  это и был «фриз/экран не кликается» при смене темы. Никаких глушилок-классов
+ *  больше не нужно: div-поверхности transition не имеют → перекрашиваются разом,
+ *  кнопки/инпуты плавно за 200мс (дёшево). */
 export function applyTheme(mode: ThemeMode): void {
   const actual = resolve(mode);
-  const root = document.documentElement;
-
-  // ВАЖНО: глушим все CSS-transitions на момент переключения. Иначе смена
-  // data-theme разом анимирует цвет/фон тысяч элементов + body-transition с
-  // background-attachment:fixed форсит дорогой re-composite всех backdrop-filter
-  // на каждом кадре 300мс → главный поток фризит («экран блокируется»).
-  // С глушилкой тема меняется одним мгновенным репейнтом.
-  root.classList.add('theme-switching');
-  root.setAttribute('data-theme', actual);
-  // theme-color для PWA/мобильного статус-бара.
+  document.documentElement.setAttribute('data-theme', actual);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', actual === 'light' ? '#f4f2f7' : '#17151e');
-
-  // Снимаем глушилку после того, как браузер применил новые переменные
-  // (двойной rAF — гарантированно следующий кадр).
-  if (unsuppressRaf) cancelAnimationFrame(unsuppressRaf);
-  if (typeof requestAnimationFrame !== 'undefined') {
-    unsuppressRaf = requestAnimationFrame(() => {
-      unsuppressRaf = requestAnimationFrame(() => root.classList.remove('theme-switching'));
-    });
-    // Подстраховка: если вкладка в фоне — rAF не вызывается и глушилка «залипает»
-    // (переходы навсегда выключены = ощущение «зависшего» экрана). Таймер снимет
-    // класс в любом случае.
-    setTimeout(() => root.classList.remove('theme-switching'), 200);
-  } else {
-    root.classList.remove('theme-switching');
-  }
 }
 
 export function setMode(mode: ThemeMode): void {

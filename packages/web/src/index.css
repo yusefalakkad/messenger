@@ -63,17 +63,6 @@
   color-scheme: light;
 }
 
-/* На момент переключения темы (lib/theme.ts добавляет .theme-switching на <html>)
-   вырубаем ВСЕ переходы — браузер делает один мгновенный репейнт вместо
-   одновременной анимации цвета/фона тысяч элементов и пересборки backdrop-filter.
-   Без этого экран фризил на ~300мс. Вне @layer — чтобы !important точно победил. */
-html.theme-switching,
-html.theme-switching *,
-html.theme-switching *::before,
-html.theme-switching *::after {
-  transition: none !important;
-}
-
 /* ─── Лендинг: нативный скролл документа БЕЗ системного скроллбара ────────────
    Базовый CSS держит html/body/#root в overflow:hidden (чтобы чат не оверскроллил).
    На лендинге это мешает — нужен обычный скролл всей страницы. Делаем ОДИН
@@ -131,9 +120,10 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
     line-height: 20px;
     /* Только сплошной фон. Ambient-засветки — на отдельном fixed-слое ниже,
        чтобы НЕ использовать background-attachment:fixed (он форсит репейнт
-       всего вьюпорта при смене темы/скролле и фризит UI под backdrop-filter). */
+       всего вьюпорта при смене темы/скролле и фризит UI под backdrop-filter).
+       НЕ анимируем background-color: иначе 300мс анимации фона форсят
+       пере-композицию всех backdrop-filter каждый кадр → фриз при смене темы. */
     background-color: var(--bg);
-    transition: background-color 0.3s ease;
   }
 
   /* Ambient-градиент темы на собственном композ-слое (fixed + own layer):
