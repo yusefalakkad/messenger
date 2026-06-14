@@ -301,7 +301,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
               // Опрос — всегда нейтральный пузырь (bubble-in), даже у отправителя.
               isPoll ? 'bubble-in' : (isOwn ? 'bubble-out' : 'bubble-in'),
               isCont && 'is-cont',
-              (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3.5 py-2',
+              (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3.5 py-2 relative',
               'min-w-[88px]',
               isSelected    && 'ring-2 ring-primary-500/70',
               isHighlighted && 'ring-2 ring-primary-400/60 bg-primary-500/10 transition-all duration-500',
@@ -381,6 +381,8 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
                             )
                             : <span className={clsx('text-xs ml-1', isOwn ? 'text-white/40' : 'text-content/40')}>(изм.)</span>
                         )}
+                        {/* резерв места под время+галочки в углу (как в ТГ) */}
+                        <span className={clsx('inline-block select-none align-bottom', isOwn ? 'w-[3.5rem]' : 'w-9')} aria-hidden> </span>
                       </p>
                       {/* OG-превью первой ссылки */}
                       {firstUrl && <LinkPreview url={firstUrl} isOwn={isOwn} />}
@@ -404,8 +406,12 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
 
               {/* Время + статус */}
               <div className={clsx(
-                'flex items-center gap-1 mt-1 justify-end',
-                (isPureImage || isPureVideo) && 'absolute bottom-1.5 right-2',
+                'flex items-center gap-1 justify-end',
+                (isPureImage || isPureVideo)
+                  ? 'absolute bottom-1.5 right-2'
+                  : message.type === 'text'
+                    ? 'absolute bottom-1 right-2.5'   // время в углу пузыря, не на отдельной строке
+                    : 'mt-1',
               )}>
                 {message.encrypted && (
                   <Lock size={9} className={isPureImage ? 'text-white/70' : 'text-primary-400/80'} />
@@ -426,8 +432,10 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
                 </span>
                 {isOwn && (
                   isRead
-                    ? <CheckCheck size={12} className="text-primary-600 dark:text-primary-300" />
-                    : <Check size={12} className="text-white/50" />
+                    // прочитано → 2 светящиеся синие галочки (как в Telegram)
+                    ? <CheckCheck size={13} className="text-sky-300 drop-shadow-[0_0_5px_rgba(56,189,248,0.85)]" />
+                    // отправлено/доставлено → 1 галочка
+                    : <Check size={12} className={(isPureImage || isPureVideo) ? 'text-white/75' : 'text-white/55'} />
                 )}
               </div>
             </div>

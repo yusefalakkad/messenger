@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone } from 'lucide-react';
+import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone, Download } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listParent, listChild, tap, SPRING } from '@/lib/motion';
 import { useChatStore } from '@/stores/chat.store';
@@ -212,8 +212,8 @@ export default function Sidebar() {
       {/* ── In-call pill (LiveKit групповой звонок, виден только в активном звонке) ── */}
       <GroupCallPill />
 
-      {/* ── Search (44px hit-target — на 8 пиксельных стопов выровнен) ── */}
-      <div className="px-4 py-3 flex-shrink-0">
+      {/* ── Search — выровнен по тому же левому краю, что Архив/Избранное/чаты ── */}
+      <div className="px-2 py-3 flex-shrink-0">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content/40" />
           <input
@@ -263,8 +263,8 @@ export default function Sidebar() {
       </motion.button>
       )}
 
-      {/* ── Chat list ── */}
-      <div className="relative flex-1 overflow-y-auto px-1">
+      {/* ── Chat list (без доп. px — левый край совпадает с поиском/Архивом) ── */}
+      <div className="relative flex-1 overflow-y-auto">
         {/* Глобальный поиск поверх списка — локальную фильтрацию не показываем */}
         <AnimatePresence>
           {showGlobalSearch && (
@@ -341,6 +341,19 @@ export default function Sidebar() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ── Скачать десктоп-приложение (только на сайте; в самом приложении не нужно) ── */}
+      {!(window as { dakkaDesktop?: { isDesktop?: boolean } }).dakkaDesktop?.isDesktop && (
+        <div className="px-2 pb-3 pt-1 flex-shrink-0">
+          <a
+            href="https://akkdmsg.online/download"
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-gradient text-white font-semibold text-[13.5px] shadow-glow-violet hover:opacity-95 active:scale-[0.98] transition"
+          >
+            <Download size={17} /> Скачать приложение
+          </a>
+        </div>
+      )}
 
       {/* ── Modals ── */}
       <AnimatePresence>

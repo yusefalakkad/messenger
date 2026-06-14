@@ -1205,8 +1205,9 @@ router.put('/:chatId/wallpaper',
     param('chatId').notEmpty(),
     body('wallpaper').custom((value) => {
       if (value === null) return true;
-      if (typeof value !== 'string' || !WALLPAPER_PRESETS.has(value)) {
-        throw new Error('wallpaper must be null or one of presets');
+      // Пресет ИЛИ кастомный URL загруженного изображения (владение проверяется в обработчике).
+      if (typeof value !== 'string' || value.length > 2048) {
+        throw new Error('wallpaper must be null, a preset, or an uploaded image URL');
       }
       return true;
     }),
@@ -1216,6 +1217,12 @@ router.put('/:chatId/wallpaper',
       const { userId } = req as AuthRequest;
       const { chatId } = req.params;
       const wallpaper = req.body.wallpaper as string | null;
+
+      // Кастомные обои: разрешаем ТОЛЬКО своё загруженное изображение (image/<userId>/...),
+      // иначе можно подсунуть чужой/внешний URL.
+      if (wallpaper !== null && !WALLPAPER_PRESETS.has(wallpaper) && !wallpaper.includes(`image/${userId}/`)) {
+        throw new AppError(403, 'WALLPAPER_FORBIDDEN', 'Custom wallpaper must be your own uploaded image');
+      }
 
       const member = await prisma.chatMember.findUnique({
         where: { chatId_userId: { chatId, userId } },

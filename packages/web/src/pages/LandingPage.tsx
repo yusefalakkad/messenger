@@ -36,10 +36,7 @@ export default function LandingPage() {
 
       <Header onSignIn={() => navigate('/auth')} />
 
-      <Hero
-        onPrimary={() => navigate('/auth')}
-        onDemo={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-      />
+      <Hero />
 
       <FeatureGrid />
 
@@ -171,7 +168,7 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void }) {
+function Hero() {
   return (
     <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-6 lg:pt-10 pb-16 lg:pb-20">
       <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
@@ -225,20 +222,14 @@ function Hero({ onPrimary, onDemo }: { onPrimary: () => void; onDemo: () => void
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
+            className="flex justify-center lg:justify-start"
           >
             <button
-              onClick={onPrimary}
-              className="group inline-flex items-center justify-center gap-2 bg-brand-gradient hover:opacity-95 active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium text-white shadow-glow-violet"
+              onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
+              className="group inline-flex items-center justify-center gap-2 bg-brand-gradient hover:opacity-95 active:scale-[0.98] transition px-8 py-4 rounded-full text-base font-medium text-white shadow-glow-violet"
             >
               Скачать бесплатно
-              <ArrowRight size={18} className="opacity-0 group-hover:opacity-100 -ml-1 group-hover:ml-0 transition-all" />
-            </button>
-            <button
-              onClick={onDemo}
-              className="inline-flex items-center justify-center gap-2 bg-content/[0.09] hover:bg-content/[0.14] border border-content/[0.18] active:scale-[0.98] transition px-7 py-4 rounded-full text-base font-medium"
-            >
-              <Play size={16} fill="currentColor" /> Смотреть демо
+              <ArrowRight size={18} className="-ml-0.5 group-hover:translate-x-1 transition-transform" />
             </button>
           </motion.div>
         </motion.div>

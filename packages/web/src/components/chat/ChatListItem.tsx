@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
-import { formatDistanceToNowStrict } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { format, isToday } from 'date-fns';
 import { clsx } from 'clsx';
 import { Pin, BellOff, Bookmark, Megaphone } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
@@ -51,9 +50,9 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   // E2E-сообщения не расшифровываем синхронно — formatMessagePreview маркирует 🔒.
   const previewText = draft ? draft : formatMessagePreview(lastMsg);
 
-  const timeStr = lastMsg
-    ? formatDistanceToNowStrict(new Date(lastMsg.createdAt), { locale: ru, addSuffix: false })
-    : '';
+  // Время как в Telegram: сегодня → ЧЧ:ММ, иначе → дд.ММ (без «0 секунд назад»).
+  const lastTs = lastMsg ? new Date(lastMsg.createdAt) : null;
+  const timeStr = lastTs ? (isToday(lastTs) ? format(lastTs, 'HH:mm') : format(lastTs, 'dd.MM')) : '';
 
   const isPinned = !!chat.pinnedAt;
   const isMuted  = !!chat.mutedUntil && (chat.mutedUntil === 'forever' || new Date(chat.mutedUntil).getTime() > Date.now());

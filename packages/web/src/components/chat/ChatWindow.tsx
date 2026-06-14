@@ -28,6 +28,18 @@ const WALLPAPERS: Record<string, string> = {
   candy:  'linear-gradient(160deg,#241632,#321a3e 50%,#3a1f33)',
 };
 
+// Стиль фона: пресет (градиент/цвет), кастомная картинка (URL) или дефолт (undefined).
+function wallpaperStyle(wp: string | null | undefined) {
+  if (!wp) return undefined;
+  if (WALLPAPERS[wp]) return { background: WALLPAPERS[wp] };
+  return {
+    backgroundImage: `url("${wp}")`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  } as const;
+}
+
 export default function ChatWindow() {
   const { chatId } = useParams<{ chatId: string }>();
   const setActiveChat = useChatStore((s) => s.setActiveChat);
@@ -113,7 +125,7 @@ export default function ChatWindow() {
       {/* Обои чата: фон области сообщений по chat.wallpaper (self-настройка ChatMember) */}
       <div
         className="flex-1 min-h-0 flex flex-col"
-        style={{ background: chat.wallpaper ? WALLPAPERS[chat.wallpaper] : undefined }}
+        style={wallpaperStyle(chat.wallpaper)}
       >
         <MessageList chatId={chatId} messages={messages} />
       </div>

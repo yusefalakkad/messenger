@@ -3,9 +3,9 @@
  * («По умолчанию» + 6 градиентных пресетов).
  * Выбор → PUT /chats/:id/wallpaper + оптимистичный updateChat + onClose.
  */
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X } from 'lucide-react';
+import { Check, X, ImagePlus, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { useChatStore } from '@/stores/chat.store';
@@ -31,6 +31,26 @@ const PRESETS: { id: string | null; label: string; background: string }[] = [
 export default function WallpaperPicker({ chatId, current, onClose }: Props) {
   const updateChat = useChatStore((s) => s.updateChat);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Свои обои: загружаем картинку и ставим её URL как обои.
+  const onCustomFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/media/upload/image', form);
+      setUploading(false);
+      await pick(data.data.url);
+    } catch {
+      toast.error('Не удалось загрузить обои');
+      setUploading(false);
+    }
+  };
 
   const pick = async (wallpaper: string | null) => {
     if (saving) return;
@@ -108,6 +128,17 @@ export default function WallpaperPicker({ chatId, current, onClose }: Props) {
             );
           })}
         </div>
+
+        {/* Свои обои — загрузка собственного изображения */}
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onCustomFile} />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={saving || uploading}
+          className="mt-4 w-full h-11 rounded-xl border border-dashed border-content/25 text-content/75 hover:text-content hover:bg-content/[0.05] flex items-center justify-center gap-2 text-[13px] font-medium transition disabled:opacity-60"
+        >
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+          {uploading ? 'Загрузка…' : 'Загрузить своё фото'}
+        </button>
       </motion.div>
     </motion.div>
   );

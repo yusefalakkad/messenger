@@ -77,14 +77,14 @@ export default function MediaPreview({ media, onSend, onCancel }: Props) {
             <img
               src={media.previewUrl}
               alt="preview"
-              className="max-w-full max-h-full object-contain rounded-2xl shadow-e4"
+              className="max-w-[min(90vw,560px)] max-h-[68vh] object-contain rounded-2xl shadow-e4"
             />
           ) : (
             <video
               src={media.previewUrl}
               controls
               playsInline
-              className="max-w-full max-h-full rounded-2xl shadow-e4"
+              className="max-w-[min(90vw,560px)] max-h-[68vh] rounded-2xl shadow-e4"
             />
           )}
         </motion.div>
