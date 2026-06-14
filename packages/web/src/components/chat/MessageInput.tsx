@@ -994,12 +994,12 @@ export default function MessageInput({ chatId }: Props) {
       {/* ─── Основная панель (8-grid: px-16, py-12, border единый dark-border) ─── */}
       <div className="relative flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
 
-        {/* ── Live-превью видео-кружка (Telegram-style: большой круг по центру) ──
-            Всегда в DOM (ref стабилен для srcObject), показывается только при
-            записи кружка. Зеркалим как селфи. */}
+        {/* ── Live-превью видео-кружка (Telegram-style: большой круг ПО ЦЕНТРУ экрана) ──
+            Всегда в DOM (ref стабилен для srcObject), показывается только при записи
+            кружка. БЕЗ зеркала — превью совпадает с тем, что отправится. */}
         <div className={clsx(
-          'absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-dropdown pointer-events-none transition-all duration-200 ease-spring',
-          isRecording && recMode === 'circle' ? 'opacity-100 scale-100' : 'opacity-0 scale-50 hidden',
+          'fixed inset-0 z-overlay flex items-center justify-center pointer-events-none transition-opacity duration-200',
+          isRecording && recMode === 'circle' ? 'opacity-100' : 'opacity-0 hidden',
         )}>
           <div className="relative">
             {/* мягкое пульсирующее кольцо записи */}
@@ -1012,7 +1012,7 @@ export default function MessageInput({ chatId }: Props) {
               pttState === 'locked' ? 'border-primary-400' : 'border-rose-500',
             )}>
               <video ref={circleVideoRef} autoPlay playsInline muted
-                className="w-full h-full object-cover -scale-x-100" />
+                className="w-full h-full object-cover" />
 
               {/* свайп влево → отмена: красный оверлей с корзиной */}
               {showCancel && (

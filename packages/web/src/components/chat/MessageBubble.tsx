@@ -578,7 +578,12 @@ function CircleMessage({
     const v = videoRef.current;
     if (!v) return;
     if (playing) { v.pause(); setPlaying(false); }
-    else         { v.play().catch(() => {}); setPlaying(true); }
+    else {
+      // сначала показываем video (был hidden) и грузим, затем play; при сбое — откат
+      setPlaying(true);
+      if (v.preload !== 'auto') v.preload = 'auto';
+      v.play().catch(() => setPlaying(false));
+    }
   };
 
   return (
@@ -598,8 +603,10 @@ function CircleMessage({
           src={media.url}
           playsInline
           loop
+          preload="metadata"
           className={clsx('w-full h-full object-cover', playing ? 'block' : 'hidden')}
           onEnded={() => setPlaying(false)}
+          onError={() => setPlaying(false)}
         />
 
         {/* Оверлей с кнопкой */}
