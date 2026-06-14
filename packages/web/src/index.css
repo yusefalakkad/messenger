@@ -74,6 +74,17 @@ html.theme-switching *::after {
   transition: none !important;
 }
 
+/* ─── Лендинг: нативный скролл документа БЕЗ системного скроллбара ────────────
+   Базовый CSS держит html/body/#root в overflow:hidden (чтобы чат не оверскроллил).
+   На лендинге это мешает — нужен обычный скролл всей страницы. Делаем ОДИН
+   скролл-контейнер (html), а body/#root — visible, иначе вложенные overflow:auto
+   съедают события колёсика (скроллбар таскается, а колесо не работает).
+   Системный скроллбар прячем — его роль играет брендовый луч слева. */
+html.landing-scroll { overflow-y: auto; height: auto; scrollbar-width: none; -ms-overflow-style: none; }
+html.landing-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+html.landing-scroll body,
+html.landing-scroll #root { overflow: visible; height: auto; }
+
 /* ─── Десктоп-титлбар (Electron, macOS) ───────────────────────────────────────
    Окно frameless: сдвигаем контент вниз на высоту бара, а сам бар делаем
    перетаскиваемым (двигать окно). Системные кнопки «светофор» живут в этой

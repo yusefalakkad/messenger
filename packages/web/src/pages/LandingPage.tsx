@@ -19,24 +19,13 @@ import {
 export default function LandingPage() {
   const navigate = useNavigate();
 
-  // index.css фиксит `html, body, #root { overflow: hidden }` чтобы чат не имел
-  // pull-to-refresh оверскролла. Для лендинга это смертельно — страница длинная,
-  // нужен скролл. Временно снимаем правило на время mount'а лендинга.
+  // index.css держит `html, body, #root { overflow: hidden }` (чтобы чат не
+  // оверскроллил). Лендинг длинный — включаем нативный скролл документа классом
+  // `landing-scroll` (см. index.css): ОДИН скролл-контейнер (html), колёсико
+  // работает, системный скроллбар скрыт (его роль играет луч слева).
   useEffect(() => {
-    const els = [document.documentElement, document.body, document.getElementById('root')];
-    const prev = els.map((el) => el ? { overflow: el.style.overflow, height: el.style.height } : null);
-    els.forEach((el) => {
-      if (!el) return;
-      el.style.overflow = 'auto';
-      el.style.height = 'auto';
-    });
-    return () => {
-      els.forEach((el, i) => {
-        if (!el || !prev[i]) return;
-        el.style.overflow = prev[i]!.overflow;
-        el.style.height = prev[i]!.height;
-      });
-    };
+    document.documentElement.classList.add('landing-scroll');
+    return () => document.documentElement.classList.remove('landing-scroll');
   }, []);
 
   return (
@@ -278,13 +267,14 @@ function ScrollHint({ onClick }: { onClick: () => void }) {
     <motion.button
       onClick={onClick}
       style={{ opacity }}
-      className="hidden lg:flex absolute left-1/2 -translate-x-1/2 bottom-2 flex-col items-center gap-1 text-content/60 hover:text-content transition-colors"
+      className="hidden lg:flex fixed left-1/2 -translate-x-1/2 bottom-6 z-20 flex-col items-center gap-1.5 text-content/70 hover:text-content transition-colors"
       aria-label="Листайте вниз"
     >
       <span className="text-[11px] tracking-wide uppercase">Листайте</span>
       <motion.span
         animate={{ y: [0, 6, 0] }}
         transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+        className="w-10 h-10 rounded-full border border-content/20 bg-content/[0.07] backdrop-blur-sm flex items-center justify-center shadow-e2"
       >
         <ChevronDown size={20} />
       </motion.span>
@@ -396,11 +386,8 @@ function LivePhone() {
   // 3D-наклон от мыши (объём + параллакс).
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
-  const rotX = useSpring(useTransform(my, [-0.5, 0.5], [12, -12]),  { stiffness: 120, damping: 18 });
-  const rotY = useSpring(useTransform(mx, [-0.5, 0.5], [-16, 16]),  { stiffness: 120, damping: 18 });
-  // Блик-«стекло» едет по экрану вслед за наклоном.
-  const sheenX = useTransform(mx, [-0.5, 0.5], ['20%', '80%']);
-  const sheen = useMotionTemplate`linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.10) ${sheenX}, transparent 70%)`;
+  const rotX = useSpring(useTransform(my, [-0.5, 0.5], [10, -10]),  { stiffness: 150, damping: 20 });
+  const rotY = useSpring(useTransform(mx, [-0.5, 0.5], [-14, 14]),  { stiffness: 150, damping: 20 });
 
   const onMouseMove = (e: React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -557,8 +544,8 @@ function LivePhone() {
             </div>
           </div>
 
-          {/* стеклянный блик поверх экрана (едет за наклоном) */}
-          <motion.div aria-hidden className="absolute inset-0 pointer-events-none rounded-[44px]" style={{ background: sheen }} />
+          {/* статичный стеклянный блик — без перерисовки на каждый кадр, не лагает */}
+          <div aria-hidden className="absolute inset-0 pointer-events-none rounded-[44px] bg-gradient-to-br from-white/[0.07] via-transparent to-transparent" />
         </div>
       </motion.div>
     </div>
