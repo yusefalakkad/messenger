@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone, Download } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listParent, listChild, tap, SPRING } from '@/lib/motion';
@@ -26,6 +27,7 @@ import type { Chat } from '@messenger/shared';
 export default function Sidebar() {
   const { chatId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const chats = useChatStore((s) => s.chats);
   const addChat = useChatStore((s) => s.addChat);
   const user  = useAuthStore((s) => s.user);
@@ -218,7 +220,7 @@ export default function Sidebar() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content/40" />
           <input
             className="input-pill w-full"
-            placeholder="Поиск чатов..."
+            placeholder={t('chat.searchChats')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -240,7 +242,7 @@ export default function Sidebar() {
         <span className="w-10 h-10 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
           <Archive size={18} />
         </span>
-        <span className="flex-1 text-content/85 font-medium">Архив</span>
+        <span className="flex-1 text-content/85 font-medium">{t('chat.archive')}</span>
         {archivedCount > 0 && (
           <span className="text-[12px] font-medium text-content/50 px-2 tabular-nums">{archivedCount}</span>
         )}
@@ -259,7 +261,7 @@ export default function Sidebar() {
         <span className="w-10 h-10 rounded-lg bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
           <Bookmark size={18} />
         </span>
-        <span className="flex-1 text-content/85 font-medium">Избранное</span>
+        <span className="flex-1 text-content/85 font-medium">{t('chat.saved')}</span>
       </motion.button>
       )}
 
@@ -350,7 +352,7 @@ export default function Sidebar() {
             target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-gradient text-white font-semibold text-[13.5px] shadow-glow-violet hover:opacity-95 active:scale-[0.98] transition"
           >
-            <Download size={17} /> Скачать приложение
+            <Download size={17} /> {t('chat.downloadApp')}
           </a>
         </div>
       )}

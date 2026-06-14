@@ -10,6 +10,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { SPRING, EASE, tap } from '@/lib/motion';
 import { sendMessage, sendTyping } from '@/lib/socket';
 import { api } from '@/lib/api';
@@ -43,6 +44,7 @@ const isAbortError = (err: unknown): boolean => {
 };
 
 export default function MessageInput({ chatId }: Props) {
+  const { t } = useTranslation();
   const [text,         setText]         = useState('');
   const [showAttach,   setShowAttach]   = useState(false);
   const [showEmoji,    setShowEmoji]    = useState(false);
@@ -1291,7 +1293,7 @@ export default function MessageInput({ chatId }: Props) {
                 <textarea
                   ref={textareaRef}
                   className="flex-1 bg-transparent text-content placeholder-content/30 outline-none resize-none text-sm leading-relaxed max-h-[120px] py-1.5"
-                  placeholder="Сообщение..."
+                  placeholder={t('chat.messagePlaceholder')}
                   rows={1}
                   value={text}
                   disabled={uploading}

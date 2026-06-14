@@ -28,5 +28,9 @@ export const en: Dict = {
     messagePlaceholder: 'Message…',
     searchChats: 'Search chats…',
     online: 'online', offline: 'offline',
+    archive: 'Archive', saved: 'Saved Messages',
+    downloadApp: 'Download app',
+    newChat: 'New chat', newGroup: 'New group', newChannel: 'New channel',
+    settings: 'Settings', logout: 'Log out',
   },
 };

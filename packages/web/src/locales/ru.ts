@@ -28,6 +28,10 @@ export const ru = {
     messagePlaceholder: 'Сообщение…',
     searchChats: 'Поиск чатов…',
     online: 'в сети', offline: 'не в сети',
+    archive: 'Архив', saved: 'Избранное',
+    downloadApp: 'Скачать приложение',
+    newChat: 'Новый чат', newGroup: 'Новая группа', newChannel: 'Новый канал',
+    settings: 'Настройки', logout: 'Выйти',
   },
 };
 
