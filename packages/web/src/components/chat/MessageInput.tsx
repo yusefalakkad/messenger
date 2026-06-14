@@ -7,7 +7,7 @@
  * • В фиксированном режиме: × отмена, ✓ отправить
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay } from 'lucide-react';
+import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { SPRING, EASE, tap } from '@/lib/motion';
@@ -994,22 +994,74 @@ export default function MessageInput({ chatId }: Props) {
       {/* ─── Основная панель (8-grid: px-16, py-12, border единый dark-border) ─── */}
       <div className="relative flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
 
-        {/* ── Live-превью видео-кружка (как в Telegram) ──
+        {/* ── Live-превью видео-кружка (Telegram-style: большой круг по центру) ──
             Всегда в DOM (ref стабилен для srcObject), показывается только при
             записи кружка. Зеркалим как селфи. */}
         <div className={clsx(
-          'absolute bottom-full right-3 mb-3 z-dropdown pointer-events-none transition-all duration-200 ease-spring',
+          'absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-dropdown pointer-events-none transition-all duration-200 ease-spring',
           isRecording && recMode === 'circle' ? 'opacity-100 scale-100' : 'opacity-0 scale-50 hidden',
         )}>
-          <div className="relative w-44 h-44 rounded-full overflow-hidden border-[3px] border-rose-500 shadow-e4 bg-black">
-            <video ref={circleVideoRef} autoPlay playsInline muted
-              className="w-full h-full object-cover -scale-x-100" />
-            <div className="absolute bottom-2 inset-x-0 flex items-center justify-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-              <span className="text-[11px] text-white tabular-nums font-medium bg-black/45 px-1.5 py-0.5 rounded-full">{fmt(pttTime)}</span>
+          <div className="relative">
+            {/* мягкое пульсирующее кольцо записи */}
+            <div className={clsx(
+              'absolute -inset-2 rounded-full blur-xl animate-pulse',
+              pttState === 'locked' ? 'bg-primary-500/30' : 'bg-rose-500/30',
+            )} />
+            <div className={clsx(
+              'relative w-56 h-56 rounded-full overflow-hidden border-4 shadow-e4 bg-black transition-colors',
+              pttState === 'locked' ? 'border-primary-400' : 'border-rose-500',
+            )}>
+              <video ref={circleVideoRef} autoPlay playsInline muted
+                className="w-full h-full object-cover -scale-x-100" />
+
+              {/* свайп влево → отмена: красный оверлей с корзиной */}
+              {showCancel && (
+                <div className="absolute inset-0 bg-red-900/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1">
+                  <Trash2 size={36} className="text-white" />
+                  <span className="text-[12px] text-white font-medium">отпустите — отмена</span>
+                </div>
+              )}
+
+              {/* статус «зафиксировано» */}
+              {pttState === 'locked' && !showCancel && (
+                <div className="absolute top-3 inset-x-0 flex justify-center">
+                  <span className="flex items-center gap-1 bg-primary-500/90 text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
+                    <Lock size={11} /> зафиксировано
+                  </span>
+                </div>
+              )}
+
+              {/* таймер записи */}
+              <div className="absolute bottom-3 inset-x-0 flex items-center justify-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-[13px] text-white tabular-nums font-semibold bg-black/50 px-2 py-0.5 rounded-full">{fmt(pttTime)}</span>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* ── Замок над кнопкой записи (Telegram-style) ──
+            Тянешь кнопку вверх → замок «загорается» → фиксация записи без удержания. */}
+        {pttState === 'recording' && (
+          <div className="absolute bottom-full right-3 mb-3 z-dropdown pointer-events-none flex flex-col items-center gap-1.5">
+            <motion.div
+              animate={{ scale: 1 + lockProgress * 0.18 }}
+              className={clsx(
+                'w-10 h-10 rounded-full border flex items-center justify-center shadow-e3 transition-colors',
+                lockProgress > 0.6 ? 'bg-primary-500 border-primary-400' : 'bg-dark-card border-dark-border',
+              )}
+            >
+              <Lock size={16} className={clsx('transition-colors', lockProgress > 0.6 ? 'text-white' : 'text-content/65')} />
+            </motion.div>
+            <motion.div
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ opacity: 0.45 + lockProgress * 0.5 }}
+            >
+              <ChevronUp size={16} className="text-content/50" />
+            </motion.div>
+          </div>
+        )}
 
         {/* Планка «Ответить» — surface-1 + brand-полоска слева */}
         <AnimatePresence>
@@ -1273,32 +1325,31 @@ export default function MessageInput({ chatId }: Props) {
                   <span className="text-[12px] font-medium">{showCancel ? 'отпусти' : '← отмена'}</span>
                 </motion.div>
 
-                {/* Waveform */}
-                <div className="flex-1 flex items-center gap-[2px] h-7 min-w-0">
-                  {pttBars.map((h, i) => (
-                    <div key={i} className={clsx(
-                      'flex-1 rounded-full transition-all duration-75',
-                      showCancel ? 'bg-red-300/70' : 'bg-red-400',
-                    )}
-                      style={{ height: `${Math.max(3, h * 24)}px`, opacity: 0.5 + h * 0.5 }} />
-                  ))}
-                </div>
+                {/* Центр: для голоса — волна; для кружка — подпись (волна не нужна,
+                    анализатор у кружка не настроен → была бы плоской). */}
+                {recMode === 'circle' ? (
+                  <div className="flex-1 flex items-center justify-center min-w-0">
+                    <span className="text-[12px] text-content/55 font-medium select-none truncate">
+                      Видео-кружок · ↑ замок
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center gap-[2px] h-7 min-w-0">
+                    {pttBars.map((h, i) => (
+                      <div key={i} className={clsx(
+                        'flex-1 rounded-full transition-all duration-75',
+                        showCancel ? 'bg-red-300/70' : 'bg-red-400',
+                      )}
+                        style={{ height: `${Math.max(3, h * 24)}px`, opacity: 0.5 + h * 0.5 }} />
+                    ))}
+                  </div>
+                )}
 
-                {/* Таймер */}
+                {/* Таймер (замок-подсказка теперь вертикальным треком над кнопкой) */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                   <span className="text-[12px] text-content/75 tabular-nums font-medium">{fmt(pttTime)}</span>
                 </div>
-
-                {/* Замок — подсказка потянуть вверх */}
-                <motion.div
-                  animate={{ opacity: 0.4 + lockProgress * 0.6, scale: 0.9 + lockProgress * 0.25 }}
-                  className="flex flex-col items-center justify-center flex-shrink-0 w-6"
-                  title="Потяните вверх для фиксации"
-                >
-                  <span className="text-[10px] leading-none text-content/40">↑</span>
-                  <Lock size={13} className={clsx('transition-colors mt-0.5', lockProgress > 0.5 ? 'text-primary-400' : 'text-content/45')} />
-                </motion.div>
               </div>
             )}
 
@@ -1312,13 +1363,21 @@ export default function MessageInput({ chatId }: Props) {
                   <Trash2 size={16} />
                 </button>
 
-                {/* Waveform — primary тон, фиксированная запись */}
-                <div className="flex-1 flex items-center gap-[2px] h-7 min-w-0">
-                  {pttBars.map((h, i) => (
-                    <div key={i} className="flex-1 rounded-full bg-primary-400 transition-all duration-75"
-                      style={{ height: `${Math.max(3, h * 24)}px`, opacity: 0.5 + h * 0.5 }} />
-                  ))}
-                </div>
+                {/* Для голоса — волна; для зафиксированного кружка — подпись */}
+                {recMode === 'circle' ? (
+                  <div className="flex-1 flex items-center justify-center min-w-0">
+                    <span className="text-[12px] text-primary-500 dark:text-primary-200 font-medium select-none truncate">
+                      Видео-кружок · зафиксировано
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center gap-[2px] h-7 min-w-0">
+                    {pttBars.map((h, i) => (
+                      <div key={i} className="flex-1 rounded-full bg-primary-400 transition-all duration-75"
+                        style={{ height: `${Math.max(3, h * 24)}px`, opacity: 0.5 + h * 0.5 }} />
+                    ))}
+                  </div>
+                )}
 
                 {/* Таймер */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
