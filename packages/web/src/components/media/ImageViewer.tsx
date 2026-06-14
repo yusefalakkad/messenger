@@ -50,23 +50,23 @@ export default function ImageViewer({ src, type = 'image', onClose }: Props) {
         </a>
       </div>
 
-      {/* Изображение */}
-      <div
-        className="flex-1 flex items-center justify-center p-4 min-h-0"
-        onClick={(e) => e.stopPropagation()}
-      >
+      {/* Изображение. stopPropagation — ТОЛЬКО на самом медиа, чтобы клик по
+          тёмной области вокруг фото/видео закрывал вьюер (как в Telegram). */}
+      <div className="flex-1 flex items-center justify-center p-4 min-h-0">
         {type === 'video' ? (
           <video
             src={src}
             controls
             autoPlay
             playsInline
+            onClick={(e) => e.stopPropagation()}
             className="max-w-full max-h-full rounded-xl shadow-2xl"
           />
         ) : (
           <img
             src={src}
             alt="Просмотр"
+            onClick={(e) => e.stopPropagation()}
             className="max-w-full max-h-full object-contain rounded-xl shadow-2xl select-none"
             draggable={false}
           />

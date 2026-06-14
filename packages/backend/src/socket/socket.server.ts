@@ -926,7 +926,14 @@ function isMediaOwnedByUser(
 
   const allowedPrefixes = expectedPrefixesFor(messageType, userId);
   if (!check(mediaData.url, allowedPrefixes)) return false;
-  if (mediaData.thumbnailUrl && !check(mediaData.thumbnailUrl, allowedPrefixes)) return false;
+  // thumbnailUrl/poster (для circle и video) ВСЕГДА загружается как изображение
+  // через /media/upload/image → путь `image/<uid>/`. Поэтому валидируем его по
+  // image-префиксу (плюс собственный префикс типа — на всякий случай), иначе
+  // отправка кружка/видео-с-постером падала с «Media URL does not belong to you».
+  if (mediaData.thumbnailUrl) {
+    const thumbPrefixes = [`image/${userId}/`, ...allowedPrefixes];
+    if (!check(mediaData.thumbnailUrl, thumbPrefixes)) return false;
+  }
   return true;
 
   function check(url: string, prefixes: string[]): boolean {
