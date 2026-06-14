@@ -136,24 +136,21 @@ function AppearanceSection() {
       <div className="relative grid grid-cols-3 gap-1 p-1 rounded-xl bg-content/[0.05] border border-dark-border">
         {THEME_OPTIONS.map(({ mode: m, key, Icon }) => {
           const active = mode === m;
+          // БЕЗ layoutId: framer layoutId + AnimatePresence exit могли задедлочиться,
+          // если закрыть настройки сразу после смены темы (пилюля ещё анимируется) →
+          // backdrop не размонтировался → «экран не кликается». Просто красим активную.
           return (
             <button
               key={m}
               onClick={() => choose(m)}
-              className="relative flex flex-col items-center justify-center gap-1.5 h-16 rounded-lg
-                         text-content/60 transition-colors hover:text-content/90"
+              className={`relative flex flex-col items-center justify-center gap-1.5 h-16 rounded-lg transition-colors ${
+                active
+                  ? 'bg-brand-gradient shadow-glow-violet text-white'
+                  : 'text-content/60 hover:text-content/90'
+              }`}
             >
-              {active && (
-                <motion.span
-                  layoutId="theme-pill"
-                  transition={SPRING.snappy}
-                  className="absolute inset-0 rounded-lg bg-brand-gradient shadow-glow-violet"
-                />
-              )}
-              <span className={`relative z-10 flex flex-col items-center gap-1.5 ${active ? 'text-white' : ''}`}>
-                <Icon size={20} />
-                <span className="text-[12px] font-medium">{t(key)}</span>
-              </span>
+              <Icon size={20} />
+              <span className="text-[12px] font-medium">{t(key)}</span>
             </button>
           );
         })}
@@ -168,13 +165,9 @@ function AppearanceSection() {
             return (
               <button key={l} onClick={() => chooseLang(l)}
                 className={`relative px-3 h-8 rounded-md text-[13px] font-medium transition-colors ${
-                  active ? 'text-white' : 'text-content/60 hover:text-content/90'
+                  active ? 'bg-brand-gradient shadow-glow-violet text-white' : 'text-content/60 hover:text-content/90'
                 }`}>
-                {active && (
-                  <motion.span layoutId="lang-pill" transition={SPRING.snappy}
-                    className="absolute inset-0 rounded-md bg-brand-gradient shadow-glow-violet" />
-                )}
-                <span className="relative z-10">{label}</span>
+                {label}
               </button>
             );
           })}

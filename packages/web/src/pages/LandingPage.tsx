@@ -265,11 +265,14 @@ function ScrollDownButton() {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const onScroll = () => {
-      // max — сколько вообще можно прокрутить. Пока < 100 (страница ещё не стала
-      // скроллируемой — landing-scroll применяется отдельным эффектом), кнопку НЕ
-      // прячем, иначе она «залипнет» скрытой. Прячем только у самого низа.
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      setHidden(max > 100 && window.scrollY >= max - 80);
+      // Прячем кнопку, когда СЛЕДУЮЩЕЙ секции уже нет (ты на последней) — тогда
+      // стрелка вниз бесполезна. Пока страница ещё не скроллируема (landing-scroll
+      // применяется отдельным эффектом) — НЕ прячем, иначе залипнет скрытой.
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight > 200;
+      const hasNext = ['features', 'privacy', 'download']
+        .map((id) => document.getElementById(id))
+        .some((el) => el && el.getBoundingClientRect().top > 140);
+      setHidden(scrollable && !hasNext);
     };
     onScroll();
     // повторный замер после раскладки/применения landing-scroll
@@ -284,22 +287,20 @@ function ScrollDownButton() {
   }, []);
 
   const goNext = () => {
-    const els = ['features', 'privacy', 'download']
+    const next = ['features', 'privacy', 'download']
       .map((id) => document.getElementById(id))
-      .filter(Boolean) as HTMLElement[];
-    const next = els.find((el) => el.getBoundingClientRect().top > 80);
+      .find((el) => el && el.getBoundingClientRect().top > 120);
     if (next) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
     else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
   };
 
-  // Всегда в DOM, фейдим по hidden (без AnimatePresence — надёжнее при StrictMode).
-  // opacity через style не трогает transform → центрирование -translate-x-1/2 живёт.
+  // На последней секции кнопка не нужна — просто не рендерим (unmount = гарантированно
+  // исчезает, без зависимости от opacity/framer). Хуки выше выполняются всегда.
+  if (hidden) return null;
+
   return (
-    <motion.button
+    <button
       onClick={goNext}
-      animate={{ opacity: hidden ? 0 : 1 }}
-      transition={{ duration: 0.3 }}
-      style={{ pointerEvents: hidden ? 'none' : 'auto' }}
       className="hidden lg:flex fixed left-1/2 -translate-x-1/2 bottom-6 z-30 flex-col items-center gap-1.5 text-content/70 hover:text-content transition-colors"
       aria-label="Листать вниз"
     >
@@ -311,7 +312,7 @@ function ScrollDownButton() {
       >
         <ChevronDown size={20} />
       </motion.span>
-    </motion.button>
+    </button>
   );
 }
 
@@ -416,19 +417,6 @@ function LivePhone() {
   const [typing,  setTyping]  = useState(false);
   const [reacted, setReacted] = useState(false);
 
-  // 3D-наклон от мыши (объём + параллакс).
-  const mx = useMotionValue(0);
-  const my = useMotionValue(0);
-  const rotX = useSpring(useTransform(my, [-0.5, 0.5], [5, -5]),  { stiffness: 150, damping: 22 });
-  const rotY = useSpring(useTransform(mx, [-0.5, 0.5], [-8, 8]),  { stiffness: 150, damping: 22 });
-
-  const onMouseMove = (e: React.MouseEvent) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    mx.set((e.clientX - r.left) / r.width - 0.5);
-    my.set((e.clientY - r.top) / r.height - 0.5);
-  };
-  const onMouseLeave = () => { mx.set(0); my.set(0); };
-
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     const run = () => {
@@ -453,11 +441,8 @@ function LivePhone() {
       <IntroBeam />
 
       <motion.div
-        onMouseMove={onMouseMove}
-        onMouseLeave={onMouseLeave}
-        animate={{ y: [0, -10, 0] }}
+        animate={{ y: [0, -8, 0] }}
         transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ rotateX: rotX, rotateY: rotY, transformStyle: 'preserve-3d' }}
         className="relative rounded-[46px] p-[3px] bg-gradient-to-br from-white/20 via-white/5 to-transparent shadow-[0_40px_90px_-20px_rgba(0,0,0,0.75)]"
       >
         {/* боковые кнопки iPhone — mute + громкость слева, питание справа */}
@@ -468,12 +453,9 @@ function LivePhone() {
 
         {/* корпус */}
         <div className="relative rounded-[44px] bg-[#0a0814] border border-white/[0.06] overflow-hidden">
-          <div className="aspect-[0.49] flex flex-col" style={{ transform: 'translateZ(0.1px)' }}>
-            {/* Dynamic Island — по центру, лёгкая глубина (без перекоса) */}
-            <div
-              className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full z-30"
-              style={{ transform: 'translateZ(6px)' }}
-            />
+          <div className="aspect-[0.49] flex flex-col">
+            {/* Dynamic Island — строго по центру, плоский (без перекоса) */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full z-30" />
 
             {/* status bar */}
             <div className="absolute top-0 left-0 right-0 px-6 pt-4 flex justify-between items-center text-[11px] text-white/85 z-20">
@@ -793,8 +775,32 @@ function DownloadCard({
 
 function Footer() {
   return (
-    <footer className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-12 border-t border-content/[0.07]">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-content/45">
+    <footer className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-12 pb-16 border-t border-content/[0.07] space-y-8">
+      {/* Юридический дисклеймер — снимаем ответственность с сервиса/разработчиков. */}
+      <div className="text-[12px] leading-relaxed text-content/40 space-y-3 max-w-3xl">
+        <p>
+          Dakka предоставляется на условиях «как есть» (as is) и «как доступно» (as available),
+          без каких-либо гарантий, явных или подразумеваемых, включая, помимо прочего, гарантии
+          пригодности для определённой цели, бесперебойной и безошибочной работы, сохранности данных
+          и безопасности.
+        </p>
+        <p>
+          Используя сервис, вы соглашаетесь, что делаете это на свой страх и риск. Администрация и
+          разработчики в максимально допустимой законом степени не несут ответственности за любой
+          прямой, косвенный, случайный или последующий ущерб, утрату данных, сообщений, медиафайлов
+          либо упущенную выгоду, возникшие в результате использования или невозможности использования
+          сервиса.
+        </p>
+        <p>
+          Сервис не предназначен для экстренной связи. Пользователи несут полную ответственность за
+          размещаемый ими контент и обязуются соблюдать применимое законодательство. Продолжая
+          использование, вы принимаете{' '}
+          <a href="#" className="text-content/60 underline hover:text-content/90">Пользовательское соглашение</a> и{' '}
+          <a href="#" className="text-content/60 underline hover:text-content/90">Политику конфиденциальности</a>.
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-content/45 pt-6 border-t border-content/[0.05]">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-brand-gradient flex items-center justify-center">
             <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
@@ -802,11 +808,12 @@ function Footer() {
             </svg>
           </div>
           <span className="text-content/70 font-medium">Dakka</span>
-          <span>· 2026</span>
+          <span>© 2026 · Все права защищены</span>
         </div>
-        <div className="flex items-center gap-6">
-          <a href="#" className="hover:text-content/80 transition">Условия</a>
+        <div className="flex items-center gap-5 flex-wrap justify-center">
+          <a href="#" className="hover:text-content/80 transition">Соглашение</a>
           <a href="#" className="hover:text-content/80 transition">Конфиденциальность</a>
+          <a href="#" className="hover:text-content/80 transition">Оферта</a>
           <a href="mailto:hello@akkdmsg.online" className="hover:text-content/80 transition">Связаться</a>
         </div>
       </div>
