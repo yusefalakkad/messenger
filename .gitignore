@@ -46,3 +46,8 @@ google-services.json
 apps/desktop/release/
 apps/desktop/renderer/
 apps/desktop/.cache/
+
+# Десктоп-установщики, раздаваемые nginx /download (большие бинарники, не в git).
+# Папку держим (.gitkeep), сами файлы — нет.
+nginx/download/*
+!nginx/download/.gitkeep

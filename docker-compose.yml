@@ -39,6 +39,9 @@ services:
       - "443:8443"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      # Десктоп-установщики (.dmg/.exe) раздаются по /download/.
+      # Бинарники не в git/образе — кладутся на хост через tools/publish-desktop.sh.
+      - ./nginx/download:/usr/share/nginx/html/download:ro
     depends_on:
       - backend
     networks:

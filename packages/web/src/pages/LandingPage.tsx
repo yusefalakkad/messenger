@@ -8,7 +8,9 @@ import DakkaIcon from '@/components/ui/DakkaIcon';
 import {
   ShieldCheck, Phone, Mic, Video as VideoIcon, Smile, Lock, Globe,
   ArrowRight, Play, Apple, Smartphone, Sparkles, Heart, Check, ChevronDown,
+  Monitor, Download,
 } from 'lucide-react';
+import { desktopDownload, DESKTOP_DOWNLOADS } from '@/lib/desktopDownload';
 
 /**
  * Главная — редакторская типографика + ОБЪЁМНЫЙ 3D-телефон с живой перепиской,
@@ -156,7 +158,7 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
           Войти
         </button>
         <button
-          onClick={onSignIn}
+          onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
           className="text-sm text-content bg-content/[0.06] hover:bg-content/[0.10] border border-content/[0.10] px-4 py-2 rounded-xl transition"
         >
           Скачать
@@ -719,6 +721,7 @@ function PrivacySection() {
 // ─── Download section ─────────────────────────────────────────────────────────
 
 function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
+  const dl = desktopDownload();
   return (
     <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <SectionHeader
@@ -727,39 +730,67 @@ function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
         sub="Установите Dakka на любое устройство — все ваши чаты автоматически появятся."
       />
 
-      <div className="grid sm:grid-cols-3 gap-4 mt-12">
-        <DownloadCard icon={Apple}      title="iPhone & iPad" sub="iOS 16.4+"           onClick={onSignIn} />
-        <DownloadCard icon={Smartphone} title="Android"       sub="Android 8+"          onClick={onSignIn} />
-        <DownloadCard icon={Globe}      title="Web"           sub="Браузер — прямо здесь" onClick={onSignIn} highlight />
+      {/* Главная кнопка — сразу под текущую ОС (macOS/Windows). Иначе — открыть в браузере. */}
+      <div className="mt-10 flex justify-center">
+        {dl.url ? (
+          <motion.a
+            href={dl.url} download
+            whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+            className="inline-flex items-center gap-2.5 h-14 px-8 rounded-2xl bg-brand-gradient text-white font-semibold text-base shadow-glow-violet hover:opacity-95"
+          >
+            <Download size={20} /> {dl.label}
+          </motion.a>
+        ) : (
+          <motion.button
+            onClick={onSignIn}
+            whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+            className="inline-flex items-center gap-2.5 h-14 px-8 rounded-2xl bg-brand-gradient text-white font-semibold text-base shadow-glow-violet hover:opacity-95"
+          >
+            <Globe size={20} /> Открыть в браузере
+          </motion.button>
+        )}
+      </div>
+
+      <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-12">
+        <DownloadCard icon={Apple}      title="macOS"         sub="Apple Silicon · .dmg"   href={DESKTOP_DOWNLOADS.mac}     highlight={dl.os === 'mac'} />
+        <DownloadCard icon={Monitor}    title="Windows"       sub="x64 · установщик .exe"  href={DESKTOP_DOWNLOADS.windows} highlight={dl.os === 'windows'} />
+        <DownloadCard icon={Apple}      title="iPhone & iPad" sub="iOS 16.4+"              onClick={onSignIn} />
+        <DownloadCard icon={Smartphone} title="Android"       sub="Android 8+"             onClick={onSignIn} />
+        <DownloadCard icon={Globe}      title="Web"           sub="Браузер — прямо здесь"  onClick={onSignIn} />
       </div>
     </section>
   );
 }
 
 function DownloadCard({
-  icon: Icon, title, sub, onClick, highlight,
+  icon: Icon, title, sub, onClick, href, highlight,
 }: {
-  icon: typeof Apple; title: string; sub: string; onClick: () => void; highlight?: boolean;
+  icon: typeof Apple; title: string; sub: string; onClick?: () => void; href?: string; highlight?: boolean;
 }) {
-  return (
-    <motion.button
-      onClick={onClick}
-      whileHover={{ y: -4 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-      className={`group relative text-left p-6 rounded-2xl border transition-colors overflow-hidden
-        ${highlight
-          ? 'bg-brand-gradient-soft border-content/[0.14] hover:border-content/[0.22]'
-          : 'bg-content/[0.025] border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12]'
-        }`}
-    >
+  const className = `group relative block text-left p-6 rounded-2xl border transition-colors overflow-hidden
+    ${highlight
+      ? 'bg-brand-gradient-soft border-accent-violet/40 ring-1 ring-accent-violet/30'
+      : 'bg-content/[0.025] border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12]'
+    }`;
+  const inner = (
+    <>
       <Icon size={32} className="mb-4 text-content/85 group-hover:scale-110 transition" />
-      <div className="text-base font-medium mb-1">{title}</div>
+      <div className="text-base font-medium mb-1 flex items-center gap-2">
+        {title}
+        {highlight && <span className="text-[10px] font-semibold text-accent-violet bg-accent-violet/15 px-1.5 py-0.5 rounded-full">ваша ОС</span>}
+      </div>
       <div className="text-sm text-content/55">{sub}</div>
       <div className="flex items-center gap-1 mt-3 text-xs text-accent-pink opacity-0 group-hover:opacity-100 transition">
-        Открыть <ArrowRight size={12} />
+        {href ? 'Скачать' : 'Открыть'} <ArrowRight size={12} />
       </div>
-    </motion.button>
+    </>
   );
+  const motionProps = { whileHover: { y: -4 }, transition: { type: 'spring' as const, stiffness: 300, damping: 22 } };
+  return href
+    ? <motion.a href={href} download {...motionProps} className={className}>{inner}</motion.a>
+    : <motion.button onClick={onClick} {...motionProps} className={className}>{inner}</motion.button>;
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────

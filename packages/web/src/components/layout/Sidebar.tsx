@@ -9,6 +9,7 @@ import { useFoldersStore } from '@/stores/folders.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
+import { desktopDownload } from '@/lib/desktopDownload';
 import Avatar from '@/components/ui/Avatar';
 import IconBtn from '@/components/ui/IconBtn';
 import Dropdown, { DropdownItem } from '@/components/ui/Dropdown';
@@ -348,11 +349,11 @@ export default function Sidebar() {
       {!(window as { dakkaDesktop?: { isDesktop?: boolean } }).dakkaDesktop?.isDesktop && (
         <div className="px-2 pb-3 pt-1 flex-shrink-0">
           <a
-            href="https://akkdmsg.online/download"
+            href={desktopDownload().url ?? 'https://akkdmsg.online/download'}
             target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-gradient text-white font-semibold text-[13.5px] shadow-glow-violet hover:opacity-95 active:scale-[0.98] transition"
           >
-            <Download size={17} /> {t('chat.downloadApp')}
+            <Download size={17} /> {desktopDownload().label}
           </a>
         </div>
       )}
