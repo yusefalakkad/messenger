@@ -995,7 +995,7 @@ export default function MessageInput({ chatId }: Props) {
         onChange={(e) => handleFileChange(e, 'video')} />
 
       {/* ─── Основная панель (8-grid: px-16, py-12, border единый dark-border) ─── */}
-      <div className="relative flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
+      <div className="relative flex-shrink-0 px-4 pt-3 pb-input bg-transparent lg:border-t lg:border-dark-border lg:bg-dark-surface/80 lg:backdrop-blur-xl">
 
         {/* ── Live-превью видео-кружка (Telegram-style: большой круг ПО ЦЕНТРУ экрана) ──
             Рендерится через portal в document.body: иначе `position: fixed`
@@ -1192,7 +1192,7 @@ export default function MessageInput({ chatId }: Props) {
             <div className="relative flex-shrink-0">
               {/* Тот же вид, что у кнопки записи справа (круг 44px, заливка+бордер) — симметрия */}
               <IconBtn
-                className="!w-11 !h-11 !rounded-full bg-content/[0.06] hover:bg-content/[0.1] border border-dark-border text-content/65"
+                className="!w-11 !h-11 !rounded-full liquid-card text-content/70"
                 onClick={() => setShowAttach(!showAttach)} disabled={uploading} active={showAttach}
               >
                 <Paperclip size={19} />
@@ -1267,9 +1267,8 @@ export default function MessageInput({ chatId }: Props) {
             )}
           </AnimatePresence>
           <div className={clsx(
-            'rounded-3xl transition-colors duration-200',
-            'bg-content/[0.04] border border-dark-border backdrop-blur-sm',
-            !isRecording && 'focus-within:border-primary-500/50 focus-within:ring-2 focus-within:ring-primary-500/15 focus-within:bg-content/[0.06]',
+            'rounded-3xl transition-colors duration-200 liquid-card',
+            !isRecording && 'focus-within:ring-2 focus-within:ring-[#7A82FF]/30',
           )}>
             {/* Обычный ввод текста */}
             {!isRecording && (
@@ -1442,8 +1441,8 @@ export default function MessageInput({ chatId }: Props) {
                 pttState === 'recording'
                   ? 'bg-rose-500 text-white shadow-e2 shadow-rose-500/40 animate-pulse-glow'
                   : recMode === 'voice'
-                  ? 'bg-content/[0.06] hover:bg-content/[0.1] text-content/65 hover:text-content border border-dark-border'
-                  : 'bg-content/[0.06] hover:bg-content/[0.1] text-primary-600 dark:text-primary-300 hover:text-primary-500 dark:hover:text-primary-200 border border-dark-border',
+                  ? 'liquid-card text-content/70 hover:text-content'
+                  : 'liquid-card text-[#aeb4ff] hover:text-white',
                 uploading && 'opacity-40 cursor-not-allowed',
               )}
             >
