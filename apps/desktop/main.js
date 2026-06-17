@@ -1,4 +1,4 @@
-// Dakka — нативное десктоп-приложение для macOS (Electron).
+// Dakka — нативное десктоп-приложение для macOS и Windows (Electron).
 //
 // Это НЕ «окно с сайтом»: фронтенд (renderer/) ЗАШИТ внутрь приложения и грузится
 // локально с http://127.0.0.1 — мгновенно, как у Telegram Desktop. Внутри приложения
@@ -43,7 +43,9 @@ function startLocalServer() {
     const proxy = httpProxy.createProxyServer({
       target: TARGET,
       changeOrigin: true,        // Host → akkdmsg.online (nginx роутит по Host)
-      secure: false,             // принимаем self-signed сертификат сервера
+      // Прод (akkdmsg.online, валидный LE-сертификат) → проверяем TLS, без MITM.
+      // Кастомный MESSENGER_URL (локальный dev / self-signed) → не проверяем.
+      secure: !process.env.MESSENGER_URL,
       cookieDomainRewrite: '',   // refresh-cookie привязываем к localhost
       ws: true,
       xfwd: true,
@@ -90,6 +92,7 @@ function startLocalServer() {
 
 // ─── Окно ─────────────────────────────────────────────────────────────────────
 function createWindow() {
+  const isMac = process.platform === 'darwin';
   mainWindow = new BrowserWindow({
     width: 1180,
     height: 800,
@@ -97,8 +100,11 @@ function createWindow() {
     minHeight: 600,
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#17151e' : '#f4f2f7',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 18 },
+    // macOS: «спрятанный» тайтлбар с traffic-lights (как Telegram).
+    // Windows/Linux: обычная системная рамка с кнопками свернуть/развернуть/закрыть.
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 18 } }
+      : { icon: path.join(__dirname, 'assets', 'icon.png') }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

@@ -1,7 +1,7 @@
 {
   "name": "dakka-desktop",
   "version": "1.0.0",
-  "description": "Dakka — нативное десктоп-приложение для macOS (Electron + bundled SPA)",
+  "description": "Dakka — нативное десктоп-приложение для macOS и Windows (Electron + bundled SPA)",
   "private": true,
   "main": "main.js",
   "author": "Dakka",
@@ -10,7 +10,9 @@
     "start": "npm run bundle && electron .",
     "start:nobundle": "electron .",
     "dist:mac": "npm run bundle && electron-builder --mac",
-    "dist:mac:universal": "npm run bundle && electron-builder --mac --universal"
+    "dist:mac:universal": "npm run bundle && electron-builder --mac --universal",
+    "dist:win": "npm run bundle && electron-builder --win",
+    "dist:win:portable": "npm run bundle && electron-builder --win portable"
   },
   "dependencies": {
     "http-proxy": "^1.18.1"
@@ -32,7 +34,6 @@
       "assets/icon.png",
       "renderer/**/*"
     ],
-    "electronDist": "node_modules/electron/dist",
     "mac": {
       "category": "public.app-category.social-networking",
       "icon": "assets/icon.png",
@@ -53,6 +54,27 @@
         { "x": 130, "y": 220, "type": "file" },
         { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
       ]
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false,
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Dakka",
+      "artifactName": "Dakka-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Dakka-${version}-portable.${ext}"
     }
   }
 }
