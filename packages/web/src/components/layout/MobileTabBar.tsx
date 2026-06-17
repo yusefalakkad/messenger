@@ -74,14 +74,14 @@ export default function MobileTabBar() {
                 <motion.span
                   layoutId="tabbar-active"
                   transition={SPRING.smooth}
-                  className="absolute inset-0 rounded-[22px] bg-accent-violet/20 ring-1 ring-accent-violet/30"
+                  className="absolute inset-0 rounded-[22px] bg-[#7A82FF]/25 ring-1 ring-[#7A82FF]/45"
                 />
               )}
               <span className="relative z-10 flex flex-col items-center gap-1">
                 <span className="relative">
                   <Icon
                     size={24}
-                    className={isActive ? 'text-accent-violet' : 'text-content/55'}
+                    className={isActive ? 'text-[#aeb4ff]' : 'text-content/55'}
                     fill="currentColor"
                     strokeWidth={1.6}
                   />
@@ -93,7 +93,7 @@ export default function MobileTabBar() {
                     </span>
                   )}
                 </span>
-                <span className={`text-[10px] leading-none ${isActive ? 'text-accent-violet font-semibold' : 'text-content/55'}`}>
+                <span className={`text-[10px] leading-none ${isActive ? 'text-[#aeb4ff] font-semibold' : 'text-content/55'}`}>
                   {label}
                 </span>
               </span>

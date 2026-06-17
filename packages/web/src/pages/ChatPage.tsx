@@ -42,13 +42,20 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
-      {/* Фирменное свечение в фоне — чтобы матовое стекло (таб-бар, панели) «играло»
-          и преломляло цвет, как в glassmorphism. Только мобила, тускло, не мешает чтению. */}
-      {/* Фон — спокойный матовый: лишь лёгкая фирменная глубина, без ярких пятен.
-          Цвет теперь «налит» в сами элементы (.liquid-card), а не в фон. */}
-      <div className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-spot-violet blur-3xl opacity-20" />
-        <div className="absolute -bottom-20 -right-16 w-80 h-72 rounded-full bg-spot-pink blur-3xl opacity-15" />
+      {/* Фон по референсу — тёмно-фиолетовый градиент со свечениями (сине-фиолет
+          сверху, малиновое снизу). Поверх него фиолетово-дымчатое стекло. Мобила. */}
+      <div
+        className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden"
+        style={{ background: 'radial-gradient(120% 90% at 22% 6%, #38336a 0%, #221b3a 52%, #361b44 100%)' }}
+      >
+        <div
+          className="absolute -top-10 -left-10 w-80 h-80 rounded-full blur-3xl opacity-50"
+          style={{ background: 'radial-gradient(circle, #5a6bff, transparent 62%)' }}
+        />
+        <div
+          className="absolute bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl opacity-45"
+          style={{ background: 'radial-gradient(circle, #c8418f, transparent 62%)' }}
+        />
       </div>
 
       {/* Плавающий кружок-PiP — на уровне страницы (portal в body), переживает смену чата */}

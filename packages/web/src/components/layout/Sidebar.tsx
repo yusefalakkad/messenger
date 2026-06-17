@@ -151,7 +151,8 @@ export default function Sidebar() {
             onClick={() => setShowPlus((v) => !v)}
             whileTap={tap}
             transition={SPRING.snappy}
-            className="w-9 h-9 rounded-full bg-brand-gradient text-white flex items-center justify-center shadow-glow-violet active:opacity-90"
+            className="w-9 h-9 rounded-full text-white flex items-center justify-center active:opacity-90"
+            style={{ background: 'linear-gradient(142deg, #ff6b72, #ff9a5c)', boxShadow: '0 4px 14px -4px rgba(255,107,114,0.6)' }}
             title="Новый чат"
             aria-label="Новый чат"
           >
