@@ -262,7 +262,7 @@ export default function Sidebar() {
           onClick={() => setShowArchive(true)}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left hover:bg-dark-hover/60 transition-colors group"
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left liquid-card group"
           title="Архивные чаты"
         >
           <span className="w-10 h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
@@ -278,7 +278,7 @@ export default function Sidebar() {
           onClick={openSaved}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left hover:bg-dark-hover/60 transition-colors group"
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left liquid-card group"
           title="Избранное"
         >
           <span className="w-10 h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">

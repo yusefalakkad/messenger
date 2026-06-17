@@ -105,13 +105,12 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         onTouchMove={cancelLongPress}
         onTouchCancel={cancelLongPress}
         className={clsx(
-          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 rounded-lg text-left group',
-          'transition-[background-color,transform,box-shadow] duration-200 ease-out',
+          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 mb-1.5 rounded-2xl text-left group liquid-card',
+          'transition-[transform,box-shadow] duration-200 ease-out',
           'active:scale-[0.985] active:duration-75',
           active
-            ? 'bg-dark-card shadow-e1'
-            : 'hover:bg-dark-hover/60 hover:-translate-y-px',
-          isPinned && !active && 'bg-accent-violet/[0.05]',
+            ? 'ring-1 ring-white/35 -translate-y-px'
+            : 'hover:-translate-y-px',
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >

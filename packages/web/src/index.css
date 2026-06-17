@@ -239,6 +239,50 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
       0 1px 0 rgb(255 255 255 / 0.7) inset,
       0 14px 40px -18px rgb(0 0 0 / 0.18);
   }
+  /* «Эффект жидкости» — медленный глянцевый блик, скользящий по стеклу. */
+  .liquid-glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 32%, rgb(255 255 255 / 0.12) 48%, transparent 64%);
+    background-size: 260% 100%;
+    animation: liquidSheen 7s ease-in-out infinite;
+  }
+  @keyframes liquidSheen {
+    0%   { background-position: 160% 0; }
+    100% { background-position: -60% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .liquid-glass::after { animation: none; }
+  }
+
+  /* Градиентная стеклянная карточка — фон спокойный, а элемент «налит» фирменным
+     градиентом + матовое стекло + блик. Для строк чатов, поиска, плиток. */
+  .liquid-card {
+    position: relative;
+    isolation: isolate;
+    background:
+      linear-gradient(120deg, rgb(138 82 255 / 0.24), rgb(255 90 141 / 0.12)),
+      rgb(var(--surface-rgb) / 0.38);
+    backdrop-filter: blur(18px) saturate(185%);
+    -webkit-backdrop-filter: blur(18px) saturate(185%);
+    border: 1px solid rgb(255 255 255 / 0.16);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.18) inset,
+      0 10px 30px -20px rgb(0 0 0 / 0.5);
+  }
+  .liquid-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.08), transparent 45%);
+  }
 
   /* Брендовый чип-пилюля с градиентной обводкой */
   .chip-brand {

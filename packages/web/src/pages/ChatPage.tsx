@@ -44,10 +44,11 @@ export default function ChatPage() {
     <div className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
       {/* Фирменное свечение в фоне — чтобы матовое стекло (таб-бар, панели) «играло»
           и преломляло цвет, как в glassmorphism. Только мобила, тускло, не мешает чтению. */}
+      {/* Фон — спокойный матовый: лишь лёгкая фирменная глубина, без ярких пятен.
+          Цвет теперь «налит» в сами элементы (.liquid-card), а не в фон. */}
       <div className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-20 -left-16 w-72 h-72 rounded-full bg-spot-violet blur-3xl opacity-60" />
-        <div className="absolute top-1/3 -right-20 w-64 h-64 rounded-full bg-spot-pink blur-3xl opacity-40" />
-        <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 w-[460px] h-80 rounded-full bg-spot-pink blur-3xl opacity-55" />
+        <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-spot-violet blur-3xl opacity-20" />
+        <div className="absolute -bottom-20 -right-16 w-80 h-72 rounded-full bg-spot-pink blur-3xl opacity-15" />
       </div>
 
       {/* Плавающий кружок-PiP — на уровне страницы (portal в body), переживает смену чата */}
