@@ -1,17 +1,18 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Phone, Users, Settings, Search, MessageCircle } from 'lucide-react';
+import { Phone, Users, Settings, MessageCircle } from 'lucide-react';
 import { useUIStore } from '@/stores/ui.store';
 import { useChatStore } from '@/stores/chat.store';
 import { haptic } from '@/lib/native';
 import { SPRING, tap } from '@/lib/motion';
 
 /**
- * Нижняя навигация для телефона — Контакты · Звонки · Чаты · Настройки + круглый
- * поиск. Только на мобиле (`lg:hidden`), внутри чата её прячет ChatPage.
+ * Нижняя навигация для телефона — ПЛАВАЮЩАЯ стеклянная капсула с отступами от
+ * краёв (современный вид, не прямоугольная панель во всю ширину). Только на мобиле
+ * (`lg:hidden`), внутри чата её прячет ChatPage.
  *
- * Активная вкладка — производная от стора (открытый оверлей). Под активной едет
- * мягкая «пилюля» (layoutId-spring) — плавный, приятный переход между вкладками.
+ * Вкладки: Контакты · Звонки · Чаты · Настройки. Активная — производная от стора;
+ * под ней едет мягкая пилюля (layoutId + spring). Поиска тут нет — он в шапке списка.
  */
 type TabKey = 'contacts' | 'calls' | 'chats' | 'settings';
 
@@ -30,12 +31,6 @@ export default function MobileTabBar() {
   const unread = useChatStore((s) =>
     s.chats.reduce((n, c) => n + (c.archivedAt ? 0 : (c.unreadCount ?? 0)), 0));
 
-  const focusSearch = () => {
-    const el = document.querySelector<HTMLInputElement>('aside input.input-pill');
-    el?.focus();
-    el?.scrollIntoView({ block: 'nearest' });
-  };
-
   const active: TabKey = settingsOpen ? 'settings' : contactsOpen ? 'contacts' : callsOpen ? 'calls' : 'chats';
   const closeAll = () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(false); };
 
@@ -49,69 +44,59 @@ export default function MobileTabBar() {
   };
 
   return (
-    <nav
-      className="lg:hidden flex-shrink-0 flex items-stretch gap-1 px-2 pt-1.5 liquid-glass pb-[var(--sab)]"
-      role="tablist"
-      aria-label="Навигация"
-    >
-      {TABS.map(({ key, label, Icon }) => {
-        const isActive = active === key;
-        const showBadge = key === 'chats' && unread > 0;
-        return (
-          <motion.button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            aria-label={label}
-            onClick={() => onTab(key)}
-            whileTap={tap}
-            transition={SPRING.snappy}
-            className="relative flex-1 flex flex-col items-center justify-center gap-1 h-[52px] rounded-2xl"
-          >
-            {/* Мягкая пилюля под активной вкладкой — едет между табами. */}
-            {isActive && (
-              <motion.span
-                layoutId="tabbar-active"
-                transition={SPRING.smooth}
-                className="absolute inset-x-1 inset-y-0.5 rounded-2xl bg-accent-violet/14 ring-1 ring-accent-violet/25"
-              />
-            )}
-            <span className="relative z-10 flex flex-col items-center gap-1">
-              <span className="relative">
-                <Icon
-                  size={23}
-                  className={isActive ? 'text-accent-violet' : 'text-content/45'}
-                  strokeWidth={isActive ? 2.4 : 2}
-                />
-                {showBadge && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[17px] h-[17px] px-1 rounded-full
-                                   bg-accent-violet text-white text-[10px] font-bold leading-[17px]
-                                   text-center tabular-nums shadow-glow-violet">
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-              </span>
-              <span className={`text-[10.5px] leading-none ${isActive ? 'text-accent-violet font-semibold' : 'text-content/45'}`}>
-                {label}
-              </span>
-            </span>
-          </motion.button>
-        );
-      })}
-
-      {/* Круглая кнопка поиска справа. */}
-      <motion.button
-        type="button"
-        aria-label="Поиск"
-        onClick={() => { haptic.selection(); closeAll(); navigate('/'); setTimeout(focusSearch, 60); }}
-        whileTap={tap}
-        transition={SPRING.snappy}
-        className="self-center flex-shrink-0 w-11 h-11 ml-0.5 mr-1 rounded-full liquid-glass
-                   flex items-center justify-center text-content/75 active:opacity-90"
+    // Плавающая обёртка: капсула не во всю ширину, с отступами и над safe-area.
+    <div className="lg:hidden flex-shrink-0 px-3 pt-1 pb-[calc(var(--sab)+0.6rem)] pointer-events-none">
+      <nav
+        className="pointer-events-auto mx-auto max-w-md flex items-stretch gap-1 px-2 py-1.5
+                   rounded-[26px] liquid-glass"
+        role="tablist"
+        aria-label="Навигация"
       >
-        <Search size={20} />
-      </motion.button>
-    </nav>
+        {TABS.map(({ key, label, Icon }) => {
+          const isActive = active === key;
+          const showBadge = key === 'chats' && unread > 0;
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-label={label}
+              onClick={() => onTab(key)}
+              whileTap={tap}
+              transition={SPRING.snappy}
+              className="relative flex-1 flex flex-col items-center justify-center gap-1 h-[50px] rounded-[20px]"
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="tabbar-active"
+                  transition={SPRING.smooth}
+                  className="absolute inset-0 rounded-[20px] bg-accent-violet/16 ring-1 ring-accent-violet/25"
+                />
+              )}
+              <span className="relative z-10 flex flex-col items-center gap-1">
+                <span className="relative">
+                  <Icon
+                    size={22}
+                    className={isActive ? 'text-accent-violet' : 'text-content/45'}
+                    strokeWidth={isActive ? 2.4 : 2}
+                  />
+                  {showBadge && (
+                    <span className="absolute -top-1.5 -right-2 min-w-[17px] h-[17px] px-1 rounded-full
+                                     bg-accent-violet text-white text-[10px] font-bold leading-[17px]
+                                     text-center tabular-nums shadow-glow-violet">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </span>
+                <span className={`text-[10px] leading-none ${isActive ? 'text-accent-violet font-semibold' : 'text-content/45'}`}>
+                  {label}
+                </span>
+              </span>
+            </motion.button>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
