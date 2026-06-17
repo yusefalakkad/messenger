@@ -14,7 +14,7 @@ export const ru = {
   },
   auth: {
     tagline: 'Общение, которое чувствуешь',
-    e2eBadge: 'E2E-шифрование по умолчанию',
+    e2eBadge: 'Приватность по умолчанию',
     enterPhone: 'Введите ваш номер',
     phoneHint: 'Мы отправим одноразовый код через Telegram.',
     phoneLabel: 'Номер телефона',

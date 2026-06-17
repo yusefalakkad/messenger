@@ -37,7 +37,7 @@ export default function EmptyChat() {
         {/* Чип-плашка */}
         <motion.div variants={child} className="chip-brand mb-6">
           <ShieldCheck size={13} className="text-primary-600 dark:text-primary-300" />
-          Приватность по умолчанию · E2E-шифрование
+          Приватность по умолчанию · защищённое соединение
         </motion.div>
 
         {/* Заголовок с градиентным акцентом */}

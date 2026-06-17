@@ -82,7 +82,7 @@ export default function AuthPage() {
             className="chip-brand mt-4"
           >
             <ShieldCheck size={12} className="text-primary-600 dark:text-primary-300" />
-            E2E-шифрование по умолчанию
+            Приватность по умолчанию
           </motion.div>
         </div>
 

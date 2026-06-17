@@ -112,7 +112,7 @@ export default function RegisterForm() {
         </div>
       </div>
 
-      {/* E2E notice */}
+      {/* Privacy notice */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -121,7 +121,7 @@ export default function RegisterForm() {
       >
         <ShieldCheck size={16} className="text-primary-600 dark:text-primary-300 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-primary-500/85 dark:text-primary-200/85 leading-relaxed">
-          При регистрации автоматически создаётся ключ шифрования. Приватный ключ хранится только на вашем устройстве.
+          Соединение защищено TLS, пароль хранится как Argon2-хеш. Доступ к аккаунту можно усилить 2FA.
         </p>
       </motion.div>
 

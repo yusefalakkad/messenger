@@ -14,7 +14,7 @@ export const en: Dict = {
   },
   auth: {
     tagline: 'Messaging you can feel',
-    e2eBadge: 'E2E encryption by default',
+    e2eBadge: 'Privacy by default',
     enterPhone: 'Enter your number',
     phoneHint: 'We will send a one-time code via Telegram.',
     phoneLabel: 'Phone number',

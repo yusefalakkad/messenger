@@ -186,7 +186,7 @@ function Hero() {
             className="inline-flex items-center gap-2 text-xs text-content/65 bg-content/[0.05] border border-content/[0.09] rounded-full px-3 py-1.5"
           >
             <Sparkles size={12} className="text-accent-pink" />
-            E2E-шифрование по умолчанию · бесплатно
+            Приватность по умолчанию · бесплатно
           </motion.div>
 
           {/* HUGE typography — выровнено по базовой линии, читается в обеих темах */}
@@ -586,7 +586,7 @@ function LiveWaveform() {
 
 function FeatureGrid() {
   const items = [
-    { icon: Lock,      title: 'E2E по умолчанию',    desc: 'ECDH P-256 + AES-256-GCM. Только вы и собеседник видите содержимое.' },
+    { icon: Lock,      title: 'Защита данных',       desc: 'TLS-шифрование трафика, приватные медиа и 2FA. Доступ к чату — только у участников.' },
     { icon: Mic,       title: 'Голосовые сообщения', desc: 'Жмёшь и говоришь — мгновенно, с волной и автостопом.' },
     { icon: VideoIcon, title: 'Звонки и видео',      desc: 'Один-на-один + групповые до 8. Без задержек, через свой TURN/SFU.' },
     { icon: Smile,     title: 'Живые реакции',       desc: 'Эмодзи, ответы, цитаты, пересылка — всё под пальцем.' },
@@ -663,15 +663,15 @@ function PrivacySection() {
             только <span className="bg-clip-text text-transparent bg-brand-gradient">ваши</span>.
           </h2>
           <p className="text-content/60 text-lg leading-relaxed max-w-md">
-            Сообщения шифруются ещё на устройстве. Сервер видит только зашифрованный текст
-            и не может его прочитать. Ключи лежат в Keychain / Keystore — никогда не покидают телефон.
+            Соединение защищено TLS, медиафайлы приватны и доступны только участникам чата.
+            Пароли хранятся как Argon2-хеши, вход — по одноразовому коду, плюс 2FA.
           </p>
 
           <div className="mt-8 space-y-3 text-sm text-content/70">
             {[
-              'P-256 ECDH + AES-256-GCM, bit-perfect между Web/iOS/Android',
+              'TLS 1.2/1.3, HSTS и строгие security-заголовки',
               'TURN с эфемерными HMAC-credentials, TTL 10 минут',
-              'Push-нотификации без содержимого сообщений',
+              'Приватное хранилище медиа: доступ только участникам чата',
               'Двухфакторная защита через TOTP (Google Authenticator)',
             ].map((line) => (
               <div key={line} className="flex items-center gap-3">
@@ -698,16 +698,16 @@ function PrivacySection() {
                 <Lock size={28} className="text-white" />
               </div>
               <div>
-                <div className="text-2xl font-semibold">Сквозное шифрование</div>
-                <div className="text-sm text-content/55">включено для всех чатов</div>
+                <div className="text-2xl font-semibold">Защищённое соединение</div>
+                <div className="text-sm text-content/55">TLS · приватные медиа · 2FA</div>
               </div>
             </div>
 
             <div className="relative mt-7 p-4 rounded-xl bg-black/40 border border-white/[0.06] font-mono text-[11px] text-white/70 leading-relaxed">
-              <span className="text-accent-pink">{'> '}</span>encrypted: <span className="text-accent-orange">true</span><br/>
-              <span className="text-accent-pink">{'> '}</span>algo: <span className="text-accent-orange">'ECDH-P256+AES-GCM'</span><br/>
-              <span className="text-accent-pink">{'> '}</span>nonce: <span className="text-white/40">12 bytes</span><br/>
-              <span className="text-accent-pink">{'> '}</span>auth_tag: <span className="text-white/40">16 bytes</span>
+              <span className="text-accent-pink">{'> '}</span>tls: <span className="text-accent-orange">'1.3'</span><br/>
+              <span className="text-accent-pink">{'> '}</span>hsts: <span className="text-accent-orange">enabled</span><br/>
+              <span className="text-accent-pink">{'> '}</span>media: <span className="text-white/40">private</span><br/>
+              <span className="text-accent-pink">{'> '}</span>2fa: <span className="text-white/40">'TOTP'</span>
             </div>
           </div>
         </motion.div>
