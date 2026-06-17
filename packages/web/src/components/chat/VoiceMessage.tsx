@@ -87,8 +87,8 @@ export default function VoiceMessage({
       <button
         onClick={handlePlay}
         className={clsx(
-          'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-          isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-primary-600 hover:bg-primary-500',
+          'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-opacity',
+          isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-[linear-gradient(142deg,#ff6b72,#ff9a5c)] hover:opacity-90',
         )}
       >
         {playing
@@ -112,7 +112,7 @@ export default function VoiceMessage({
             className={clsx(
               'flex-1 rounded-full pointer-events-none transition-colors duration-75',
               i < filledCount
-                ? (isOwn ? 'bg-white' : 'bg-primary-400')
+                ? (isOwn ? 'bg-white' : 'bg-[#7A82FF]')
                 : (isOwn ? 'bg-white/35' : 'bg-content/25'),
             )}
             style={{ height: `${Math.max(3, h * 28)}px` }}

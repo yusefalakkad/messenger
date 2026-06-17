@@ -156,7 +156,13 @@ export default function ChatHeader({ chat, otherMember }: Props) {
     <>
       {/* Высота 64px (h-16), padding x16/y0 — стандарт messenger-headers по 8-сетке.
           На мобиле — h-15 (60) и компактный отступ от safe-area. */}
-      <header className="relative z-30 flex items-center gap-2 px-4 h-16 pt-[var(--sat)] border-b border-dark-border bg-dark-surface/70 backdrop-blur-xl flex-shrink-0">
+      <header className={clsx(
+        'relative z-30 flex items-center gap-2 flex-shrink-0 h-16 px-3',
+        // Мобила — плавающая стеклянная капсула (по референсу).
+        'mx-2 mt-[calc(var(--sat)+0.5rem)] rounded-[24px] border border-white/20 bg-[rgba(56,51,84,0.55)] backdrop-blur-xl shadow-[0_12px_34px_-18px_rgba(0,0,0,0.6)]',
+        // Десктоп — обычный бар, как был.
+        'lg:mx-0 lg:mt-0 lg:px-4 lg:pt-[var(--sat)] lg:rounded-none lg:border-0 lg:border-b lg:border-dark-border lg:bg-dark-surface/70 lg:shadow-none',
+      )}>
         <IconBtn onClick={() => navigate('/')} className="lg:hidden -ml-2" title="Назад">
           <ChevronLeft size={20} />
         </IconBtn>
