@@ -75,16 +75,17 @@ html.landing-scroll body,
 html.landing-scroll #root { overflow: visible; height: auto; }
 
 /* ─── Десктоп-титлбар (Electron, macOS) ───────────────────────────────────────
-   Окно frameless: сдвигаем контент вниз на высоту бара, а сам бар делаем
-   перетаскиваемым (двигать окно). Системные кнопки «светофор» живут в этой
-   полосе и больше не налезают на аватар в шапке. */
-html.is-desktop #root { padding-top: 30px; }
+   Окно frameless (hiddenInset): контент идёт ДО САМОГО ВЕРХА (без пустой полосы),
+   а верхняя зона — перетаскиваемая. Системный «светофор» (x≈16) живёт поверх
+   левого края шапки-сайдбара, поэтому её содержимое сдвинуто вправо. */
+html.is-desktop #root { padding-top: 0; }
+html.is-desktop .electron-sb-header { padding-left: 76px; }   /* место под «светофор» */
 .desktop-titlebar {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 30px;
   z-index: 50;                 /* выше контента, ниже модалок/оверлеев */
-  -webkit-app-region: drag;    /* тянем окно за эту полосу */
+  -webkit-app-region: drag;    /* тянем окно за верхнюю полоску */
 }
 /* Интерактив внутри драг-зоны (на всякий случай) кликается, а не тянет окно. */
 html.is-desktop button,

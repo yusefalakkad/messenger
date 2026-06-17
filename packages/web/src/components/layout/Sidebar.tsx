@@ -167,7 +167,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── Desktop header (h=64px, hit-target ≥44px): аватар, имя, +, настройки, выход ── */}
-      <div className="hidden lg:flex relative items-center gap-3 px-4 h-16 flex-shrink-0">
+      <div className="electron-sb-header hidden lg:flex relative items-center gap-3 px-4 h-16 flex-shrink-0">
 
         {/* Аватар в градиентном кольце с возможностью смены */}
         <div className="relative flex-shrink-0 group">
