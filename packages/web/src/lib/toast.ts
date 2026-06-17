@@ -75,8 +75,63 @@ function show(kind: ToastKind, message: string, durationMs = 4000): void {
   }, durationMs);
 }
 
+/**
+ * Тост с кнопкой-действием. Не исчезает сам (для «обновить версию» и т.п.).
+ * Возвращает dismiss() — закрыть программно. Повторный вызов с тем же `key`
+ * не плодит дубли (заменяет предыдущий).
+ */
+const actionToasts = new Map<string, HTMLDivElement>();
+
+function showAction(
+  message: string,
+  action: { label: string; onClick: () => void },
+  opts?: { key?: string },
+): () => void {
+  const container = ensureContainer();
+  const key = opts?.key;
+  if (key) actionToasts.get(key)?.remove();
+
+  const s = STYLES.info;
+  const t = document.createElement('div');
+  Object.assign(t.style, {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    background: s.bg, border: `1px solid ${s.border}`, color: s.text,
+    backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+    padding: '10px 12px 10px 16px', borderRadius: '14px',
+    fontSize: '13.5px', fontWeight: '500',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+    pointerEvents: 'auto', opacity: '0', transform: 'translateY(-6px)',
+    transition: 'opacity 200ms ease, transform 200ms ease', maxWidth: '440px',
+  } as Partial<CSSStyleDeclaration>);
+
+  const label = document.createElement('span');
+  label.textContent = message;
+  const btn = document.createElement('button');
+  btn.textContent = action.label;
+  Object.assign(btn.style, {
+    flexShrink: '0', cursor: 'pointer', border: `1px solid ${s.border}`,
+    background: 'rgba(124, 77, 255, 0.28)', color: '#fff', fontWeight: '600',
+    fontSize: '13px', padding: '6px 12px', borderRadius: '10px',
+  } as Partial<CSSStyleDeclaration>);
+
+  const dismiss = () => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateY(-6px)';
+    setTimeout(() => t.remove(), 220);
+    if (key) actionToasts.delete(key);
+  };
+  btn.onclick = () => action.onClick();
+
+  t.append(label, btn);
+  container.appendChild(t);
+  if (key) actionToasts.set(key, t);
+  requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+  return dismiss;
+}
+
 export const toast = {
   error:   (msg: string, durationMs?: number) => show('error', msg, durationMs),
   success: (msg: string, durationMs?: number) => show('success', msg, durationMs),
   info:    (msg: string, durationMs?: number) => show('info', msg, durationMs),
+  action:  showAction,
 };

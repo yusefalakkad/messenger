@@ -51,5 +51,6 @@ ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 FROM nginxinc/nginx-unprivileged:stable-alpine AS nginx-frontend
 COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/security-headers.conf /etc/nginx/security-headers.conf
 EXPOSE 8080 8443
 CMD ["nginx", "-g", "daemon off;"]
