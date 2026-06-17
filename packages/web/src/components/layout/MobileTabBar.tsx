@@ -1,18 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Phone, Users, Settings, MessageCircle } from 'lucide-react';
+import { Phone, Users, Settings, Search, MessageCircle } from 'lucide-react';
 import { useUIStore } from '@/stores/ui.store';
 import { useChatStore } from '@/stores/chat.store';
 import { haptic } from '@/lib/native';
 import { SPRING, tap } from '@/lib/motion';
 
 /**
- * Нижняя навигация для телефона — ПЛАВАЮЩАЯ стеклянная капсула с отступами от
- * краёв (современный вид, не прямоугольная панель во всю ширину). Только на мобиле
- * (`lg:hidden`), внутри чата её прячет ChatPage.
- *
- * Вкладки: Контакты · Звонки · Чаты · Настройки. Активная — производная от стора;
- * под ней едет мягкая пилюля (layoutId + spring). Поиска тут нет — он в шапке списка.
+ * Нижняя навигация для телефона — раскладка как в Telegram, цвета наши (фиолет).
+ * Полноширинная панель вровень с низом, ТОТ ЖЕ фон, что у сайдбара/списка
+ * (bg-dark-surface/80 + blur) — чтобы низ не выбивался. Активная вкладка просто
+ * подсвечена цветом (без «пилюли»), справа — круглая кнопка поиска (как в TG).
  */
 type TabKey = 'contacts' | 'calls' | 'chats' | 'settings';
 
@@ -31,6 +29,12 @@ export default function MobileTabBar() {
   const unread = useChatStore((s) =>
     s.chats.reduce((n, c) => n + (c.archivedAt ? 0 : (c.unreadCount ?? 0)), 0));
 
+  const focusSearch = () => {
+    const el = document.querySelector<HTMLInputElement>('aside input.input-pill');
+    el?.focus();
+    el?.scrollIntoView({ block: 'nearest' });
+  };
+
   const active: TabKey = settingsOpen ? 'settings' : contactsOpen ? 'contacts' : callsOpen ? 'calls' : 'chats';
   const closeAll = () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(false); };
 
@@ -44,59 +48,61 @@ export default function MobileTabBar() {
   };
 
   return (
-    // Плавающая обёртка: капсула не во всю ширину, с отступами и над safe-area.
-    <div className="lg:hidden flex-shrink-0 px-3 pt-1 pb-[calc(var(--sab)+0.6rem)] pointer-events-none">
-      <nav
-        className="pointer-events-auto mx-auto max-w-md flex items-stretch gap-1 px-2 py-1.5
-                   rounded-[26px] liquid-glass"
-        role="tablist"
-        aria-label="Навигация"
-      >
-        {TABS.map(({ key, label, Icon }) => {
-          const isActive = active === key;
-          const showBadge = key === 'chats' && unread > 0;
-          return (
-            <motion.button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-label={label}
-              onClick={() => onTab(key)}
-              whileTap={tap}
-              transition={SPRING.snappy}
-              className="relative flex-1 flex flex-col items-center justify-center gap-1 h-[50px] rounded-[20px]"
-            >
-              {isActive && (
-                <motion.span
-                  layoutId="tabbar-active"
-                  transition={SPRING.smooth}
-                  className="absolute inset-0 rounded-[20px] bg-accent-violet/16 ring-1 ring-accent-violet/25"
-                />
+    <nav
+      className="lg:hidden flex-shrink-0 flex items-stretch px-1 border-t border-dark-border
+                 bg-dark-surface/80 backdrop-blur-xl pb-[var(--sab)]"
+      role="tablist"
+      aria-label="Навигация"
+    >
+      {TABS.map(({ key, label, Icon }) => {
+        const isActive = active === key;
+        const showBadge = key === 'chats' && unread > 0;
+        return (
+          <motion.button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            aria-label={label}
+            onClick={() => onTab(key)}
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="flex-1 flex flex-col items-center justify-center gap-1 h-[52px]"
+          >
+            <span className="relative">
+              <Icon
+                size={25}
+                className={isActive ? 'text-accent-violet' : 'text-content/45'}
+                strokeWidth={isActive ? 2.3 : 2}
+              />
+              {showBadge && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full
+                                 bg-accent-violet text-white text-[10px] font-bold leading-[18px]
+                                 text-center tabular-nums">
+                  {unread > 99 ? '99+' : unread}
+                </span>
               )}
-              <span className="relative z-10 flex flex-col items-center gap-1">
-                <span className="relative">
-                  <Icon
-                    size={22}
-                    className={isActive ? 'text-accent-violet' : 'text-content/45'}
-                    strokeWidth={isActive ? 2.4 : 2}
-                  />
-                  {showBadge && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[17px] h-[17px] px-1 rounded-full
-                                     bg-accent-violet text-white text-[10px] font-bold leading-[17px]
-                                     text-center tabular-nums shadow-glow-violet">
-                      {unread > 99 ? '99+' : unread}
-                    </span>
-                  )}
-                </span>
-                <span className={`text-[10px] leading-none ${isActive ? 'text-accent-violet font-semibold' : 'text-content/45'}`}>
-                  {label}
-                </span>
-              </span>
-            </motion.button>
-          );
-        })}
-      </nav>
-    </div>
+            </span>
+            <span className={`text-[10px] leading-none ${isActive ? 'text-accent-violet font-medium' : 'text-content/45'}`}>
+              {label}
+            </span>
+          </motion.button>
+        );
+      })}
+
+      {/* Круглая кнопка поиска справа — как в Telegram. */}
+      <motion.button
+        type="button"
+        aria-label="Поиск"
+        onClick={() => { haptic.selection(); closeAll(); navigate('/'); setTimeout(focusSearch, 60); }}
+        whileTap={tap}
+        transition={SPRING.snappy}
+        className="self-center flex-shrink-0 w-12 h-12 mx-1 rounded-full bg-content/[0.06]
+                   border border-content/10 flex items-center justify-center text-content/65
+                   active:bg-content/10"
+      >
+        <Search size={20} />
+      </motion.button>
+    </nav>
   );
 }
