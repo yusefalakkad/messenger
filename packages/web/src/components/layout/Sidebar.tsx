@@ -142,22 +142,14 @@ export default function Sidebar() {
       {/* Ambient свечение в шапке сайдбара */}
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 
-      {/* ── Mobile header — современный минимализм: крупный заголовок + одна
-             круглая кнопка «написать». Аватар/настройки/выход переехали в таб-бар
-             (Настройки) — наверху телефона им не место. ── */}
-      <div className="lg:hidden relative flex items-center justify-between pl-5 pr-3 pt-2 pb-1 flex-shrink-0">
-        <h1 className="text-[27px] font-bold tracking-[-0.02em] leading-none">Чаты</h1>
-        <div className="relative">
-          <motion.button
-            onClick={() => setShowPlus((v) => !v)}
-            whileTap={tap}
-            transition={SPRING.snappy}
-            className="w-11 h-11 rounded-full bg-brand-gradient text-white flex items-center justify-center shadow-glow-violet active:opacity-90"
-            title="Новый чат"
-            aria-label="Новый чат"
-          >
-            <MessageSquarePlus size={20} />
-          </motion.button>
+      {/* ── Mobile header — как в Telegram: компактный, заголовок по центру,
+             «написать» справа. Настройки/аватар/выход живут в таб-баре. ── */}
+      <div className="lg:hidden relative flex items-center justify-center px-3 h-14 flex-shrink-0 border-b border-dark-border">
+        <h1 className="text-[17px] font-semibold tracking-[-0.01em]">Чаты</h1>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title="Новый чат" className="text-accent-violet">
+            <MessageSquarePlus size={21} />
+          </IconBtn>
           <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
             <DropdownItem icon={<MessageSquarePlus size={16} />} label="Новый чат"   onClick={() => { setShowNewChat(true); setShowPlus(false); }} />
             <DropdownItem icon={<Users size={16} />}            label="Новая группа" onClick={() => { setShowNewGroup(true); setShowPlus(false); }} />
@@ -265,8 +257,8 @@ export default function Sidebar() {
         className="mx-2 mb-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
         title="Архивные чаты"
       >
-        <span className="w-10 h-10 rounded-lg bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
-          <Archive size={18} />
+        <span className="w-12 h-12 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+          <Archive size={20} />
         </span>
         <span className="flex-1 text-content/85 font-medium">{t('chat.archive')}</span>
         {archivedCount > 0 && (
@@ -284,8 +276,8 @@ export default function Sidebar() {
         className="mx-2 mb-1.5 flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
         title="Избранное"
       >
-        <span className="w-10 h-10 rounded-lg bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
-          <Bookmark size={18} />
+        <span className="w-12 h-12 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
+          <Bookmark size={20} />
         </span>
         <span className="flex-1 text-content/85 font-medium">{t('chat.saved')}</span>
       </motion.button>
