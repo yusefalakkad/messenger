@@ -43,9 +43,10 @@ export default function ChatPage() {
   return (
     <div className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
       {/* Фон по референсу — тёмно-фиолетовый градиент со свечениями (сине-фиолет
-          сверху, малиновое снизу). Поверх него фиолетово-дымчатое стекло. Мобила. */}
+          сверху, малиновое снизу). Поверх него фиолетово-дымчатое стекло. ВЕЗДЕ
+          (и десктоп-сайт, и Mac/Windows-приложения бандлят тот же веб). */}
       <div
-        className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden"
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
         style={{ background: 'radial-gradient(120% 90% at 22% 6%, #38336a 0%, #221b3a 52%, #361b44 100%)' }}
       >
         <div
