@@ -88,6 +88,14 @@ export default function ChatHeader({ chat, otherMember }: Props) {
 
   const startCall = useCallback((callType: 'audio' | 'video') => {
     if (!peerId) return;
+    // Busy-guard (исходящая сторона): нельзя начать второй звонок поверх текущего —
+    // иначе active + outgoing висят одновременно и оба ломаются. Симметрично P1-4
+    // на входящей стороне (socket.ts call:incoming).
+    const cs = useCallStore.getState();
+    if (cs.active || cs.outgoing || cs.incoming || cs.group) {
+      toast.error('Сначала завершите текущий звонок');
+      return;
+    }
     const callId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     initiateCall(callId, peerId, chat.id, callType);
     setOutgoing({ callId, chatId: chat.id, peerId, callType });

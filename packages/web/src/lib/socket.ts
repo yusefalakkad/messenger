@@ -139,10 +139,10 @@ export function initSocket(): Socket {
 
   socket.on('call:incoming', (data: WSServerEvents['call:incoming']) => {
     const cs = useCallStore.getState();
-    // P1-4: busy. Если уже есть активный/исходящий/входящий звонок — автоматически
-    // отшиваем второй, чтобы UI не показывал две панели и случайный accept не ломал
-    // первый звонок.
-    if (cs.active || cs.outgoing || cs.incoming) {
+    // P1-4: busy. Если уже есть активный/исходящий/входящий ИЛИ групповой звонок —
+    // автоматически отшиваем второй, чтобы UI не показывал две панели и случайный
+    // accept не ломал первый звонок.
+    if (cs.active || cs.outgoing || cs.incoming || cs.group) {
       try { rejectCall(data.callId); } catch { /* ignore */ }
       toast.error(`Пропущенный звонок от ${data.callerName ?? 'неизвестно'}`);
       return;
