@@ -67,7 +67,7 @@ export default function ContactsView() {
   const showEmpty = !loading && list.length === 0;
 
   return (
-    <div className="lg:hidden absolute inset-0 z-30 bg-dark-bg flex flex-col pt-[var(--sat)]">
+    <div className="h-full w-full bg-dark-bg flex flex-col pt-[var(--sat)]">
       <header className="flex-shrink-0 h-14 flex items-center px-5 liquid-glass">
         <h1 className="text-[22px] font-bold tracking-[-0.02em]">Контакты</h1>
       </header>

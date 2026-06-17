@@ -15,6 +15,7 @@ import FloatingCircle from '@/components/chat/FloatingCircle';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import { useChatStore } from '@/stores/chat.store';
 import { useUIStore } from '@/stores/ui.store';
+import { SPRING } from '@/lib/motion';
 import { api } from '@/lib/api';
 
 export default function ChatPage() {
@@ -77,10 +78,28 @@ export default function ChatPage() {
         </main>
 
         {/* Мобильные вкладки-панели поверх контента (таб-бар остаётся под ними).
-            Сами компоненты — absolute inset-0 lg:hidden, поэтому накрывают список. */}
+            Обёртка motion даёт плавный slide+fade; панели заполняют её. */}
         <AnimatePresence>
-          {!inThread && contactsOpen && <ContactsView key="contacts" />}
-          {!inThread && callsOpen && <CallsView key="calls" />}
+          {!inThread && contactsOpen && (
+            <motion.div
+              key="contacts"
+              className="lg:hidden absolute inset-0 z-30"
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
+              transition={SPRING.smooth}
+            >
+              <ContactsView />
+            </motion.div>
+          )}
+          {!inThread && callsOpen && (
+            <motion.div
+              key="calls"
+              className="lg:hidden absolute inset-0 z-30"
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }}
+              transition={SPRING.smooth}
+            >
+              <CallsView />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
