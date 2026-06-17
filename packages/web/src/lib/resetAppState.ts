@@ -13,6 +13,8 @@
  */
 import { useChatStore } from '@/stores/chat.store';
 import { useCallStore } from '@/stores/call.store';
+import { usePlaybackStore } from '@/stores/playback.store';
+import { useCirclePlayer } from '@/stores/circlePlayer.store';
 import { disconnectSocket } from '@/lib/socket';
 import { queryClient } from '@/lib/queryClient';
 
@@ -29,6 +31,10 @@ export function resetAppState(): void {
     call.clearCall();
     call.clearGroupCall();
   } catch { /* ignore */ }
+
+  // Медиа-плееры: голосовое/кружок не должны продолжать играть под новой сессией.
+  try { usePlaybackStore.getState().stop(); } catch { /* ignore */ }
+  try { useCirclePlayer.getState().stop(); } catch { /* ignore */ }
 
   // React-query кэш — содержит контакты, профили и пр. предыдущего юзера.
   try { queryClient.clear(); } catch { /* ignore */ }

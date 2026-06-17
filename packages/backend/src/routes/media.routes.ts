@@ -140,7 +140,20 @@ router.get(/^\/(.+)$/, async (req: Request, res: Response, next: NextFunction) =
     const stat = await statObject(objectName).catch(() => null);
     if (!stat) throw new AppError(404, 'NOT_FOUND', 'Object not found');
 
-    res.setHeader('Content-Type', stat.metaData?.['content-type'] ?? 'application/octet-stream');
+    // SECURITY: медиа отдаётся с того же origin, что и SPA. Нельзя позволить
+    // браузеру исполнить залитый html/svg как документ (stored XSS). Жёстко
+    // фиксируем тип: безопасные media-типы → inline; всё остальное (включая
+    // text/html, image/svg+xml) → octet-stream + attachment + nosniff.
+    const SAFE_INLINE_TYPES = new Set([
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'video/mp4', 'video/webm', 'video/quicktime',
+      'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/webm', 'audio/wav', 'audio/aac', 'audio/x-m4a',
+    ]);
+    const storedType = (stat.metaData?.['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+    const inlineSafe = SAFE_INLINE_TYPES.has(storedType);
+    res.setHeader('Content-Type', inlineSafe ? storedType : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', inlineSafe ? 'inline' : 'attachment');
     res.setHeader('Content-Length', String(stat.size));
     res.setHeader('Cache-Control', 'private, max-age=604800, immutable');
 

@@ -35,12 +35,14 @@ export function signRefreshToken(userId: string, deviceId: string): { token: str
   return { token, jti };
 }
 
+// algorithms пиннингуем явно (HS256) — defense-in-depth против alg-confusion,
+// чтобы verify не принял токен, подписанный другим алгоритмом.
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, config.jwt.accessSecret) as AccessTokenPayload;
+  return jwt.verify(token, config.jwt.accessSecret, { algorithms: ['HS256'] }) as AccessTokenPayload;
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  return jwt.verify(token, config.jwt.refreshSecret) as RefreshTokenPayload;
+  return jwt.verify(token, config.jwt.refreshSecret, { algorithms: ['HS256'] }) as RefreshTokenPayload;
 }
 
 export function decodeToken<T>(token: string): T | null {
