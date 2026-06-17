@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Loader2, TriangleAlert } from 'lucide-react';
+import { Loader2, TriangleAlert, LogOut } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
+import { disconnectSocket } from '@/lib/socket';
 import Dialog, { DialogButton } from '@/components/ui/Dialog';
 import { tap, SPRING } from '@/lib/motion';
 
@@ -35,6 +36,13 @@ export default function SettingsDanger({ passwordSet }: { passwordSet: boolean }
 
   const canDelete = confirmText.trim() === CONFIRM_WORD && (!passwordSet || password.length > 0);
 
+  const handleLogout = async () => {
+    await api.post('/auth/logout').catch(() => {});
+    disconnectSocket();
+    logout();
+    navigate('/auth');
+  };
+
   const deleteAccount = async () => {
     setBusy(true); setErr('');
     try {
@@ -51,6 +59,17 @@ export default function SettingsDanger({ passwordSet }: { passwordSet: boolean }
 
   return (
     <div>
+      {/* Выйти из аккаунта — обычное действие (раньше было в шапке сайдбара). */}
+      <motion.button
+        className="btn-secondary btn-sm w-full mb-5"
+        whileTap={tap}
+        transition={SPRING.snappy}
+        onClick={handleLogout}
+      >
+        <LogOut size={15} />
+        Выйти из аккаунта
+      </motion.button>
+
       <div className="flex items-start gap-3 mb-3">
         <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 flex-shrink-0">
           <TriangleAlert size={18} />

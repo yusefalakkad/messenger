@@ -7,6 +7,7 @@ import { listParent, listChild, tap, SPRING } from '@/lib/motion';
 import { useChatStore } from '@/stores/chat.store';
 import { useFoldersStore } from '@/stores/folders.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useUIStore } from '@/stores/ui.store';
 import { api } from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
 import { desktopDownload } from '@/lib/desktopDownload';
@@ -17,7 +18,6 @@ import ChatListItem from '@/components/chat/ChatListItem';
 import NewChatModal from '@/components/chat/NewChatModal';
 import NewGroupModal from '@/components/chat/NewGroupModal';
 import NewChannelModal from '@/components/chat/NewChannelModal';
-import SettingsDialog from '@/components/settings/SettingsDialog';
 import ArchivedChatsDialog from '@/components/chat/ArchivedChatsDialog';
 import GlobalSearchOverlay from '@/components/chat/GlobalSearchOverlay';
 import FolderTabs from '@/components/layout/FolderTabs';
@@ -40,8 +40,9 @@ export default function Sidebar() {
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [showPlus,    setShowPlus]    = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showArchive,  setShowArchive]  = useState(false);
+  // Настройки открываются и из сайдбара, и из мобильного таб-бара → общий ui-стор.
+  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   // Редактирование папки: open + id (null = создание новой)
   const [editFolder, setEditFolder] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
@@ -141,8 +142,32 @@ export default function Sidebar() {
       {/* Ambient свечение в шапке сайдбара */}
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 
-      {/* ── Header (h=64px = 4+44+16 паддинги, hit-target ≥44px) ── */}
-      <div className="relative flex items-center gap-3 px-4 h-16 border-b border-dark-border flex-shrink-0">
+      {/* ── Mobile header — современный минимализм: крупный заголовок + одна
+             круглая кнопка «написать». Аватар/настройки/выход переехали в таб-бар
+             (Настройки) — наверху телефона им не место. ── */}
+      <div className="lg:hidden relative flex items-center justify-between pl-5 pr-3 pt-2 pb-1 flex-shrink-0">
+        <h1 className="text-[27px] font-bold tracking-[-0.02em] leading-none">Чаты</h1>
+        <div className="relative">
+          <motion.button
+            onClick={() => setShowPlus((v) => !v)}
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="w-11 h-11 rounded-full bg-brand-gradient text-white flex items-center justify-center shadow-glow-violet active:opacity-90"
+            title="Новый чат"
+            aria-label="Новый чат"
+          >
+            <MessageSquarePlus size={20} />
+          </motion.button>
+          <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
+            <DropdownItem icon={<MessageSquarePlus size={16} />} label="Новый чат"   onClick={() => { setShowNewChat(true); setShowPlus(false); }} />
+            <DropdownItem icon={<Users size={16} />}            label="Новая группа" onClick={() => { setShowNewGroup(true); setShowPlus(false); }} />
+            <DropdownItem icon={<Megaphone size={16} />}        label="Новый канал"  onClick={() => { setShowNewChannel(true); setShowPlus(false); }} />
+          </Dropdown>
+        </div>
+      </div>
+
+      {/* ── Desktop header (h=64px, hit-target ≥44px): аватар, имя, +, настройки, выход ── */}
+      <div className="hidden lg:flex relative items-center gap-3 px-4 h-16 border-b border-dark-border flex-shrink-0">
 
         {/* Аватар в градиентном кольце с возможностью смены */}
         <div className="relative flex-shrink-0 group">
@@ -202,7 +227,7 @@ export default function Sidebar() {
             </Dropdown>
           </div>
 
-          <IconBtn onClick={() => setShowSettings(true)} title="Настройки">
+          <IconBtn onClick={() => setSettingsOpen(true)} title="Настройки">
             <Settings size={18} />
           </IconBtn>
 
@@ -345,9 +370,10 @@ export default function Sidebar() {
         </AnimatePresence>
       </div>
 
-      {/* ── Скачать десктоп-приложение (только на сайте; в самом приложении не нужно) ── */}
+      {/* ── Скачать десктоп-приложение (только на сайте-десктопе; на телефоне внизу
+             таб-бар, а десктоп-установщик там не нужен — поэтому hidden lg:block) ── */}
       {!(window as { dakkaDesktop?: { isDesktop?: boolean } }).dakkaDesktop?.isDesktop && (
-        <div className="px-2 pb-3 pt-1 flex-shrink-0">
+        <div className="hidden lg:block px-2 pb-3 pt-1 flex-shrink-0">
           <a
             href={desktopDownload().url ?? 'https://akkdmsg.online/download'}
             target="_blank" rel="noopener noreferrer"
@@ -371,7 +397,6 @@ export default function Sidebar() {
         )}
       </AnimatePresence>
 
-      <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
       <ArchivedChatsDialog open={showArchive} onClose={() => setShowArchive(false)} />
     </aside>
   );
