@@ -105,12 +105,14 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         onTouchMove={cancelLongPress}
         onTouchCancel={cancelLongPress}
         className={clsx(
-          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 mb-1.5 rounded-2xl text-left group liquid-card',
-          'transition-[transform,box-shadow] duration-200 ease-out',
+          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 text-left group',
+          'transition-[transform,background-color,box-shadow] duration-200 ease-out',
           'active:scale-[0.985] active:duration-75',
+          // Мобила — стеклянная карточка; десктоп — компактная плотная строка.
+          'max-lg:liquid-card max-lg:rounded-2xl max-lg:mb-1.5 lg:rounded-lg',
           active
-            ? 'ring-1 ring-white/35 -translate-y-px'
-            : 'hover:-translate-y-px',
+            ? 'max-lg:ring-1 max-lg:ring-white/35 -translate-y-px lg:bg-dark-card lg:shadow-e1'
+            : 'hover:-translate-y-px lg:hover:bg-dark-hover/60',
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >

@@ -1192,7 +1192,7 @@ export default function MessageInput({ chatId }: Props) {
             <div className="relative flex-shrink-0">
               {/* Тот же вид, что у кнопки записи справа (круг 44px, заливка+бордер) — симметрия */}
               <IconBtn
-                className="!w-11 !h-11 !rounded-full liquid-card text-content/70"
+                className="!w-11 !h-11 !rounded-full text-content/70 max-lg:liquid-card lg:bg-content/[0.06] lg:hover:bg-content/[0.1] lg:border lg:border-dark-border"
                 onClick={() => setShowAttach(!showAttach)} disabled={uploading} active={showAttach}
               >
                 <Paperclip size={19} />
@@ -1267,8 +1267,9 @@ export default function MessageInput({ chatId }: Props) {
             )}
           </AnimatePresence>
           <div className={clsx(
-            'rounded-3xl transition-colors duration-200 liquid-card',
-            !isRecording && 'focus-within:ring-2 focus-within:ring-[#7A82FF]/30',
+            'rounded-3xl transition-colors duration-200',
+            'max-lg:liquid-card lg:bg-content/[0.04] lg:border lg:border-dark-border lg:backdrop-blur-sm',
+            !isRecording && 'focus-within:ring-2 focus-within:ring-[#7A82FF]/30 lg:focus-within:ring-primary-500/15 lg:focus-within:border-primary-500/50',
           )}>
             {/* Обычный ввод текста */}
             {!isRecording && (
@@ -1441,8 +1442,8 @@ export default function MessageInput({ chatId }: Props) {
                 pttState === 'recording'
                   ? 'bg-rose-500 text-white shadow-e2 shadow-rose-500/40 animate-pulse-glow'
                   : recMode === 'voice'
-                  ? 'liquid-card text-content/70 hover:text-content'
-                  : 'liquid-card text-[#aeb4ff] hover:text-white',
+                  ? 'text-content/70 hover:text-content max-lg:liquid-card lg:bg-content/[0.06] lg:hover:bg-content/[0.1] lg:border lg:border-dark-border'
+                  : 'text-[#aeb4ff] hover:text-white max-lg:liquid-card lg:bg-content/[0.06] lg:hover:bg-content/[0.1] lg:border lg:border-dark-border',
                 uploading && 'opacity-40 cursor-not-allowed',
               )}
             >

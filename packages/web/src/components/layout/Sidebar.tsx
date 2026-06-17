@@ -138,7 +138,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/10 bg-dark-surface/40 backdrop-blur-xl relative pt-[var(--sat)]">
+    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/10 lg:border-dark-border bg-dark-surface/40 lg:bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
       {/* Ambient свечение в шапке сайдбара */}
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 
@@ -263,7 +263,7 @@ export default function Sidebar() {
           onClick={() => setShowArchive(true)}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left liquid-card group"
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left group max-lg:liquid-card lg:hover:bg-dark-hover/60 transition-colors"
           title="Архивные чаты"
         >
           <span className="w-10 h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
@@ -279,7 +279,7 @@ export default function Sidebar() {
           onClick={openSaved}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left liquid-card group"
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left group max-lg:liquid-card lg:hover:bg-dark-hover/60 transition-colors"
           title="Избранное"
         >
           <span className="w-10 h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
