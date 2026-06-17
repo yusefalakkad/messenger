@@ -251,7 +251,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      out: фирменный градиент с внутренним свечением сверху + мягкая цветная тень.
      in:  плотная тёмная поверхность с тонкой светящейся границей и глубиной. */
   .bubble-out {
-    @apply text-white rounded-[22px] rounded-br-[7px];
+    @apply text-white rounded-[26px] rounded-br-[9px];
     background: linear-gradient(140deg, #8d57ff 0%, #b24ce6 48%, #ff5b8d 100%);
     box-shadow:
       0 1px 0 rgba(255,255,255,0.14) inset,
@@ -259,7 +259,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
       0 2px 6px -2px rgba(0,0,0,0.25);
   }
   .bubble-in {
-    @apply rounded-[22px] rounded-bl-[7px];
+    @apply rounded-[26px] rounded-bl-[9px];
     color: var(--bubble-in-text);
     background: var(--bubble-in);
     box-shadow:
@@ -269,8 +269,8 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
     border: 1px solid var(--border);
   }
   /* Continuation — подряд от того же отправителя: меньше скругление со стороны хвоста. */
-  .bubble-out.is-cont { @apply rounded-tr-[7px]; }
-  .bubble-in.is-cont  { @apply rounded-tl-[7px]; }
+  .bubble-out.is-cont { @apply rounded-tr-[9px]; }
+  .bubble-in.is-cont  { @apply rounded-tl-[9px]; }
 
   /* ─────────────────────────────────────────────
      Input — единые размеры по системе.
