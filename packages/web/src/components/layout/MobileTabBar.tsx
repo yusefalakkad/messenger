@@ -68,35 +68,34 @@ export default function MobileTabBar() {
               onClick={() => onTab(key)}
               whileTap={tap}
               transition={SPRING.snappy}
-              className="relative flex-1 flex flex-col items-center justify-center gap-1.5 h-[54px]"
+              className="relative flex-1 flex flex-col items-center justify-center gap-1 h-[50px] rounded-[22px]"
             >
-              <span className="relative w-12 h-8 flex items-center justify-center">
-                {/* Плитка «расплавленного стекла» под иконкой; активная — фирменная. */}
-                {isActive && (
-                  <motion.span
-                    layoutId="tabbar-active"
-                    transition={SPRING.smooth}
-                    className="absolute inset-0 rounded-[15px] glass-icon glass-icon--active"
-                  />
-                )}
-                {!isActive && <span className="absolute inset-0 rounded-[15px] glass-icon opacity-70" />}
-                <Icon
-                  size={20}
-                  className={`relative z-10 ${isActive ? 'text-white' : 'text-content/60'}`}
-                  fill="currentColor"
-                  fillOpacity={0.35}
-                  strokeWidth={1.7}
+              {isActive && (
+                <motion.span
+                  layoutId="tabbar-active"
+                  transition={SPRING.smooth}
+                  className="absolute inset-0 rounded-[22px] bg-accent-violet/20 ring-1 ring-accent-violet/30"
                 />
-                {showBadge && (
-                  <span className="absolute -top-1 -right-0.5 z-20 min-w-[16px] h-[16px] px-1 rounded-full
-                                   bg-accent-pink text-white text-[9.5px] font-bold leading-[16px]
-                                   text-center tabular-nums">
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-              </span>
-              <span className={`text-[10px] leading-none ${isActive ? 'text-accent-violet font-semibold' : 'text-content/55'}`}>
-                {label}
+              )}
+              <span className="relative z-10 flex flex-col items-center gap-1">
+                <span className="relative">
+                  <Icon
+                    size={24}
+                    className={isActive ? 'text-accent-violet' : 'text-content/55'}
+                    fill="currentColor"
+                    strokeWidth={1.6}
+                  />
+                  {showBadge && (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[17px] h-[17px] px-1 rounded-full
+                                     bg-accent-pink text-white text-[10px] font-bold leading-[17px]
+                                     text-center tabular-nums">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </span>
+                <span className={`text-[10px] leading-none ${isActive ? 'text-accent-violet font-semibold' : 'text-content/55'}`}>
+                  {label}
+                </span>
               </span>
             </motion.button>
           );

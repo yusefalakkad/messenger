@@ -208,10 +208,10 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   .liquid-glass {
     position: relative;
     isolation: isolate;
-    /* Полупрозрачное стекло + едва заметный фирменный оттенок. */
+    /* Полупрозрачное стекло + тусклый фирменный оттенок (фиолет→розовый). */
     background:
-      linear-gradient(135deg, rgb(124 77 255 / 0.06), rgb(255 90 141 / 0.035)),
-      rgb(var(--surface-rgb) / 0.5);
+      linear-gradient(135deg, rgb(124 77 255 / 0.12), rgb(255 90 141 / 0.07)),
+      rgb(var(--surface-rgb) / 0.45);
     backdrop-filter: blur(30px) saturate(200%);
     -webkit-backdrop-filter: blur(30px) saturate(200%);
     border: 1px solid rgb(255 255 255 / 0.12);
@@ -239,6 +239,26 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
       0 1px 0 rgb(255 255 255 / 0.7) inset,
       0 14px 40px -18px rgb(0 0 0 / 0.18);
   }
+  /* «Эффект жидкости» — медленный глянцевый блик, скользящий по стеклу. */
+  .liquid-glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 32%, rgb(255 255 255 / 0.12) 48%, transparent 64%);
+    background-size: 260% 100%;
+    animation: liquidSheen 7s ease-in-out infinite;
+  }
+  @keyframes liquidSheen {
+    0%   { background-position: 160% 0; }
+    100% { background-position: -60% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .liquid-glass::after { animation: none; }
+  }
+
   /* Градиентная стеклянная карточка — фон спокойный, а элемент «налит» фирменным
      градиентом + матовое стекло + блик. Для строк чатов, поиска, плиток. */
   .liquid-card {
@@ -262,29 +282,6 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
     pointer-events: none;
     border-radius: inherit;
     background: linear-gradient(180deg, rgb(255 255 255 / 0.08), transparent 45%);
-  }
-
-  /* «Расплавленное стекло» — мягкая стеклянная плитка под иконкой: матовая,
-     с верхним бликом и тонкой обводкой, будто иконка отлита из стекла. */
-  .glass-icon {
-    position: relative;
-    background: rgb(255 255 255 / 0.06);
-    border: 1px solid rgb(255 255 255 / 0.12);
-    box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.22) inset,
-      0 -1px 2px rgb(0 0 0 / 0.18) inset,
-      0 2px 6px -2px rgb(0 0 0 / 0.3);
-    backdrop-filter: blur(10px) saturate(160%);
-    -webkit-backdrop-filter: blur(10px) saturate(160%);
-  }
-  .glass-icon--active {
-    background:
-      linear-gradient(135deg, rgb(138 82 255 / 0.45), rgb(255 90 141 / 0.32)),
-      rgb(255 255 255 / 0.04);
-    border-color: rgb(255 255 255 / 0.28);
-    box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.4) inset,
-      0 4px 14px -4px rgb(138 82 255 / 0.6);
   }
 
   /* Брендовый чип-пилюля с градиентной обводкой */

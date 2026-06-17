@@ -47,8 +47,8 @@ export default function ChatPage() {
       {/* Фон — спокойный матовый: лишь лёгкая фирменная глубина, без ярких пятен.
           Цвет теперь «налит» в сами элементы (.liquid-card), а не в фон. */}
       <div className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-spot-violet blur-3xl opacity-[0.10]" />
-        <div className="absolute -bottom-20 -right-16 w-80 h-72 rounded-full bg-spot-pink blur-3xl opacity-[0.08]" />
+        <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-spot-violet blur-3xl opacity-20" />
+        <div className="absolute -bottom-20 -right-16 w-80 h-72 rounded-full bg-spot-pink blur-3xl opacity-15" />
       </div>
 
       {/* Плавающий кружок-PiP — на уровне страницы (portal в body), переживает смену чата */}
