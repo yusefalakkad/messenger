@@ -249,7 +249,10 @@ export class AuthService {
     deviceId: string,
     meta?: { deviceName?: string; ipAddress?: string; userAgent?: string },
   ): Promise<AuthTokens> {
-    const accessToken = signAccessToken(userId, '');
+    // Кладём реальный username в access-токен (раньше был ''), чтобы req.username
+    // в middleware был консистентным и для legacy/refresh-пути, а не только phone.
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } });
+    const accessToken = signAccessToken(userId, u?.username ?? '');
     const { token: refreshToken } = signRefreshToken(userId, deviceId);
 
     const expiresAt = new Date();

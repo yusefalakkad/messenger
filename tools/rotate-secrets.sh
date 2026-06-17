@@ -97,6 +97,17 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
   sleep 2
 done
 
+# ВАЖНО: docker compose НЕ меняет пароль postgres на уже существующем volume
+# (POSTGRES_PASSWORD применяется только при ПЕРВОЙ инициализации БД). Без ALTER USER
+# .env/DATABASE_URL получат новый пароль, а сама БД останется со старым → backend
+# не подключится. Меняем пароль вручную через локальный сокет (peer/trust внутри
+# контейнера — старый пароль знать не нужно), затем рестартим backend.
+docker exec messenger_postgres psql -U "\$PG_USER" -d "\$PG_DB" \
+  -c "ALTER USER \"\$PG_USER\" WITH PASSWORD '$POSTGRES_PASSWORD';" \
+  && echo "[+] postgres: пароль изменён (ALTER USER)"
+docker compose restart backend
+echo "[+] backend перезапущен с новым DATABASE_URL"
+
 # Invalidate все активные сессии (форсит всех клиентов перелогиниться)
 docker exec messenger_postgres psql -U "\$PG_USER" -d "\$PG_DB" -c 'TRUNCATE TABLE "Session";' || true
 echo "[+] Все Session-записи удалены — все клиенты будут перелогинены"
