@@ -7,6 +7,8 @@ import ChatWindow from '@/components/chat/ChatWindow';
 import EmptyChat from '@/components/chat/EmptyChat';
 import JoinByCode from '@/components/chat/JoinByCode';
 import AddByUsername from '@/components/chat/AddByUsername';
+import NowPlayingBar from '@/components/chat/NowPlayingBar';
+import FloatingCircle from '@/components/chat/FloatingCircle';
 import { useChatStore } from '@/stores/chat.store';
 import { api } from '@/lib/api';
 
@@ -26,6 +28,8 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full bg-dark-bg">
+      {/* Плавающий кружок-PiP — на уровне страницы (portal в body), переживает смену чата */}
+      <FloatingCircle />
       <div className={clsx(
         'flex-shrink-0 w-full lg:w-auto h-full',
         (inChat || inJoin || inUser) && 'hidden lg:block',
@@ -36,6 +40,8 @@ export default function ChatPage() {
         'flex-1 flex-col min-w-0 h-full relative',
         (inChat || inJoin || inUser) ? 'flex' : 'hidden lg:flex',
       )}>
+        {/* Плашка «сейчас играет» — вне роут-анимации, поэтому переживает смену чата */}
+        <NowPlayingBar />
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}

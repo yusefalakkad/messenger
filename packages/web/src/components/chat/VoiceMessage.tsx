@@ -1,68 +1,58 @@
 /**
- * Голосовое сообщение — play/pause, waveform с перемоткой (клик/драг),
- * скорость 1x/1.5x/2x, текущее время при воспроизведении. Вынесено из MessageBubble.
+ * Голосовое сообщение — контроллер ГЛОБАЛЬНОГО плеера (usePlaybackStore).
+ * Своего <audio> не держит: воспроизведение живёт в сторе и продолжается даже
+ * при переходе в другой чат (там его показывает верхняя плашка NowPlayingBar).
+ * Здесь — кнопка play/pause, waveform с перемоткой, скорость, время.
  */
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRef } from 'react';
 import { clsx } from 'clsx';
 import { Play, Pause } from 'lucide-react';
 import type { Message } from '@messenger/shared';
-
-const RATES = [1, 1.5, 2] as const;
+import { usePlaybackStore, RATES } from '@/stores/playback.store';
 
 export default function VoiceMessage({
-  media, isOwn,
+  media, isOwn, messageId, chatId, senderName,
 }: {
   media: NonNullable<Message['media']>;
   isOwn: boolean;
+  messageId: string;
+  chatId: string;
+  senderName: string;
 }) {
-  const audioRef    = useRef<HTMLAudioElement>(null);
   const waveRef     = useRef<HTMLDivElement>(null);
-  const rafRef      = useRef(0);
   const draggingRef = useRef(false);
 
-  const [playing,  setPlaying]  = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1
-  const [current,  setCurrent]  = useState(0); // секунды
-  const [rateIdx,  setRateIdx]  = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [audioDur, setAudioDur] = useState(0);
+  const isActive    = usePlaybackStore((s) => s.current?.messageId === messageId);
+  const playing     = usePlaybackStore((s) => s.playing && s.current?.messageId === messageId);
+  const storeTime   = usePlaybackStore((s) => s.currentTime);
+  const storeDur    = usePlaybackStore((s) => s.duration);
+  const rate        = usePlaybackStore((s) => s.rate);
+  const play        = usePlaybackStore((s) => s.play);
+  const toggle      = usePlaybackStore((s) => s.toggle);
+  const seekRatio   = usePlaybackStore((s) => s.seekRatio);
+  const setRate     = usePlaybackStore((s) => s.setRate);
 
-  // audio.duration у webm-записей бывает Infinity — фолбэк на media.duration
-  const duration = audioDur > 0 ? audioDur : (media.duration ?? 0);
+  // Длительность: у активного берём из стора (точная), иначе из media.
+  const duration = isActive && storeDur > 0 ? storeDur : (media.duration ?? 0);
+  const current  = isActive ? storeTime : 0;
+  const progress = duration > 0 ? Math.min(1, current / duration) : 0;
 
-  // Точный прогресс: timeupdate редкий — пока играет, догоняем через rAF
-  const syncProgress = useCallback(() => {
-    const a = audioRef.current;
-    if (!a || draggingRef.current) return;
-    setCurrent(a.currentTime);
-    if (duration > 0) setProgress(Math.min(1, a.currentTime / duration));
-  }, [duration]);
+  const item = () => ({
+    messageId, chatId, url: media.url, senderName, duration: media.duration ?? 0,
+  });
 
-  useEffect(() => {
-    if (!playing) return;
-    const tick = () => { syncProgress(); rafRef.current = requestAnimationFrame(tick); };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [playing, syncProgress]);
+  const handlePlay = () => {
+    if (isActive) toggle();
+    else play(item());
+  };
 
-  const toggle = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (playing) { a.pause(); setPlaying(false); }
-    else {
-      a.playbackRate = RATES[rateIdx];
-      a.play().catch(() => {});
-      setPlaying(true);
-    }
-  }, [playing, rateIdx]);
+  const cycleRate = () => {
+    const idx  = RATES.indexOf(rate as typeof RATES[number]);
+    const next = RATES[(idx + 1 + RATES.length) % RATES.length];
+    setRate(next);
+  };
 
-  const cycleRate = useCallback(() => {
-    const next = (rateIdx + 1) % RATES.length;
-    setRateIdx(next);
-    if (audioRef.current) audioRef.current.playbackRate = RATES[next];
-  }, [rateIdx]);
-
-  // --- Перемотка по waveform ---
+  // --- Перемотка по waveform (только когда трек активен) ---
   const ratioFromEvent = (e: React.PointerEvent) => {
     const el = waveRef.current;
     if (!el) return 0;
@@ -71,60 +61,31 @@ export default function VoiceMessage({
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    e.stopPropagation(); // не дёргать swipe-to-reply/long-press пузыря
+    e.stopPropagation(); // не дёргать swipe-to-reply пузыря
+    if (!isActive) { play(item()); return; } // не активен → просто запускаем
     e.currentTarget.setPointerCapture(e.pointerId);
     draggingRef.current = true;
-    setDragging(true);
-    const r = ratioFromEvent(e);
-    setProgress(r);
-    setCurrent(r * duration);
+    seekRatio(ratioFromEvent(e));
   };
-
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!draggingRef.current) return;
-    const r = ratioFromEvent(e);
-    setProgress(r);
-    setCurrent(r * duration);
+    seekRatio(ratioFromEvent(e));
   };
-
   const endDrag = (e: React.PointerEvent, seek: boolean) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    setDragging(false);
-    if (!seek) return;
-    const r = ratioFromEvent(e);
-    const a = audioRef.current;
-    if (a && duration > 0) {
-      a.currentTime = r * duration;
-      setProgress(r);
-      setCurrent(r * duration);
-    }
+    if (seek) seekRatio(ratioFromEvent(e));
   };
 
-  const handleEnded = () => { setPlaying(false); setProgress(0); setCurrent(0); };
-
-  const totalBars = 40;
   const bars = media.waveform
-    ?? Array.from({ length: totalBars }, (_, i) => 0.3 + 0.5 * Math.sin(i * 0.4));
+    ?? Array.from({ length: 40 }, (_, i) => 0.3 + 0.5 * Math.sin(i * 0.4));
   const filledCount = Math.round(progress * bars.length);
 
   return (
     <div className="flex items-center gap-3 py-1 min-w-[200px] pr-2">
-      <audio
-        ref={audioRef}
-        src={media.url}
-        onTimeUpdate={syncProgress}
-        onLoadedMetadata={() => {
-          const d = audioRef.current?.duration;
-          if (d && Number.isFinite(d)) setAudioDur(d);
-        }}
-        onEnded={handleEnded}
-        preload="metadata"
-      />
-
       {/* Кнопка play/pause */}
       <button
-        onClick={toggle}
+        onClick={handlePlay}
         className={clsx(
           'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
           isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-primary-600 hover:bg-primary-500',
@@ -149,8 +110,7 @@ export default function VoiceMessage({
           <div
             key={i}
             className={clsx(
-              'flex-1 rounded-full pointer-events-none',
-              !dragging && 'transition-colors duration-75',
+              'flex-1 rounded-full pointer-events-none transition-colors duration-75',
               i < filledCount
                 ? (isOwn ? 'bg-white' : 'bg-primary-400')
                 : (isOwn ? 'bg-white/35' : 'bg-content/25'),
@@ -160,26 +120,28 @@ export default function VoiceMessage({
         ))}
       </div>
 
-      {/* Время: при playing/drag — текущее / общее, иначе длительность */}
+      {/* Время: активный → текущее / общее, иначе длительность */}
       <span className={clsx('text-xs flex-shrink-0 tabular-nums', isOwn ? 'text-white/50' : 'text-content/50')}>
-        {playing || dragging
+        {isActive
           ? `${formatDuration(current)} / ${formatDuration(duration)}`
           : formatDuration(duration)}
       </span>
 
-      {/* Скорость воспроизведения */}
-      <button
-        onClick={cycleRate}
-        className={clsx(
-          'h-7 px-2 rounded-full flex items-center justify-center flex-shrink-0',
-          'text-[11px] font-medium tabular-nums transition-colors',
-          isOwn
-            ? 'bg-white/15 hover:bg-white/25 text-white/80'
-            : 'bg-content/10 hover:bg-content/20 text-content/70',
-        )}
-      >
-        {RATES[rateIdx]}x
-      </button>
+      {/* Скорость (глобальная) — показываем только у активного, как в Telegram */}
+      {isActive && (
+        <button
+          onClick={cycleRate}
+          className={clsx(
+            'h-7 px-2 rounded-full flex items-center justify-center flex-shrink-0',
+            'text-[11px] font-medium tabular-nums transition-colors',
+            isOwn
+              ? 'bg-white/15 hover:bg-white/25 text-white/80'
+              : 'bg-content/10 hover:bg-content/20 text-content/70',
+          )}
+        >
+          {rate}x
+        </button>
+      )}
     </div>
   );
 }

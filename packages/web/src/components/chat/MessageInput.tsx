@@ -7,6 +7,7 @@
  * • В фиксированном режиме: × отмена, ✓ отправить
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -997,12 +998,15 @@ export default function MessageInput({ chatId }: Props) {
       <div className="relative flex-shrink-0 border-t border-dark-border bg-dark-surface/80 backdrop-blur-xl px-4 pt-3 pb-input">
 
         {/* ── Live-превью видео-кружка (Telegram-style: большой круг ПО ЦЕНТРУ экрана) ──
-            Всегда в DOM (ref стабилен для srcObject), показывается только при записи
-            кружка. БЕЗ зеркала — превью совпадает с тем, что отправится. */}
-        <div className={clsx(
-          'fixed inset-0 z-overlay flex items-center justify-center pointer-events-none transition-opacity duration-200',
-          isRecording && recMode === 'circle' ? 'opacity-100' : 'opacity-0 hidden',
-        )}>
+            Рендерится через portal в document.body: иначе `position: fixed`
+            привязывается к motion.div страницы (он анимирует transform `y`),
+            и круг съезжает вниз/вбок — «кривой». Портал = истинный центр окна.
+            Всегда в DOM (ref стабилен для srcObject), показывается только при записи. */}
+        {createPortal(
+          <div className={clsx(
+            'fixed inset-0 z-overlay flex items-center justify-center pointer-events-none transition-opacity duration-200',
+            isRecording && recMode === 'circle' ? 'opacity-100' : 'opacity-0 hidden',
+          )}>
           <div className="relative">
             {/* мягкое пульсирующее кольцо записи */}
             <div className={clsx(
@@ -1040,7 +1044,9 @@ export default function MessageInput({ chatId }: Props) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+          document.body,
+        )}
 
         {/* ── Замок над кнопкой записи (Telegram-style) ──
             Тянешь кнопку вверх → замок «загорается» → фиксация записи без удержания. */}

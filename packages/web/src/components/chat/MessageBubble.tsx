@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { AnimatePresence, motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { clsx } from 'clsx';
-import { Check, CheckCheck, Play, Lock, CornerUpRight, CornerUpLeft, CheckCircle2, FileText, Download, Timer, Eye } from 'lucide-react';
+import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight, CornerUpLeft, CheckCircle2, FileText, Download, Timer, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import Avatar from '@/components/ui/Avatar';
 import ImageViewer from '@/components/media/ImageViewer';
@@ -16,6 +16,8 @@ import { LinkPreview } from '@/components/chat/LinkPreview';
 import { decryptMessage } from '@/lib/e2e';
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useCirclePlayer } from '@/stores/circlePlayer.store';
+import { usePlaybackStore } from '@/stores/playback.store';
 import { deleteMessage, editMessage as socketEditMessage, reactToMessage } from '@/lib/socket';
 import { api } from '@/lib/api';
 import { haptic } from '@/lib/native';
@@ -292,7 +294,11 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
 
           {/* ─── Кружок (без пузырька) ─── */}
           {isCircle && message.media && (
-            <CircleMessage media={message.media} isOwn={isOwn} time={time} />
+            <CircleMessage
+              media={message.media} isOwn={isOwn} time={time}
+              messageId={message.id} chatId={chatId}
+              senderName={message.sender?.displayName ?? 'Кружок'}
+            />
           )}
 
           {/* ─── Обычный пузырёк ─── */}
@@ -314,7 +320,11 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
 
               {/* View-once голосовое после тапа — играем из локального снэпшота media */}
               {revealedVoiceMedia && (
-                <VoiceMessage media={revealedVoiceMedia} isOwn={isOwn} />
+                <VoiceMessage
+                  media={revealedVoiceMedia} isOwn={isOwn}
+                  messageId={message.id} chatId={chatId}
+                  senderName={message.sender?.displayName ?? 'Голосовое сообщение'}
+                />
               )}
 
               {/* View-once истрачено — «сгоревший» плейсхолдер */}
@@ -396,7 +406,11 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
 
               {/* Голосовое */}
               {message.type === 'voice' && message.media && (!isViewOnce || isOwn) && (
-                <VoiceMessage media={message.media} isOwn={isOwn} />
+                <VoiceMessage
+                  media={message.media} isOwn={isOwn}
+                  messageId={message.id} chatId={chatId}
+                  senderName={message.sender?.displayName ?? 'Голосовое сообщение'}
+                />
               )}
 
               {/* Файл (документ) */}
@@ -572,68 +586,267 @@ function VideoMessage({
 // ─── Видео-кружок ─────────────────────────────────────────────────────────────
 
 function CircleMessage({
-  media, isOwn, time,
+  media, isOwn, time, messageId, chatId, senderName,
 }: {
   media: NonNullable<Message['media']>;
   isOwn: boolean;
   time: string;
+  messageId: string;
+  chatId: string;
+  senderName: string;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const isRead = false; // кружок не имеет статуса читки здесь — передаётся снаружи если нужно
+  const videoRef    = useRef<HTMLVideoElement>(null);
+  const svgRef       = useRef<SVGSVGElement>(null);
+  const wrapRef      = useRef<HTMLDivElement>(null);
+  const rafRef       = useRef(0);
+  const draggingRef  = useRef(false);
+  const wasFloating  = useRef(false);
 
-  const toggle = () => {
+  const [started,  setStarted]  = useState(false); // была ли первая проигровка (показываем video вместо thumb)
+  const [playing,  setPlaying]  = useState(false);
+  const [progress, setProgress] = useState(0);     // 0..1
+  const [current,  setCurrent]  = useState(0);     // сек
+  const [seeking,  setSeeking]  = useState(false);
+  const [vidDur,   setVidDur]   = useState(0);
+
+  // Глобальный PiP-стор (плавающий кружок при уходе из вида / в другой чат)
+  const cpPlayInline   = useCirclePlayer((s) => s.playInline);
+  const cpReport       = useCirclePlayer((s) => s.report);
+  const cpDetach       = useCirclePlayer((s) => s.detach);
+  const cpReattach     = useCirclePlayer((s) => s.reattach);
+  const cpSetPlaying   = useCirclePlayer((s) => s.setPlaying);
+  const cpStop         = useCirclePlayer((s) => s.stop);
+  const isFloatingThis = useCirclePlayer((s) => s.item?.messageId === messageId && s.floating);
+
+  // duration у webm бывает Infinity → фолбэк на media.duration
+  const duration = vidDur > 0 ? vidDur : (media.duration ?? 0);
+
+  // Геометрия кольца (viewBox 192×192, как размер кружка w-48 h-48)
+  const SIZE = 192, STROKE = 4;
+  const R = (SIZE - STROKE) / 2;
+  const C = 2 * Math.PI * R;
+
+  const item = () => ({
+    messageId, chatId, url: media.url, senderName,
+    thumbnailUrl: media.thumbnailUrl ?? undefined, duration: media.duration ?? 0,
+  });
+
+  // Пока играет — догоняем прогресс через rAF + репортим время в стор (для PiP)
+  useEffect(() => {
+    if (!playing) return;
+    const tick = () => {
+      const v = videoRef.current;
+      if (v && !draggingRef.current && duration > 0) {
+        setCurrent(v.currentTime);
+        setProgress(Math.min(1, v.currentTime / duration));
+        // Репортим в стор только когда пузырь — активный рендерер (не уехал в PiP),
+        // иначе две RAF-петли (пузырь + PiP) дёргают время → дрожание кольца.
+        const st = useCirclePlayer.getState();
+        if (st.item?.messageId === messageId && !st.floating) cpReport(v.currentTime, duration, true);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [playing, duration, cpReport]);
+
+  const play = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (playing) { v.pause(); setPlaying(false); }
-    else {
-      // сначала показываем video (был hidden) и грузим, затем play; при сбое — откат
-      setPlaying(true);
-      if (v.preload !== 'auto') v.preload = 'auto';
-      v.play().catch(() => setPlaying(false));
+    usePlaybackStore.getState().pause(); // «один звук за раз»: глушим голосовое
+    setStarted(true);
+    setPlaying(true);
+    cpPlayInline(item());
+    if (v.preload !== 'auto') v.preload = 'auto';
+    v.play().catch(() => setPlaying(false));
+  };
+  const pause = () => { videoRef.current?.pause(); setPlaying(false); cpSetPlaying(false); };
+  const toggle = () => { if (playing) pause(); else play(); };
+
+  // Кружок уехал в плавающий PiP → глушим видео в пузыре (PiP играет сам).
+  useEffect(() => {
+    if (!isFloatingThis) return;
+    videoRef.current?.pause();
+    cancelAnimationFrame(rafRef.current);
+    setPlaying(false);
+  }, [isFloatingThis]);
+
+  // Вернулись из PiP в пузырь (стал виден) → продолжаем с того же места.
+  useEffect(() => {
+    const st = useCirclePlayer.getState();
+    const activeThis = st.item?.messageId === messageId;
+    if (wasFloating.current && !isFloatingThis && activeThis && st.playing) {
+      const v = videoRef.current;
+      if (v) {
+        setStarted(true);
+        v.currentTime = st.time;
+        v.play().then(() => setPlaying(true)).catch(() => {});
+      }
     }
+    wasFloating.current = isFloatingThis;
+  }, [isFloatingThis, messageId]);
+
+  // IntersectionObserver: ушёл из вида во время игры → в PiP; вернулся → обратно.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      const st = useCirclePlayer.getState();
+      if (st.item?.messageId !== messageId) return;
+      if (!e.isIntersecting) cpDetach();
+      else if (st.floating) cpReattach();
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [messageId, cpDetach, cpReattach]);
+
+  // Размонтирование пузыря (например, ушли в другой чат) во время игры → в PiP.
+  useEffect(() => () => {
+    const st = useCirclePlayer.getState();
+    if (st.item?.messageId === messageId && st.playing && !st.floating) st.detach();
+  }, [messageId]);
+
+  // Угол указателя → доля 0..1 (0 — сверху, по часовой), как кольцо в Telegram
+  const ratioFromEvent = (e: React.PointerEvent) => {
+    const el = svgRef.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top  + rect.height / 2;
+    const a = Math.atan2(e.clientY - cy, e.clientX - cx); // 0 на 3 часа
+    let r = (a + Math.PI / 2) / (2 * Math.PI);            // сдвигаем 0 наверх
+    if (r < 0) r += 1;
+    return r;
   };
 
-  return (
-    <div
-      className={clsx('relative flex flex-col', isOwn ? 'items-end' : 'items-start')}
-    >
-      <div
-        className="relative w-48 h-48 rounded-full overflow-hidden cursor-pointer shadow-xl"
-        onClick={toggle}
-      >
-        {/* Превью / видео */}
-        {media.thumbnailUrl && !playing && (
-          <img src={media.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-        )}
-        <video
-          ref={videoRef}
-          src={media.url}
-          playsInline
-          loop
-          preload="metadata"
-          className={clsx('w-full h-full object-cover', playing ? 'block' : 'hidden')}
-          onEnded={() => setPlaying(false)}
-          onError={() => setPlaying(false)}
-        />
+  const applySeek = (r: number) => {
+    setProgress(r);
+    setCurrent(r * duration);
+  };
+  const onRingDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+    setSeeking(true);
+    if (!started) setStarted(true);
+    applySeek(ratioFromEvent(e));
+  };
+  const onRingMove = (e: React.PointerEvent) => {
+    if (!draggingRef.current) return;
+    applySeek(ratioFromEvent(e));
+  };
+  const onRingUp = (e: React.PointerEvent) => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    setSeeking(false);
+    const r = ratioFromEvent(e);
+    const v = videoRef.current;
+    if (v && duration > 0) v.currentTime = r * duration;
+    applySeek(r);
+    if (!playing) play(); // как в TG: после перемотки продолжаем воспроизведение
+  };
 
-        {/* Оверлей с кнопкой */}
-        {!playing && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Play size={22} className="text-white ml-1" fill="white" />
+  const remaining = Math.max(0, duration - current);
+
+  return (
+    <div ref={wrapRef} className={clsx('relative flex flex-col', isOwn ? 'items-end' : 'items-start')}>
+      <div className="relative w-48 h-48">
+        {/* Кружок (видео/превью) — центр кликается для play/pause */}
+        <div
+          className="absolute inset-0 rounded-full overflow-hidden cursor-pointer shadow-xl"
+          onClick={toggle}
+        >
+          {media.thumbnailUrl && !started && (
+            <img src={media.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+          )}
+          <video
+            ref={videoRef}
+            src={media.url}
+            playsInline
+            preload="metadata"
+            className={clsx('w-full h-full object-cover', started ? 'block' : 'hidden')}
+            onLoadedMetadata={() => {
+              const d = videoRef.current?.duration;
+              if (d && Number.isFinite(d)) setVidDur(d);
+            }}
+            onEnded={() => { setPlaying(false); setProgress(0); setCurrent(0);
+              if (videoRef.current) videoRef.current.currentTime = 0;
+              if (useCirclePlayer.getState().item?.messageId === messageId) cpStop(); }}
+            onError={() => setPlaying(false)}
+          />
+
+          {/* Оверлей play/pause: play всегда когда не играет; pause — тонкий на ховер */}
+          {!playing && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <Play size={22} className="text-white ml-1" fill="white" />
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Кольцо прогресса + перемотки. Прозрачный «hit»-обод (pointer-events:stroke)
+            ловит драг только по краю, центр остаётся под tap-to-play. */}
+        <svg
+          ref={svgRef}
+          className="absolute inset-0 -rotate-90 pointer-events-none overflow-visible"
+          width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
+        >
+          <circle cx={SIZE/2} cy={SIZE/2} r={R} fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth={STROKE} />
+          <circle
+            cx={SIZE/2} cy={SIZE/2} r={R}
+            fill="none"
+            stroke={isOwn ? '#fff' : '#a78bfa'}
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={C}
+            strokeDashoffset={C * (1 - progress)}
+            style={{ transition: seeking ? 'none' : 'stroke-dashoffset 0.1s linear' }}
+          />
+          {/* бегунок */}
+          {(playing || seeking || progress > 0) && (
+            <circle
+              cx={SIZE/2 + R * Math.cos(2 * Math.PI * progress)}
+              cy={SIZE/2 + R * Math.sin(2 * Math.PI * progress)}
+              r={seeking ? 7 : 5}
+              fill="#fff"
+              style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))', transition: seeking ? 'none' : 'r 0.1s' }}
+            />
+          )}
+          {/* hit-обод: только по краю (stroke), не мешает центру */}
+          <circle
+            cx={SIZE/2} cy={SIZE/2} r={R}
+            fill="none" stroke="transparent" strokeWidth={22}
+            style={{ pointerEvents: 'stroke', cursor: 'pointer', touchAction: 'none' }}
+            onPointerDown={onRingDown}
+            onPointerMove={onRingMove}
+            onPointerUp={onRingUp}
+            onPointerCancel={onRingUp}
+          />
+        </svg>
+
+        {/* Бейдж оставшегося времени — снизу по центру кружка, пока играет/мотаем */}
+        {(playing || seeking) && duration > 0 && (
+          <div className="absolute bottom-2 inset-x-0 flex justify-center pointer-events-none">
+            <span className="text-[11px] text-white tabular-nums font-medium bg-black/55 px-2 py-0.5 rounded-full">
+              {formatCircleTime(remaining)}
+            </span>
           </div>
         )}
-
       </div>
 
-      {/* Время под кружком */}
+      {/* Время отправки под кружком */}
       <div className="flex items-center gap-1 mt-1 mr-1">
         <span className="text-[11px] text-content/40 leading-none">{time}</span>
       </div>
     </div>
   );
+}
+
+function formatCircleTime(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 // ─── Реакции ─────────────────────────────────────────────────────────────────
