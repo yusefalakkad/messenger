@@ -161,7 +161,7 @@ export default function ChatHeader({ chat, otherMember }: Props) {
         // Мобила — плавающая стеклянная капсула (по референсу).
         'mx-2 mt-[calc(var(--sat)+0.5rem)] rounded-[24px] border border-white/20 bg-[rgba(56,51,84,0.55)] backdrop-blur-xl shadow-[0_12px_34px_-18px_rgba(0,0,0,0.6)]',
         // Десктоп — обычный бар, как был.
-        'lg:mx-0 lg:mt-0 lg:px-4 lg:pt-[var(--sat)] lg:rounded-none lg:border-0 lg:border-b lg:border-dark-border lg:bg-dark-surface/70 lg:shadow-none',
+        'lg:mx-0 lg:mt-0 lg:px-4 lg:pt-[var(--sat)] lg:rounded-none lg:border-0 lg:bg-dark-surface/70 lg:shadow-none',
       )}>
         <IconBtn onClick={() => navigate('/')} className="lg:hidden -ml-2" title="Назад">
           <ChevronLeft size={20} />
