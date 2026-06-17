@@ -71,9 +71,10 @@ export default function MobileTabBar() {
           >
             <span className="relative">
               <Icon
-                size={25}
-                className={isActive ? 'text-accent-violet' : 'text-content/45'}
-                strokeWidth={isActive ? 2.3 : 2}
+                size={26}
+                className={isActive ? 'text-accent-violet' : 'text-content/40'}
+                fill="currentColor"
+                strokeWidth={1.6}
               />
               {showBadge && (
                 <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full
