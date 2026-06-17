@@ -41,7 +41,7 @@ export default function ChatPage() {
   }, [setChats]);
 
   return (
-    <div className="flex flex-col h-full bg-dark-bg">
+    <div className="relative flex flex-col h-full bg-dark-bg">
       {/* Плавающий кружок-PiP — на уровне страницы (portal в body), переживает смену чата */}
       <FloatingCircle />
 

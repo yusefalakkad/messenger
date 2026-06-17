@@ -85,7 +85,7 @@ export default function ContactsView() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-3">
+      <div className="flex-1 overflow-y-auto px-2 pb-28">
         {!query.trim() && myContacts.length > 0 && (
           <p className="px-3 pb-1.5 text-[12px] font-medium text-content/40 uppercase tracking-wide">Недавние</p>
         )}

@@ -147,9 +147,16 @@ export default function Sidebar() {
       <div className="lg:hidden relative flex items-center justify-center px-3 h-14 flex-shrink-0 border-b border-dark-border">
         <h1 className="text-[17px] font-semibold tracking-[-0.01em]">Чаты</h1>
         <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title="Новый чат" className="text-accent-violet">
-            <MessageSquarePlus size={21} />
-          </IconBtn>
+          <motion.button
+            onClick={() => setShowPlus((v) => !v)}
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="w-9 h-9 rounded-full bg-brand-gradient text-white flex items-center justify-center shadow-glow-violet active:opacity-90"
+            title="Новый чат"
+            aria-label="Новый чат"
+          >
+            <MessageSquarePlus size={18} />
+          </motion.button>
           <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
             <DropdownItem icon={<MessageSquarePlus size={16} />} label="Новый чат"   onClick={() => { setShowNewChat(true); setShowPlus(false); }} />
             <DropdownItem icon={<Users size={16} />}            label="Новая группа" onClick={() => { setShowNewGroup(true); setShowPlus(false); }} />
@@ -248,43 +255,43 @@ export default function Sidebar() {
       {/* ── Folder tabs — «Все» + папки + «+» ── */}
       <FolderTabs onEditFolder={(id) => setEditFolder({ open: true, id })} />
 
-      {/* ── Archive entry — list-item стиля (h=48px компактный), только на табе «Все» ── */}
+      {/* ── Архив + Избранное — в одну линию (две половинки), только на табе «Все» ── */}
       {!activeFolderId && (
-      <motion.button
-        onClick={() => setShowArchive(true)}
-        whileTap={tap}
-        transition={SPRING.snappy}
-        className="mx-2 mb-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
-        title="Архивные чаты"
-      >
-        <span className="w-12 h-12 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
-          <Archive size={20} />
-        </span>
-        <span className="flex-1 text-content/85 font-medium">{t('chat.archive')}</span>
-        {archivedCount > 0 && (
-          <span className="text-[12px] font-medium text-content/50 px-2 tabular-nums">{archivedCount}</span>
-        )}
-      </motion.button>
+      <div className="flex gap-2 px-2 mb-1.5 flex-shrink-0">
+        <motion.button
+          onClick={() => setShowArchive(true)}
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left hover:bg-dark-hover/60 transition-colors group"
+          title="Архивные чаты"
+        >
+          <span className="w-10 h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+            <Archive size={18} />
+          </span>
+          <span className="flex-1 min-w-0 truncate text-content/85 font-medium text-[14px]">{t('chat.archive')}</span>
+          {archivedCount > 0 && (
+            <span className="text-[12px] font-medium text-content/50 tabular-nums">{archivedCount}</span>
+          )}
+        </motion.button>
+
+        <motion.button
+          onClick={openSaved}
+          whileTap={tap}
+          transition={SPRING.snappy}
+          className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left hover:bg-dark-hover/60 transition-colors group"
+          title="Избранное"
+        >
+          <span className="w-10 h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
+            <Bookmark size={18} />
+          </span>
+          <span className="flex-1 min-w-0 truncate text-content/85 font-medium text-[14px]">{t('chat.saved')}</span>
+        </motion.button>
+      </div>
       )}
 
-      {/* ── Saved messages entry — «Избранное», только на табе «Все» ── */}
-      {!activeFolderId && (
-      <motion.button
-        onClick={openSaved}
-        whileTap={tap}
-        transition={SPRING.snappy}
-        className="mx-2 mb-1.5 flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-[14px] hover:bg-dark-hover/60 transition-colors group flex-shrink-0"
-        title="Избранное"
-      >
-        <span className="w-12 h-12 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
-          <Bookmark size={20} />
-        </span>
-        <span className="flex-1 text-content/85 font-medium">{t('chat.saved')}</span>
-      </motion.button>
-      )}
-
-      {/* ── Chat list (без доп. px — левый край совпадает с поиском/Архивом) ── */}
-      <div className="relative flex-1 overflow-y-auto">
+      {/* ── Chat list (без доп. px — левый край совпадает с поиском/Архивом) ──
+             pb на мобиле — чтобы последние чаты не прятались за плавающим таб-баром. */}
+      <div className="relative flex-1 overflow-y-auto pb-24 lg:pb-0">
         {/* Глобальный поиск поверх списка — локальную фильтрацию не показываем */}
         <AnimatePresence>
           {showGlobalSearch && (

@@ -208,14 +208,17 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   .liquid-glass {
     position: relative;
     isolation: isolate;
-    background: rgb(var(--surface-rgb) / 0.55);
+    /* Полупрозрачное стекло + тусклый фирменный оттенок (фиолет→розовый). */
+    background:
+      linear-gradient(135deg, rgb(124 77 255 / 0.12), rgb(255 90 141 / 0.07)),
+      rgb(var(--surface-rgb) / 0.45);
     backdrop-filter: blur(30px) saturate(200%);
     -webkit-backdrop-filter: blur(30px) saturate(200%);
-    border: 1px solid rgb(255 255 255 / 0.10);
+    border: 1px solid rgb(255 255 255 / 0.12);
     box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.20) inset,
+      0 1px 0 rgb(255 255 255 / 0.22) inset,
       0 -1px 0 rgb(0 0 0 / 0.12) inset,
-      0 14px 44px -16px rgb(0 0 0 / 0.55);
+      0 18px 50px -16px rgb(0 0 0 / 0.55);
   }
   .liquid-glass::before {
     content: '';
