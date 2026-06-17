@@ -38,6 +38,11 @@ export default function FloatingCircle() {
   const R = (SIZE - STROKE) / 2;
   const C = 2 * Math.PI * R;
 
+  // Сброс позиции при смене кружка: иначе новый PiP появится со смещением от
+  // перетаскивания предыдущего (вплоть до за-экраном). Компонент смонтирован
+  // постоянно, поэтому pos нужно сбрасывать вручную по messageId.
+  useEffect(() => { setPos({ x: 0, y: 0 }); movedRef.current = false; }, [item?.messageId]);
+
   // Старт/синхронизация при появлении — продолжаем с сохранённого времени.
   useEffect(() => {
     if (!show) return;

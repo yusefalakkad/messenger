@@ -211,7 +211,7 @@ export class AuthService {
     await blacklistToken(payload.jti, ttl);
     await prisma.session.deleteMany({ where: { id: session.id } });
 
-    return this._createSession(session.userId, session.deviceId);
+    return this._createSession(session.userId, session.deviceId, undefined, session.user.username ?? undefined);
   }
 
   // ─── Logout ────────────────────────────────────────────────────────────────
@@ -248,11 +248,16 @@ export class AuthService {
     userId: string,
     deviceId: string,
     meta?: { deviceName?: string; ipAddress?: string; userAgent?: string },
+    username?: string,
   ): Promise<AuthTokens> {
     // Кладём реальный username в access-токен (раньше был ''), чтобы req.username
     // в middleware был консистентным и для legacy/refresh-пути, а не только phone.
-    const u = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } });
-    const accessToken = signAccessToken(userId, u?.username ?? '');
+    // Хот-путь refresh уже загрузил username — передаёт его, чтобы не делать
+    // лишний запрос к user-таблице на каждой ротации.
+    const realUsername = username
+      ?? (await prisma.user.findUnique({ where: { id: userId }, select: { username: true } }))?.username
+      ?? '';
+    const accessToken = signAccessToken(userId, realUsername);
     const { token: refreshToken } = signRefreshToken(userId, deviceId);
 
     const expiresAt = new Date();

@@ -145,9 +145,11 @@ router.get(/^\/(.+)$/, async (req: Request, res: Response, next: NextFunction) =
     // фиксируем тип: безопасные media-типы → inline; всё остальное (включая
     // text/html, image/svg+xml) → octet-stream + attachment + nosniff.
     const SAFE_INLINE_TYPES = new Set([
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-      'video/mp4', 'video/webm', 'video/quicktime',
-      'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/webm', 'audio/wav', 'audio/aac', 'audio/x-m4a',
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+      'image/heic', 'image/heif',
+      'video/mp4', 'video/webm', 'video/quicktime', 'video/ogg',
+      'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/ogg', 'audio/webm',
+      'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/x-m4a',
     ]);
     const storedType = (stat.metaData?.['content-type'] ?? '').split(';')[0].trim().toLowerCase();
     const inlineSafe = SAFE_INLINE_TYPES.has(storedType);

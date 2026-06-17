@@ -617,6 +617,7 @@ function CircleMessage({
   const cpSetPlaying   = useCirclePlayer((s) => s.setPlaying);
   const cpStop         = useCirclePlayer((s) => s.stop);
   const isFloatingThis = useCirclePlayer((s) => s.item?.messageId === messageId && s.floating);
+  const isStoreCurrent = useCirclePlayer((s) => s.item?.messageId === messageId);
 
   // duration у webm бывает Infinity → фолбэк на media.duration
   const duration = vidDur > 0 ? vidDur : (media.duration ?? 0);
@@ -670,6 +671,17 @@ function CircleMessage({
     cancelAnimationFrame(rafRef.current);
     setPlaying(false);
   }, [isFloatingThis]);
+
+  // «Один звук за раз»: стор переключился на другой источник (голосовое или
+  // другой кружок), а мы всё ещё играем ИНЛАЙН в видимом пузыре → глушим себя.
+  // (Кейс с PiP покрыт эффектом выше: там item остаётся нашим, isStoreCurrent=true.)
+  useEffect(() => {
+    if (playing && !isStoreCurrent) {
+      videoRef.current?.pause();
+      cancelAnimationFrame(rafRef.current);
+      setPlaying(false);
+    }
+  }, [playing, isStoreCurrent]);
 
   // Вернулись из PiP в пузырь (стал виден) → продолжаем с того же места.
   useEffect(() => {
