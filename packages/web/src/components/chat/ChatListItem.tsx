@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
@@ -29,6 +29,34 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressTriggered = useRef(false);
+
+  // 3D-наклон активной плашки за курсором (десктоп, мышь). Меняем transform
+  // напрямую через ref + rAF — без ре-рендера на каждое движение (список длинный).
+  const btnRef  = useRef<HTMLButtonElement>(null);
+  const sheenRef = useRef<HTMLSpanElement>(null);
+  const tiltRaf = useRef<number | null>(null);
+  const onTilt = (e: React.PointerEvent) => {
+    if (!active || e.pointerType !== 'mouse') return;
+    const el = btnRef.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width - 0.5;
+    const ny = (e.clientY - r.top) / r.height - 0.5;
+    if (tiltRaf.current) cancelAnimationFrame(tiltRaf.current);
+    tiltRaf.current = requestAnimationFrame(() => {
+      el.style.transform = `perspective(720px) rotateX(${(-ny * 5).toFixed(2)}deg) rotateY(${(nx * 7).toFixed(2)}deg) translateY(-1px)`;
+      if (sheenRef.current) {
+        sheenRef.current.style.background =
+          `radial-gradient(380px circle at ${Math.round((nx + 0.5) * 100)}% ${Math.round((ny + 0.5) * 100)}%, rgba(255,255,255,0.16), transparent 60%)`;
+      }
+    });
+  };
+  const resetTilt = () => {
+    if (tiltRaf.current) cancelAnimationFrame(tiltRaf.current);
+    if (btnRef.current) btnRef.current.style.transform = '';
+    if (sheenRef.current) sheenRef.current.style.background = 'transparent';
+  };
+  // Снимаем inline-трансформ, когда чат перестаёт быть активным.
+  useEffect(() => { if (!active) resetTilt(); }, [active]);
 
   const otherMember = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== user?.id)
@@ -100,27 +128,34 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   return (
     <>
       <button
+        ref={btnRef}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         onTouchStart={handleTouchStart}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
         onTouchCancel={cancelLongPress}
+        onPointerMove={onTilt}
+        onPointerLeave={resetTilt}
         className={clsx(
           'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 text-left group',
           'transition-[transform,background-color,box-shadow] duration-200 ease-out',
-          'active:scale-[0.985] active:duration-75',
+          !active && 'active:scale-[0.985] active:duration-75',
           // Мобила — стеклянная карточка; десктоп — компактная плотная строка.
           'max-lg:liquid-card max-lg:rounded-2xl max-lg:mb-1.5 lg:rounded-lg',
           active
-            ? 'max-lg:ring-1 max-lg:ring-white/35 -translate-y-px lg:bg-primary-500/[0.14] lg:ring-1 lg:ring-primary-500/25 lg:shadow-e1'
+            ? 'max-lg:ring-1 max-lg:ring-white/35 max-lg:-translate-y-px lg:chat-active-plaque'
             : 'hover:-translate-y-px lg:hover:bg-dark-hover/60',
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >
+        {/* Бегущий блик на активной плашке — двигается за курсором (десктоп) */}
+        {active && (
+          <span ref={sheenRef} aria-hidden className="hidden lg:block absolute inset-0 rounded-lg pointer-events-none" style={{ background: 'transparent' }} />
+        )}
         {/* Активный чат — выраженная brand-полоса слева (в RTL — справа) */}
         {active && (
-          <span className="absolute left-0 rtl:left-auto rtl:right-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow" />
+          <span className="absolute left-0 rtl:left-auto rtl:right-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow z-10" />
         )}
         {isSaved ? (
           <span className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">

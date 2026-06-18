@@ -105,6 +105,18 @@ html.is-desktop input,
 html.is-desktop textarea,
 html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
+/* ─── Активный чат: яркая «плашка» + 3D-наклон за курсором (десктоп) ──────────
+   Заливка-градиент brand + внутренняя рамка + мягкое свечение. transform
+   (наклон) ставится инлайном из ChatListItem; здесь только плавность возврата. */
+@media (min-width: 1024px) {
+  .chat-active-plaque {
+    background: linear-gradient(100deg, rgba(122,130,255,0.24), rgba(208,77,240,0.13));
+    box-shadow: inset 0 0 0 1px rgba(160,140,255,0.42), 0 12px 28px -12px rgba(122,130,255,0.55);
+    transition: transform 0.16s cubic-bezier(0.32,0.72,0,1), box-shadow 0.2s ease;
+    will-change: transform;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
