@@ -105,7 +105,9 @@ function createWindow() {
     // Windows/Linux: обычная системная рамка с кнопками свернуть/развернуть/закрыть.
     ...(isMac
       ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 18 } }
-      : { icon: path.join(__dirname, 'assets', 'icon.png') }),
+      // Windows/Linux: системная рамка, но БЕЗ верхней полоски-меню (Правка/Вид/Окно).
+      // autoHideMenuBar прячет её; пункты доступны по Alt, акселераторы (Ctrl+C/V) живут.
+      : { icon: path.join(__dirname, 'assets', 'icon.png'), autoHideMenuBar: true }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -115,6 +117,8 @@ function createWindow() {
   });
 
   mainWindow.loadURL(`http://127.0.0.1:${localPort}/`);
+  // Гарантированно прячем меню-бар на Windows/Linux (на macOS меню системное, сверху экрана).
+  if (!isMac) { mainWindow.autoHideMenuBar = true; mainWindow.setMenuBarVisibility(false); }
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   // Внешние ссылки (не наш localhost) — в системном браузере.

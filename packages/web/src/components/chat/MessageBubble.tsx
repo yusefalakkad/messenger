@@ -24,7 +24,7 @@ import { api } from '@/lib/api';
 import { haptic } from '@/lib/native';
 import { formatReplyPreview } from '@/lib/messagePreview';
 import ForwardDialog from './ForwardDialog';
-import type { Message } from '@messenger/shared';
+import type { Message, MessageRead } from '@messenger/shared';
 
 // Первый http(s)-URL в тексте — для карточки OG-превью ссылки
 const URL_RE = /https?:\/\/[^\s<>"')]+/i;
@@ -187,7 +187,15 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
   const handleReact   = (emoji: string) => reactToMessage(message.id, message.chatId, emoji);
 
   const time   = format(new Date(message.createdAt), 'HH:mm');
-  const isRead = message.readBy && message.readBy.length > 0;
+  // Прочитано = кто-то, КРОМЕ меня, отметил сообщение прочитанным.
+  // Бэк присылает связь как `reads`; live-обновления кладутся в `readBy`
+  // (addReadReceipt). Берём непустой из двух и исключаем себя (свой self-read
+  // иначе сразу красил бы галочку «прочитано»).
+  const myId = useAuthStore((s) => s.user?.id);
+  const readers = (message.readBy && message.readBy.length
+    ? message.readBy
+    : (message as Message & { reads?: MessageRead[] }).reads) ?? [];
+  const isRead = readers.some((r) => r.userId !== myId);
 
   // Кружок — только пузырёк без внутренних отступов
   const isCircle = message.type === 'circle';

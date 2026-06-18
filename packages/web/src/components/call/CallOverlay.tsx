@@ -510,7 +510,7 @@ export default function CallOverlay() {
         <motion.div
           className={minimized
             ? 'fixed bottom-4 left-4 z-call pointer-events-none'
-            : 'fixed inset-0 z-call flex items-center justify-center p-4'}
+            : 'fixed inset-0 z-call flex items-center justify-center p-4 max-lg:p-0'}
         >
           {/* Скрытый audio для аудиозвонков (video элемент обрабатывает видеозвонки) */}
           <audio ref={remoteAudioRef} autoPlay playsInline />
@@ -528,7 +528,8 @@ export default function CallOverlay() {
               minimized
                 ? `${isVideo && active ? 'w-56 h-72' : 'w-64'} bg-dark-card border border-dark-border cursor-pointer`
                 : isVideo && active
-                ? 'w-full h-full max-w-lg max-h-[90vh] bg-dark-bg'
+                // Телефон — на весь экран, вертикально (как в TG); десктоп — широкое 16:9 окно.
+                ? 'bg-dark-bg max-lg:w-full max-lg:h-full max-lg:rounded-none lg:w-[min(92vw,1100px)] lg:h-auto lg:aspect-video lg:max-h-[86vh]'
                 : 'w-full max-w-sm bg-dark-card border border-dark-border'
             }`}>
 

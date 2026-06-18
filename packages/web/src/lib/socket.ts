@@ -100,8 +100,9 @@ export function initSocket(): Socket {
       maybeShowNotification(message);
     }
 
-    // Если чат открыт — сразу отмечаем прочитанным
-    if (activeChatId === message.chatId && socket) {
+    // Если чат открыт — сразу отмечаем прочитанным. Свои сообщения НЕ отмечаем:
+    // иначе self-read красил бы галочку «прочитано» ещё до того, как прочёл собеседник.
+    if (activeChatId === message.chatId && socket && message.senderId !== myUserId) {
       socket.emit('message:read', { messageId: message.id, chatId: message.chatId });
     }
   });
