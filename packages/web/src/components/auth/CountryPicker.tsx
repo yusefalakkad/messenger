@@ -90,7 +90,8 @@ const COUNTRIES: Country[] = [
   ['TW', '+886', 'Тайвань'],
   // Ближний Восток
   ['TR', '+90',  'Турция'],
-  ['IL', '+972', 'Израиль'],
+  ['SY', '+963', 'Сирия'],
+  ['JO', '+962', 'Иордания'],
   ['AE', '+971', 'ОАЭ'],
   ['SA', '+966', 'Саудовская Аравия'],
   ['QA', '+974', 'Катар'],
@@ -117,8 +118,21 @@ export { COUNTRIES };
  *   '8 999 ...'     → country=RU, local='999...' (домашний формат)
  *   '999 123-45-67' → keep currentCountry, local='9991234567'
  */
+/** Арабско-индийские (٠-٩) и восточные/персидские (۰-۹) цифры → латинские 0-9.
+ *  Иначе арабская клавиатура вводит цифры, которые \D вырезает → ввод не работает. */
+export function toLatinDigits(s: string): string {
+  return s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
+}
+
+/** Латинские 0-9 → арабско-индийские ٠-٩ (для отображения при арабском языке). */
+export function toArabicDigits(s: string): string {
+  return s.replace(/[0-9]/g, (d) => String.fromCharCode(0x0660 + Number(d)));
+}
+
 export function parsePhoneInput(raw: string, currentCountry: Country): { local: string; country: Country } {
-  const trimmed = raw.trim();
+  const trimmed = toLatinDigits(raw.trim());
   const digits  = trimmed.replace(/\D/g, '');
 
   if (trimmed.startsWith('+') && digits.length > 0) {

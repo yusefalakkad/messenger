@@ -9,7 +9,7 @@ import { generateKeyPair } from '@/lib/crypto';
 import { cachePlaintext, getCached as getCachedPrivKey } from '@/lib/keyVault';
 import { initSocket } from '@/lib/socket';
 import { SPRING, EASE, tap } from '@/lib/motion';
-import CountryPicker, { DEFAULT_COUNTRY, parsePhoneInput, type Country } from './CountryPicker';
+import CountryPicker, { DEFAULT_COUNTRY, parsePhoneInput, toArabicDigits, toLatinDigits, type Country } from './CountryPicker';
 
 // P1-9: persist deviceId per-browser. Без этого бэк фоллбэчит на новый uuidv4
 // при каждом /verify и /complete-profile, и таблица Session растёт бесконтрольно —
@@ -74,7 +74,8 @@ interface CompleteResp {
  * Старого выбора Login/Register больше нет.
  */
 export default function PhoneAuthForm() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [step, setStep] = useState<Step>('phone');
@@ -360,8 +361,8 @@ export default function PhoneAuthForm() {
                 <input
                   autoFocus
                   inputMode="tel"
-                  placeholder="999 123 45 67"
-                  value={phone}
+                  placeholder={isAr ? toArabicDigits('999 123 45 67') : '999 123 45 67'}
+                  value={isAr ? toArabicDigits(phone) : phone}
                   onChange={(e) => {
                     // Умный парсер: +код → автоопределение страны, 8 → strip для RU.
                     const { country: c, local } = parsePhoneInput(e.target.value, country);
@@ -459,8 +460,8 @@ export default function PhoneAuthForm() {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   placeholder="••••••"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  value={isAr ? toArabicDigits(code) : code}
+                  onChange={(e) => setCode(toLatinDigits(e.target.value).replace(/\D/g, '').slice(0, 8))}
                   className="w-full bg-transparent outline-none text-center text-content text-3xl font-mono
                              font-semibold tracking-[0.45em] [text-indent:0.45em] tabular-nums
                              placeholder:text-content/20"
