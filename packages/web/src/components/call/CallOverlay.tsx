@@ -7,7 +7,7 @@ import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { acceptCall, rejectCall, endCall, sendCallSignal } from '@/lib/socket';
 import { getIceServers } from '@/lib/iceServers';
-import { startRing, stopRing } from '@/lib/notificationSound';
+import { startRing, stopRing, startRingback, stopRingback } from '@/lib/notificationSound';
 import { toast } from '@/lib/toast';
 import Avatar from '@/components/ui/Avatar';
 
@@ -279,10 +279,19 @@ export default function CallOverlay() {
   }, []);
 
   useEffect(() => {
-    const handler = () => { stopRing(); tearDown(); clearCall(); };
+    const handler = () => { stopRing(); stopRingback(); tearDown(); clearCall(); };
     window.addEventListener('call:ended', handler);
     return () => window.removeEventListener('call:ended', handler);
   }, [tearDown, clearCall]);
+
+  // Обратный гудок («ту… ту…») для звонящего, пока ждём ответа: outgoing уже
+  // есть, но звонок ещё не active. Как только собеседник принял (active) или
+  // звонок завершился (outgoing очищен) — cleanup гасит гудок.
+  useEffect(() => {
+    if (!outgoing || active) return;
+    startRingback();
+    return () => stopRingback();
+  }, [outgoing?.callId, active]);
 
   // P1-5: incoming рингтон + системная нотификация (звонок в фоновой вкладке).
   // ring-start приходит из socket call:incoming handler; ring-stop — из call:ended,
@@ -302,7 +311,7 @@ export default function CallOverlay() {
         }
       } catch { /* notifications not supported */ }
     };
-    const onStop = () => stopRing();
+    const onStop = () => { stopRing(); stopRingback(); };
     window.addEventListener('call:ring-start', onStart);
     window.addEventListener('call:ring-stop',  onStop);
     return () => {

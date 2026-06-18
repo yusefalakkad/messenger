@@ -82,6 +82,8 @@ export const en: Dict = {
     emptyTitle: 'It’s quiet here',
     emptyHint: 'Start a conversation — your chats will appear here',
     startChat: 'Start a chat',
+    callIncoming: 'Incoming call', callOutgoing: 'Outgoing call',
+    callMissed: 'Missed call', callNoAnswer: 'No answer', call: 'Call',
   },
   landing: {
     nav_features: 'Features', nav_privacy: 'Privacy', nav_download: 'Download',

@@ -4,6 +4,7 @@
  * Для медиа — emoji-маркер + опциональный caption.
  */
 import type { Message } from '@messenger/shared';
+import i18n from '@/lib/i18n';
 
 type LastLike = Pick<Message, 'type' | 'content' | 'encrypted'>;
 
@@ -22,7 +23,16 @@ export function formatMessagePreview(msg: LastLike | null | undefined): string {
   if (msg.type === 'file')   return '📎 Файл';
   // content у poll — вопрос; при encrypted его не светим.
   if (msg.type === 'poll')   return msg.encrypted ? '📊 Опрос' : (msg.content ? `📊 ${msg.content}` : '📊 Опрос');
-  if (msg.type === 'system') return msg.content ?? '';
+  if (msg.type === 'system') {
+    const call = msg.content?.match(/^__call__:(?:audio|video):(completed|missed):(\d+)$/);
+    if (call) {
+      if (call[1] === 'missed') return `📞 ${i18n.t('chat.callMissed')}`;
+      const dur = parseInt(call[2], 10);
+      const d = dur > 0 ? ` ${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` : '';
+      return `📞 ${i18n.t('chat.call')}${d}`;
+    }
+    return msg.content ?? '';
+  }
   return '';
 }
 

@@ -83,6 +83,8 @@ export const ru = {
     emptyTitle: 'Здесь пока тихо',
     emptyHint: 'Начните переписку — ваши чаты появятся здесь',
     startChat: 'Начать переписку',
+    callIncoming: 'Входящий звонок', callOutgoing: 'Исходящий звонок',
+    callMissed: 'Пропущенный звонок', callNoAnswer: 'Нет ответа', call: 'Звонок',
   },
   landing: {
     nav_features: 'Возможности', nav_privacy: 'Приватность', nav_download: 'Загрузить',

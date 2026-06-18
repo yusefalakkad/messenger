@@ -453,6 +453,54 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       return ok === 1;
     };
 
+    // Итоговое системное сообщение о звонке («Звонок · 2:34» / «Пропущенный звонок»).
+    // Контент — машинный токен `__call__:<тип>:<исход>:<секунды>`, который фронт
+    // локализует и рисует с иконкой (см. MessageBubble). Чистит Redis-ключи звонка.
+    // Race-safe: оба пира могут прислать call:end — сообщение создаёт только тот,
+    // чей `DEL meta` вернул 1 (атомарная «заявка»).
+    const postCallSummary = async (callId: string): Promise<void> => {
+      try {
+        const metaRaw = await redis.get(CALL_META_KEY(callId));
+        const claimed = await redis.del(CALL_META_KEY(callId)); // 1 = мы первыми сняли meta
+        await redis.del(CALL_PEERS_KEY(callId));
+        if (!metaRaw || claimed === 0) return;
+
+        const meta = JSON.parse(metaRaw) as {
+          chatId?: string; initiator?: string; callType?: string; acceptedAt?: number;
+        };
+        if (!meta.chatId || !meta.initiator) return;
+
+        const accepted = typeof meta.acceptedAt === 'number';
+        const duration = accepted ? Math.max(0, Math.round((Date.now() - meta.acceptedAt!) / 1000)) : 0;
+        const outcome  = accepted ? 'completed' : 'missed';
+        const content  = `__call__:${meta.callType ?? 'audio'}:${outcome}:${duration}`;
+
+        const message = await prisma.message.create({
+          data: { chatId: meta.chatId, senderId: meta.initiator, type: 'system', content },
+          include: {
+            sender:    { select: { id: true, username: true, displayName: true, avatar: true, publicKey: true } },
+            media:     true,
+            reads:     { select: { userId: true, readAt: true } },
+            reactions: { select: { userId: true, emoji: true } },
+            poll:      { include: { votes: { select: { optionId: true, userId: true } } } },
+            replyTo: {
+              select: {
+                id: true, type: true, content: true, senderId: true, encrypted: true, nonce: true,
+                sender: { select: { displayName: true } },
+                media: { select: { url: true, thumbnailUrl: true, mimeType: true } },
+              },
+            },
+          },
+        });
+
+        await prisma.chat.update({ where: { id: meta.chatId }, data: { updatedAt: new Date() } });
+        io.to(`chat:${meta.chatId}`).emit('message:new', signMediaUrlsDeep(message));
+        void notifyOfflineMembers(meta.chatId, meta.initiator, message);
+      } catch (err) {
+        logger.warn(`postCallSummary failed for ${callId}: ${String(err)}`);
+      }
+    };
+
     socket.on('call:initiate', async ({ callId, peerId, chatId, callType }: WSClientEvents['call:initiate']) => {
       if (!checkRate('call:initiate', 5, 60_000)) {
         socket.emit('error', { code: 'RATE_LIMIT', message: 'Too many call attempts' });
@@ -475,7 +523,11 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       // Регистрируем участников звонка в Redis (TTL 1ч)
       await redis.sadd(CALL_PEERS_KEY(callId), userId, peerId);
       await redis.expire(CALL_PEERS_KEY(callId), CALL_TTL_SEC);
-      await redis.set(CALL_META_KEY(callId), JSON.stringify({ chatId, initiator: userId }), 'EX', CALL_TTL_SEC);
+      await redis.set(
+        CALL_META_KEY(callId),
+        JSON.stringify({ chatId, initiator: userId, callType, createdAt: Date.now() }),
+        'EX', CALL_TTL_SEC,
+      );
 
       socket.join(`call:${callId}`);
 
@@ -510,19 +562,32 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       if (!(await isCallParticipant(callId))) return;
       socket.join(`call:${callId}`);
       socket.to(`call:${callId}`).emit('call:accepted', { callId, peerId: userId });
+      // Помечаем момент соединения — по нему считаем длительность для итогового
+      // системного сообщения. Мержим в существующую meta, сохраняя TTL.
+      try {
+        const raw = await redis.get(CALL_META_KEY(callId));
+        if (raw) {
+          const meta = JSON.parse(raw);
+          if (!meta.acceptedAt) {
+            meta.acceptedAt = Date.now();
+            const ttl = await redis.ttl(CALL_META_KEY(callId));
+            await redis.set(CALL_META_KEY(callId), JSON.stringify(meta), 'EX', ttl > 0 ? ttl : CALL_TTL_SEC);
+          }
+        }
+      } catch { /* meta повреждена/исчезла — длительность будет 0 */ }
     });
 
     socket.on('call:reject', async ({ callId }: WSClientEvents['call:reject']) => {
       if (!(await isCallParticipant(callId))) return;
       io.to(`call:${callId}`).emit('call:ended', { callId, reason: 'rejected' });
-      await redis.del(CALL_PEERS_KEY(callId), CALL_META_KEY(callId));
+      await postCallSummary(callId);
       socket.leave(`call:${callId}`);
     });
 
     socket.on('call:end', async ({ callId }: WSClientEvents['call:end']) => {
       if (!(await isCallParticipant(callId))) return;
       io.to(`call:${callId}`).emit('call:ended', { callId, reason: 'ended' });
-      await redis.del(CALL_PEERS_KEY(callId), CALL_META_KEY(callId));
+      await postCallSummary(callId);
       socket.leave(`call:${callId}`);
     });
 

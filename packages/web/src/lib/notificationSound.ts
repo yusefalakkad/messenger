@@ -95,3 +95,49 @@ export function stopRing(): void {
   ringActive = false;
   if (ringIntervalId) { clearInterval(ringIntervalId); ringIntervalId = null; }
 }
+
+// ── Обратный гудок для ЗВОНЯЩЕГО (ringback) ──────────────────────────────────
+//
+// То, что слышит инициатор, пока ждёт ответа. «Российский» гудок: одиночный
+// тон 425 Гц, ~1с звук → ~3с тишина → повтор. Тише входящего рингтона, чтобы
+// не спутать. Синтез через Web Audio API, без файлов. Idempotent.
+
+let ringbackIntervalId: ReturnType<typeof setInterval> | null = null;
+let ringbackActive = false;
+
+function playRingbackPulse(): void {
+  try {
+    const ac = getCtx();
+    if (ac.state === 'suspended') void ac.resume();
+
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(425, ac.currentTime); // классический гудок
+
+    // Огибающая: ~1с ровного тона с мягкими краями.
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    gain.gain.linearRampToValueAtTime(0.09, ac.currentTime + 0.04);
+    gain.gain.linearRampToValueAtTime(0.09, ac.currentTime + 0.95);
+    gain.gain.linearRampToValueAtTime(0,    ac.currentTime + 1.0);
+
+    osc.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 1.0);
+  } catch { /* Web Audio недоступен */ }
+}
+
+export function startRingback(): void {
+  if (ringbackActive) return;
+  ringbackActive = true;
+  playRingbackPulse();
+  ringbackIntervalId = setInterval(playRingbackPulse, 4000); // 1с гудок + 3с пауза
+}
+
+export function stopRingback(): void {
+  ringbackActive = false;
+  if (ringbackIntervalId) { clearInterval(ringbackIntervalId); ringbackIntervalId = null; }
+}

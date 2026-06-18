@@ -82,6 +82,8 @@ export const ar: Dict = {
     emptyTitle: 'المكان هادئ هنا',
     emptyHint: 'ابدأ محادثة — ستظهر محادثاتك هنا',
     startChat: 'ابدأ محادثة',
+    callIncoming: 'مكالمة واردة', callOutgoing: 'مكالمة صادرة',
+    callMissed: 'مكالمة فائتة', callNoAnswer: 'لا يوجد رد', call: 'مكالمة',
   },
   landing: {
     nav_features: 'الميزات', nav_privacy: 'الخصوصية', nav_download: 'تنزيل',

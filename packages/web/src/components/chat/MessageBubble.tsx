@@ -4,8 +4,9 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { AnimatePresence, motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { clsx } from 'clsx';
-import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight, CornerUpLeft, CheckCircle2, FileText, Download, Timer, Eye } from 'lucide-react';
+import { Check, CheckCheck, Play, Pause, Lock, CornerUpRight, CornerUpLeft, CheckCircle2, FileText, Download, Timer, Eye, Phone, PhoneMissed, Video } from 'lucide-react';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import Avatar from '@/components/ui/Avatar';
 import ImageViewer from '@/components/media/ImageViewer';
 import MessageContextMenu from './MessageContextMenu';
@@ -55,6 +56,7 @@ interface Props {
 }
 
 export default function MessageBubble({ message, isOwn, showAvatar, showName = false, isCont = false, chatId }: Props) {
+  const { t } = useTranslation();
   const [viewerSrc,  setViewerSrc]  = useState<string | null>(null);
   const [viewerType, setViewerType] = useState<'image' | 'video'>('image');
   const [menuPos,    setMenuPos]    = useState<{ x: number; y: number } | null>(null);
@@ -207,6 +209,32 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
 
   // Системные сообщения — отдельный layout, без аватара/контекст-меню
   if (message.type === 'system') {
+    // Итог звонка: машинный токен `__call__:<тип>:<исход>:<секунды>` → локализуем
+    // и рисуем с иконкой. Направление (входящий/исходящий) — по isOwn (senderId == я).
+    const call = message.content?.match(/^__call__:(audio|video):(completed|missed):(\d+)$/);
+    if (call) {
+      const callType = call[1];
+      const missed   = call[2] === 'missed';
+      const dur      = parseInt(call[3], 10);
+      const Icon     = missed ? PhoneMissed : callType === 'video' ? Video : Phone;
+      const label    = missed
+        ? (isOwn ? t('chat.callNoAnswer') : t('chat.callMissed'))
+        : (isOwn ? t('chat.callOutgoing') : t('chat.callIncoming'));
+      const durTxt   = !missed && dur > 0
+        ? ` · ${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}`
+        : '';
+      return (
+        <div className="flex justify-center my-2">
+          <div className={clsx(
+            'flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full',
+            missed ? 'text-red-300 bg-red-500/[0.10]' : 'text-content/55 bg-content/[0.05]',
+          )}>
+            <Icon size={13} className="flex-shrink-0" />
+            <span>{label}{durTxt}</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex justify-center my-2">
         <div className="text-[11px] text-content/45 bg-content/[0.04] px-3 py-1 rounded-full">
