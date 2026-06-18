@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, useMatch, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -34,6 +34,37 @@ export default function ChatPage() {
   // Внутри чата (и join/user) на мобиле скрываем таб-бар, чтобы он не перекрывал ввод.
   const inThread = !!(inChat || inJoin || inUser);
 
+  // ── Ширина списка чатов (десктоп): тянется за разделитель, как в Telegram.
+  // По умолчанию пошире (340px), хранится в localStorage. Зажата 280–560.
+  const SB_MIN = 280, SB_MAX = 560, SB_DEFAULT = 340;
+  const [sbWidth, setSbWidth] = useState<number>(() => {
+    const v = parseInt(localStorage.getItem('sidebarW') ?? '', 10);
+    return Number.isFinite(v) ? Math.min(SB_MAX, Math.max(SB_MIN, v)) : SB_DEFAULT;
+  });
+  const widthRef = useRef(sbWidth);
+  const dragRef  = useRef<{ startX: number; startW: number; rtl: boolean } | null>(null);
+  const setW = (w: number) => { const c = Math.min(SB_MAX, Math.max(SB_MIN, w)); widthRef.current = c; setSbWidth(c); };
+
+  const onResizeDown = (e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startW: widthRef.current, rtl: document.documentElement.dir === 'rtl' };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+  const onResizeMove = (e: React.PointerEvent) => {
+    const d = dragRef.current; if (!d) return;
+    const dx = e.clientX - d.startX;
+    setW(d.rtl ? d.startW - dx : d.startW + dx); // в RTL сайдбар справа → знак инвертируем
+  };
+  const onResizeUp = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* */ }
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    try { localStorage.setItem('sidebarW', String(widthRef.current)); } catch { /* инкогнито */ }
+  };
+
   useEffect(() => {
     api.get('/chats').then(({ data }) => {
       setChats(data.data ?? []);
@@ -63,12 +94,32 @@ export default function ChatPage() {
       <FloatingCircle />
 
       <div className="relative flex flex-1 min-h-0">
-        <div className={clsx(
-          'flex-shrink-0 w-full lg:w-auto h-full',
-          inThread && 'hidden lg:block',
-        )}>
+        <div
+          className={clsx(
+            'flex-shrink-0 w-full lg:w-[var(--sbw)] h-full',
+            inThread && 'hidden lg:block',
+          )}
+          style={{ ['--sbw' as string]: `${sbWidth}px` }}
+        >
           <Sidebar />
         </div>
+
+        {/* Разделитель-ручка: тянем за неё, чтобы менять ширину списка (десктоп). */}
+        <div
+          onPointerDown={onResizeDown}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeUp}
+          onDoubleClick={() => setW(SB_DEFAULT)}
+          className={clsx(
+            'hidden lg:block relative z-20 w-1 flex-shrink-0 cursor-col-resize group',
+            inThread && 'max-lg:hidden',
+          )}
+          title="Потяните, чтобы изменить ширину • двойной клик — сбросить"
+        >
+          <span className="absolute inset-y-0 -left-1.5 -right-1.5" />
+          <span className="absolute inset-y-0 left-0 w-px bg-transparent group-hover:bg-primary-500/60 transition-colors" />
+        </div>
+
         <main className={clsx(
           'flex-1 flex-col min-w-0 h-full relative',
           inThread ? 'flex' : 'hidden lg:flex',

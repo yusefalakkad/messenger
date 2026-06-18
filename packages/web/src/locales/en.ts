@@ -84,6 +84,7 @@ export const en: Dict = {
     startChat: 'Start a chat',
     callIncoming: 'Incoming call', callOutgoing: 'Outgoing call',
     callMissed: 'Missed call', callNoAnswer: 'No answer', call: 'Call',
+    draft: 'Draft:',
   },
   landing: {
     nav_features: 'Features', nav_privacy: 'Privacy', nav_download: 'Download',

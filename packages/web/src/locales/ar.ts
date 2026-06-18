@@ -84,6 +84,7 @@ export const ar: Dict = {
     startChat: 'ابدأ محادثة',
     callIncoming: 'مكالمة واردة', callOutgoing: 'مكالمة صادرة',
     callMissed: 'مكالمة فائتة', callNoAnswer: 'لا يوجد رد', call: 'مكالمة',
+    draft: 'مسودة:',
   },
   landing: {
     nav_features: 'الميزات', nav_privacy: 'الخصوصية', nav_download: 'تنزيل',

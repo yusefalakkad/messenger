@@ -24,11 +24,18 @@ initTheme();
 // «светофор» рисуются в левом-верхнем углу поверх контента и налезали на аватар
 // в шапке. Добавляем перетаскиваемую полоску-титлбар сверху и сдвигаем контент
 // вниз (html.is-desktop в index.css), чтобы кнопки жили в своём «баре».
-if ((window as { dakkaDesktop?: { isDesktop?: boolean } }).dakkaDesktop?.isDesktop) {
+const dd = (window as { dakkaDesktop?: { isDesktop?: boolean; platform?: string } }).dakkaDesktop;
+if (dd?.isDesktop) {
   document.documentElement.classList.add('is-desktop');
-  const bar = document.createElement('div');
-  bar.className = 'desktop-titlebar';
-  document.body.appendChild(bar);
+  // Перетаскиваемая полоска + сдвиг под «светофор» нужны ТОЛЬКО на macOS
+  // (frameless hiddenInset). На Windows/Linux рамка системная — иначе сверху
+  // висел бы лишний пустой бар, а слева — зазор под несуществующий «светофор».
+  if (dd.platform === 'darwin') {
+    document.documentElement.classList.add('is-desktop-mac');
+    const bar = document.createElement('div');
+    bar.className = 'desktop-titlebar';
+    document.body.appendChild(bar);
+  }
 }
 
 // Инициализируем нативные плагины как можно раньше — до первого рендера.

@@ -90,7 +90,7 @@ html.landing-scroll #root { overflow: visible; height: auto; }
    а верхняя зона — перетаскиваемая. Системный «светофор» (x≈16) живёт поверх
    левого края шапки-сайдбара, поэтому её содержимое сдвинуто вправо. */
 html.is-desktop #root { padding-top: 0; }
-html.is-desktop .electron-sb-header { padding-left: 76px; }   /* место под «светофор» */
+html.is-desktop-mac .electron-sb-header { padding-left: 76px; }   /* место под «светофор» (только macOS) */
 .desktop-titlebar {
   position: fixed;
   top: 0; left: 0; right: 0;

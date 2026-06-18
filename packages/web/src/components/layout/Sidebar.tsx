@@ -138,7 +138,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-full lg:w-80 h-full flex flex-col border-r border-white/10 lg:border-dark-border bg-dark-surface/40 lg:bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
+    <aside className="w-full h-full flex flex-col border-r border-white/10 lg:border-dark-border bg-dark-surface/40 lg:bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
       {/* Ambient свечение в шапке сайдбара */}
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 

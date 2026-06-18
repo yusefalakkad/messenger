@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { format, isToday } from 'date-fns';
@@ -20,6 +21,7 @@ interface Props {
 const LONG_PRESS_MS = 450;
 
 export default function ChatListItem({ chat, active, onClick }: Props) {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   // Кто-то печатает в этом чате — показываем вместо превью.
   const typing = useChatStore((s) => (s.typingUsers[chat.id]?.size ?? 0) > 0);
@@ -35,7 +37,7 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const isSaved = chat.type === 'saved';
   const isChannel = chat.type === 'channel';
   const name = isSaved
-    ? 'Избранное'
+    ? t('chat.saved')
     : chat.type === 'group' || isChannel ? chat.name : otherMember?.user.displayName ?? 'Unknown';
   const avatar = chat.type === 'group' || isChannel ? chat.avatar : otherMember?.user.avatar;
   const isOnline = otherMember?.user.status === 'online';
@@ -111,14 +113,14 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
           // Мобила — стеклянная карточка; десктоп — компактная плотная строка.
           'max-lg:liquid-card max-lg:rounded-2xl max-lg:mb-1.5 lg:rounded-lg',
           active
-            ? 'max-lg:ring-1 max-lg:ring-white/35 -translate-y-px lg:bg-dark-card lg:shadow-e1'
+            ? 'max-lg:ring-1 max-lg:ring-white/35 -translate-y-px lg:bg-primary-500/[0.14] lg:ring-1 lg:ring-primary-500/25 lg:shadow-e1'
             : 'hover:-translate-y-px lg:hover:bg-dark-hover/60',
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >
-        {/* Активный чат — выраженная brand-полоса слева */}
+        {/* Активный чат — выраженная brand-полоса слева (в RTL — справа) */}
         {active && (
-          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow" />
+          <span className="absolute left-0 rtl:left-auto rtl:right-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow" />
         )}
         {isSaved ? (
           <span className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
@@ -146,11 +148,11 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
           <div className="flex items-center justify-between gap-2 mt-1">
             {typing ? (
               <span className="text-[13px] leading-[18px] truncate text-primary-600 dark:text-primary-300 italic animate-pulse">
-                печатает…
+                {t('chat.typing')}
               </span>
             ) : (
               <span className="text-[13px] leading-[18px] truncate flex items-center gap-1">
-                {draft && <span className="text-red-400/90 font-medium">Черновик:</span>}
+                {draft && <span className="text-red-400/90 font-medium">{t('chat.draft')}</span>}
                 <span className={clsx('truncate', draft ? 'text-content/60' : 'text-content/55')}>
                   {previewText}
                 </span>

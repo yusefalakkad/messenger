@@ -85,6 +85,7 @@ export const ru = {
     startChat: 'Начать переписку',
     callIncoming: 'Входящий звонок', callOutgoing: 'Исходящий звонок',
     callMissed: 'Пропущенный звонок', callNoAnswer: 'Нет ответа', call: 'Звонок',
+    draft: 'Черновик:',
   },
   landing: {
     nav_features: 'Возможности', nav_privacy: 'Приватность', nav_download: 'Загрузить',
