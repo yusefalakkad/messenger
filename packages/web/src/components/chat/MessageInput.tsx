@@ -485,8 +485,11 @@ export default function MessageInput({ chatId }: Props) {
 
   const startCirclePTT = useCallback(async () => {
     try {
+      // ВАЖНО: только `ideal`, без точных width/height/aspectRatio. Точные 480×480
+      // square многие камеры (десктоп-вебки 16:9) не умеют → OverconstrainedError →
+      // запись молча не начиналась. Кружок и так кропается в квадрат через object-cover.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 480, height: 480, aspectRatio: 1, facingMode: 'user' },
+        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' },
         audio: true,
       });
       const d = ptt.current;
@@ -517,8 +520,16 @@ export default function MessageInput({ chatId }: Props) {
         setPttTime(d.time);
         if (d.time >= 60) stopCirclePTT(true); // лимит кружка — 60с
       }, 1000);
-    } catch {
-      // камера/микрофон недоступны
+    } catch (err) {
+      // Раньше ошибка глоталась молча → «кружок не записывается» без объяснения.
+      const name = (err as { name?: string })?.name;
+      toast.error(
+        name === 'NotAllowedError' || name === 'SecurityError' ? 'Доступ к камере запрещён — разрешите в настройках'
+        : name === 'NotFoundError' || name === 'OverconstrainedError' ? 'Камера не найдена'
+        : name === 'NotReadableError' ? 'Камера занята другим приложением'
+        : 'Не удалось включить камеру',
+      );
+      setPttState('idle');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

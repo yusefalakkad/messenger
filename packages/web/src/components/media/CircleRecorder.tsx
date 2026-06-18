@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Trash2, Play, Pause, Square } from 'lucide-react';
 import { SPRING, tap } from '@/lib/motion';
+import { toast } from '@/lib/toast';
 
 interface Props {
   onRecorded: (blob: Blob, duration: number, thumbnailUrl: string) => void;
@@ -43,7 +44,8 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
     let cancelled = false;
     navigator.mediaDevices
       .getUserMedia({
-        video: { width: 480, height: 480, aspectRatio: 1, facingMode: 'user' },
+        // Только `ideal` — точные 480×480 square многие камеры (16:9 вебки) не умеют.
+        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' },
         audio: true,
       })
       .then((stream) => {
@@ -55,7 +57,16 @@ export default function CircleRecorder({ onRecorded, onCancel }: Props) {
         }
         setReady(true);
       })
-      .catch(() => onCancel());
+      .catch((err) => {
+        const name = (err as { name?: string })?.name;
+        toast.error(
+          name === 'NotAllowedError' || name === 'SecurityError' ? 'Доступ к камере запрещён — разрешите в настройках'
+          : name === 'NotFoundError' || name === 'OverconstrainedError' ? 'Камера не найдена'
+          : name === 'NotReadableError' ? 'Камера занята другим приложением'
+          : 'Не удалось включить камеру',
+        );
+        onCancel();
+      });
 
     return () => {
       cancelled = true;
