@@ -6,6 +6,7 @@ export const en: Dict = {
     save: 'Save', cancel: 'Cancel', delete: 'Delete', send: 'Send',
     back: 'Back', close: 'Close', search: 'Search', loading: 'Loading…',
     confirm: 'Confirm', retry: 'Retry',
+    updateAvailable: 'A new version of Dakka is available', update: 'Update', download: 'Download',
   },
   nav: {
     chats: 'Chats', contacts: 'Contacts', calls: 'Calls', settings: 'Settings',

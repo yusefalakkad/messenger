@@ -12,6 +12,7 @@
  * сравниваем с ней — без завязки на DOM (ленивые чанки в DOM ещё не попали).
  */
 import { toast } from './toast';
+import i18n from './i18n';
 
 const CHECK_INTERVAL_MS = 2 * 60 * 1000; // каждые 2 минуты в фоне
 
@@ -33,12 +34,28 @@ async function fetchSignature(): Promise<string | null> {
 }
 
 export function initAppUpdateCheck(): void {
-  // Только продакшен-веб. В dev ассеты не хешируются; в Electron/Capacitor фронт
-  // зашит в сборку и обновляется переустановкой, не перезагрузкой вкладки.
+  const w = window as {
+    dakkaDesktop?: { isDesktop?: boolean; onUpdateAvailable?: (cb: (d: { url?: string }) => void) => void };
+    Capacitor?: unknown;
+  };
+
+  // Десктоп (Electron): сверку версии делает main-процесс (Node, без CORS) и
+  // зовёт колбэк со ссылкой на установщик под текущую ОС → тост «Скачать».
+  if (w.dakkaDesktop?.isDesktop) {
+    w.dakkaDesktop.onUpdateAvailable?.((d) => {
+      toast.action(
+        i18n.t('common.updateAvailable'),
+        { label: i18n.t('common.download'), onClick: () => { try { window.open(d?.url || 'https://akkdmsg.online/download'); } catch { /* */ } } },
+        { key: 'app-update' },
+      );
+    });
+    return;
+  }
+
+  // Только продакшен-веб. В dev ассеты не хешируются; в Capacitor фронт зашит.
   const env = (import.meta as { env?: { PROD?: boolean } }).env;
   if (!env?.PROD) return;
-  const w = window as { dakkaDesktop?: { isDesktop?: boolean }; Capacitor?: unknown };
-  if (w.dakkaDesktop?.isDesktop || w.Capacitor) return;
+  if (w.Capacitor) return;
 
   let baseline: string | null = null;
   let notified = false;
@@ -52,8 +69,8 @@ export function initAppUpdateCheck(): void {
 
     notified = true;
     toast.action(
-      'Доступна новая версия Dakka',
-      { label: 'Обновить', onClick: () => window.location.reload() },
+      i18n.t('common.updateAvailable'),
+      { label: i18n.t('common.update'), onClick: () => window.location.reload() },
       { key: 'app-update' },
     );
   };

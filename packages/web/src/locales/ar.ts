@@ -6,6 +6,7 @@ export const ar: Dict = {
     save: 'حفظ', cancel: 'إلغاء', delete: 'حذف', send: 'إرسال',
     back: 'رجوع', close: 'إغلاق', search: 'بحث', loading: 'جارٍ التحميل…',
     confirm: 'تأكيد', retry: 'إعادة المحاولة',
+    updateAvailable: 'يتوفّر إصدار جديد من Dakka', update: 'تحديث', download: 'تنزيل',
   },
   nav: {
     chats: 'المحادثات', contacts: 'جهات الاتصال', calls: 'المكالمات', settings: 'الإعدادات',

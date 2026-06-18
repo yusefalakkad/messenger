@@ -4,6 +4,7 @@ export const ru = {
     save: 'Сохранить', cancel: 'Отмена', delete: 'Удалить', send: 'Отправить',
     back: 'Назад', close: 'Закрыть', search: 'Поиск', loading: 'Загрузка…',
     confirm: 'Подтвердить', retry: 'Повторить',
+    updateAvailable: 'Доступна новая версия Dakka', update: 'Обновить', download: 'Скачать',
   },
   nav: {
     chats: 'Чаты', contacts: 'Контакты', calls: 'Звонки', settings: 'Настройки',

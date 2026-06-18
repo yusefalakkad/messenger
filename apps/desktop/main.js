@@ -15,6 +15,7 @@
 
 const { app, BrowserWindow, shell, Menu, session, nativeTheme } = require('electron');
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const httpProxy = require('http-proxy');
@@ -127,6 +128,46 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => { mainWindow = null; });
+
+  // ── Уведомление об обновлении (вариант C) ──────────────────────────────────
+  // Сверяем «сигнатуру» бандла установленного приложения (хеши /assets/* из
+  // вшитого renderer/index.html) с живым сайтом. Если на сайте свежее — значит
+  // вышла новая версия, шлём рендереру тост со ссылкой на установщик под ОС.
+  // Делается в main-процессе (Node) — без CORS-ограничений браузера.
+  let updateNotified = false;
+  function sigOf(html) {
+    const m = (html || '').match(/\/assets\/[A-Za-z0-9_.-]+\.(?:js|css)/g) || [];
+    return [...new Set(m)].sort().join('|');
+  }
+  function fetchText(url) {
+    return new Promise((resolve, reject) => {
+      const mod = url.startsWith('https') ? https : http;
+      const req = mod.get(url, { timeout: 8000 }, (r) => {
+        if (r.statusCode !== 200) { r.resume(); return reject(new Error('status ' + r.statusCode)); }
+        let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => resolve(d));
+      });
+      req.on('error', reject);
+      req.on('timeout', () => req.destroy(new Error('timeout')));
+    });
+  }
+  async function checkForUpdate() {
+    if (updateNotified || !mainWindow) return;
+    try {
+      const localSig  = sigOf(fs.readFileSync(path.join(RENDERER_DIR, 'index.html'), 'utf8'));
+      const remoteSig = sigOf(await fetchText(`${TARGET}/index.html`));
+      if (localSig && remoteSig && localSig !== remoteSig) {
+        updateNotified = true;
+        const url = process.platform === 'darwin'
+          ? `${TARGET}/download/Dakka.dmg`
+          : `${TARGET}/download/Dakka-Setup.exe`;
+        mainWindow.webContents.send('dakka:update-available', { url });
+      }
+    } catch { /* офлайн/сеть — попробуем в следующий раз */ }
+  }
+  mainWindow.webContents.on('did-finish-load', () => {
+    setTimeout(checkForUpdate, 4000);
+    setInterval(checkForUpdate, 30 * 60 * 1000); // далее раз в 30 минут
+  });
 }
 
 // Разрешаем микрофон/камеру/уведомления (звонки, голосовые).
