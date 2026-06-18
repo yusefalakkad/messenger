@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, MonitorUp, MonitorOff, Minimize2, Maximize2 } from 'lucide-react';
 import { SPRING, backdrop, popIn, tap } from '@/lib/motion';
 import { useCallStore } from '@/stores/call.store';
@@ -68,6 +68,11 @@ export default function CallOverlay() {
   // (медиа-элементы остаются в DOM — аудио/видео не прерываются).
   const [minimized, setMinimized] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Перетаскивание свёрнутой плашки + «живая» голосовая aura собеседника.
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+  const dragAreaRef = useRef<HTMLDivElement>(null);
+  const auraRef = useRef<HTMLDivElement>(null);
 
   // Свёрнутость сбрасываем, когда звонка нет (входящий не показываем свёрнутым).
   useEffect(() => { if (!active) setMinimized(false); }, [active]);
@@ -86,6 +91,48 @@ export default function CallOverlay() {
       remoteAudioRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, active?.callType]);
+
+  // Развернули звонок → сбрасываем смещение перетаскивания (плашка снова по центру).
+  useEffect(() => { if (!minimized) { dragX.set(0); dragY.set(0); } }, [minimized, dragX, dragY]);
+
+  // «Живая» aura за аватаром в аудио-звонке: пульсирует под голос собеседника
+  // (AnalyserNode по remote-аудио) + лёгкое дыхание, когда тихо. Пишем стиль
+  // напрямую через ref — без ре-рендера на каждый кадр.
+  useEffect(() => {
+    if (!active || active.callType !== 'audio' || !remoteStream) return;
+    if (!remoteStream.getAudioTracks().length) return;
+    let ac: AudioContext | null = null, raf = 0, stopped = false, t = 0, level = 0;
+    let src: MediaStreamAudioSourceNode | null = null, analyser: AnalyserNode | null = null;
+    try {
+      ac = new AudioContext();
+      src = ac.createMediaStreamSource(remoteStream);
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (stopped || !analyser) return;
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
+        const rms = Math.sqrt(sum / data.length);
+        level = level * 0.75 + Math.min(1, rms * 3.4) * 0.25;
+        t += 0.035;
+        const breathe = Math.sin(t) * 0.04;
+        const el = auraRef.current;
+        if (el) {
+          el.style.transform = `scale(${(1 + level * 0.5 + breathe).toFixed(3)})`;
+          el.style.opacity   = `${(0.32 + level * 0.5 + (breathe + 0.04)).toFixed(3)}`;
+        }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    } catch { /* Web Audio недоступен */ }
+    return () => {
+      stopped = true; if (raf) cancelAnimationFrame(raf);
+      try { src?.disconnect(); analyser?.disconnect(); void ac?.close(); } catch { /* */ }
+    };
+  }, [active, remoteStream]);
 
   const tearDown = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -518,15 +565,23 @@ export default function CallOverlay() {
           {/* Подложка — отдельный слой с собственным fade, чтобы карточка «дышала» поверх */}
           <motion.div
             variants={backdrop} initial="hidden" animate="visible" exit="exit"
-            className={`absolute inset-0 bg-black/80 backdrop-blur-md ${minimized ? 'hidden' : ''}`}
+            onClick={() => { if (active) setMinimized(true); }}
+            className={`absolute inset-0 bg-black/80 backdrop-blur-md ${minimized ? 'hidden' : ''} ${active ? 'cursor-pointer' : ''}`}
           />
+
+          {/* Невидимая зона-ограничитель для перетаскивания свёрнутой плашки. */}
+          {minimized && <div ref={dragAreaRef} className="fixed inset-0 pointer-events-none" aria-hidden />}
 
           <motion.div
             variants={popIn} initial="hidden" animate="visible" exit="exit"
-            onClick={minimized ? () => setMinimized(false) : undefined}
+            drag={minimized}
+            dragMomentum={false}
+            dragElastic={0.08}
+            dragConstraints={dragAreaRef}
+            style={{ x: dragX, y: dragY }}
             className={`relative flex flex-col items-center rounded-3xl overflow-hidden shadow-e4 pointer-events-auto ${
               minimized
-                ? `${isVideo && active ? 'w-56 h-72' : 'w-64'} bg-dark-card border border-dark-border cursor-pointer`
+                ? `${isVideo && active ? 'w-56 h-72' : 'w-64'} bg-dark-card border border-dark-border cursor-grab active:cursor-grabbing`
                 : isVideo && active
                 // Телефон — на весь экран, вертикально (как в TG); десктоп — широкое 16:9 окно.
                 ? 'bg-dark-bg max-lg:w-full max-lg:h-full max-lg:rounded-none lg:w-[min(92vw,1100px)] lg:h-auto lg:aspect-video lg:max-h-[86vh]'
@@ -590,6 +645,16 @@ export default function CallOverlay() {
               </>
             )}
 
+            {/* Аудио-звонок: размытый аватар собеседника фоном + затемнение */}
+            {active && !isVideo && !minimized && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+                {peerAvatar
+                  ? <img src={peerAvatar} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-35" />
+                  : <div className="absolute inset-0 bg-brand-radial opacity-60" />}
+                <div className="absolute inset-0 bg-dark-card/70" />
+              </div>
+            )}
+
             <div className={`relative z-10 flex flex-col items-center p-8 gap-4 ${minimized ? 'hidden' : ''} ${
               isVideo && active
                 ? 'mt-auto w-full bg-gradient-to-t from-black/80 to-transparent pt-16 pb-8'
@@ -598,10 +663,18 @@ export default function CallOverlay() {
               {!(isVideo && active) && (
                 <>
                   <div className={`relative rounded-full ${incoming ? 'animate-pulse-glow' : 'shadow-glow-violet'}`}>
-                    <Avatar src={peerAvatar} name={peerName} size="xl" />
-                    {(outgoing || active) && (
-                      <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
+                    {/* Живая голосовая aura — пульсирует, когда собеседник говорит */}
+                    {active && !isVideo && (
+                      <div ref={auraRef} aria-hidden
+                        className="absolute -inset-4 rounded-full bg-brand-gradient blur-xl"
+                        style={{ opacity: 0.4, willChange: 'transform, opacity' }} />
                     )}
+                    <div className="relative">
+                      <Avatar src={peerAvatar} name={peerName} size="xl" />
+                      {(outgoing || active) && (
+                        <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-dark-card animate-pulse" />
+                      )}
+                    </div>
                   </div>
                   <div className="text-center max-w-[260px]">
                     <p className="text-xl font-semibold truncate">{peerName}</p>
