@@ -10,6 +10,31 @@ function getCtx(): AudioContext {
   return ctx;
 }
 
+/**
+ * Разблокировка аудио на первый пользовательский жест.
+ *
+ * Браузеры держат AudioContext в 'suspended', пока юзер не взаимодействовал со
+ * страницей. Если звонок придёт ДО первого клика (свежая/восстановленная
+ * вкладка), рингтон был бы беззвучным. Поэтому на первый pointer/key/touch
+ * создаём и резюмируем контекст заранее — тогда входящий звонок точно зазвучит.
+ * Idempotent, слушатели одноразовые.
+ */
+export function primeAudioUnlock(): void {
+  if (typeof window === 'undefined') return;
+  const unlock = () => {
+    try {
+      const ac = getCtx();
+      if (ac.state === 'suspended') void ac.resume();
+    } catch { /* Web Audio недоступен */ }
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('touchstart', unlock);
+  };
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+  window.addEventListener('touchstart', unlock, { once: true });
+}
+
 export function playNotificationSound(): void {
   try {
     const ac = getCtx();

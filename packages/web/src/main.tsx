@@ -6,6 +6,7 @@ import { initNative } from './lib/native';
 import { initTheme } from './lib/theme';
 import { initSentry } from './lib/sentry';
 import { initAppUpdateCheck } from './lib/appUpdate';
+import { primeAudioUnlock } from './lib/notificationSound';
 import './lib/i18n'; // инициализация i18n (язык из localStorage/системы)
 import { queryClient } from './lib/queryClient';
 import './index.css';
@@ -19,6 +20,10 @@ initAppUpdateCheck();
 // Тема: применяем сохранённую (dark/light/auto) + подписка на системную смену.
 // index.html уже выставил data-theme до пейнта; здесь — react-runtime + auto-listener.
 initTheme();
+
+// Разблокируем аудио на первый клик/ввод — чтобы входящий рингтон гарантированно
+// зазвучал, даже если звонок придёт до первого взаимодействия со страницей.
+primeAudioUnlock();
 
 // Десктоп (Electron, macOS): окно без рамки (hiddenInset) — системные кнопки
 // «светофор» рисуются в левом-верхнем углу поверх контента и налезали на аватар
