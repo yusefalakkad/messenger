@@ -53,6 +53,9 @@ export default function Avatar({ src, name, size = 'md', online, ring, className
       >
         {showImg ? (
           <img
+            // ref: если картинка уже в кэше, onLoad может НЕ сработать → аватар
+            // остаётся невидимым (opacity-0) до перезагрузки. Проверяем complete.
+            ref={(el) => { if (el && el.complete && el.naturalWidth > 0) setLoaded(true); }}
             src={src}
             alt={name}
             onLoad={() => setLoaded(true)}
