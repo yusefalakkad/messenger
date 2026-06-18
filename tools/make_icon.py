@@ -84,14 +84,13 @@ def make_bubble(width: int, height: int, tail_size: int) -> Image.Image:
     md = ImageDraw.Draw(mask)
 
     radius = int(min(width, height) * 0.30)
-    # Основное тело бабла — отступ слева на tail_size чтобы хвост влез
+    # Основное тело бабла — КРУГ (новый круглый лого), отступ слева под хвост.
     body_left = tail_size
     body_top  = 0
     body_right = body_left + width
     body_bottom = height
-    md.rounded_rectangle(
+    md.ellipse(
         (body_left, body_top, body_right, body_bottom),
-        radius=radius,
         fill=255,
     )
 
@@ -192,6 +191,12 @@ def main() -> None:
     maskable = make_maskable(512)
     maskable.save(web_icons / "icon-512-maskable.png", "PNG", optimize=True)
     print(f"  ✓ icon-512-maskable.png")
+
+    # Electron desktop (electron-builder генерит .icns/.ico из этого PNG)
+    electron_icon = ROOT / "apps/desktop/assets/icon.png"
+    if electron_icon.parent.exists():
+        master.save(electron_icon, "PNG", optimize=True)
+        print(f"  ✓ {electron_icon}")
 
     print("\n✅ done")
 

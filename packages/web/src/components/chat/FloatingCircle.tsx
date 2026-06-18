@@ -137,7 +137,7 @@ export default function FloatingCircle() {
             src={item.url}
             playsInline
             preload="auto"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover -scale-x-100"
             onEnded={stop}
             onClick={(e) => { e.stopPropagation(); toggle(); }}
           />

@@ -769,14 +769,14 @@ function CircleMessage({
           onClick={toggle}
         >
           {media.thumbnailUrl && !started && (
-            <img src={media.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+            <img src={media.thumbnailUrl} alt="" className="w-full h-full object-cover -scale-x-100" />
           )}
           <video
             ref={videoRef}
             src={media.url}
             playsInline
             preload="metadata"
-            className={clsx('w-full h-full object-cover', started ? 'block' : 'hidden')}
+            className={clsx('w-full h-full object-cover -scale-x-100', started ? 'block' : 'hidden')}
             onLoadedMetadata={() => {
               const d = videoRef.current?.duration;
               if (d && Number.isFinite(d)) setVidDur(d);
