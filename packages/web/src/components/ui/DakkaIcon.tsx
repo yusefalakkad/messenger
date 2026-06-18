@@ -18,32 +18,33 @@ export default function DakkaIcon({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 100 100"
       fill="none"
       className={className}
       role="img"
       aria-label="Dakka"
     >
       <defs>
-        <linearGradient id={gradId} x1="10%" y1="0%" x2="90%" y2="100%">
-          <stop offset="0%"   stopColor="#8a52ff" />
-          <stop offset="55%"  stopColor="#d04df0" />
-          <stop offset="100%" stopColor="#ff5a8f" />
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor="#FF7A78" />
+          <stop offset="46%"  stopColor="#FF4E86" />
+          <stop offset="100%" stopColor="#7A82FF" />
         </linearGradient>
       </defs>
 
-      {/* Круглый спич-бабл с мягким хвостиком слева-снизу (округлый бренд). */}
+      {/* Спич-бабл с хвостиком слева-снизу (новый бренд, точно по референсу). */}
       <path
-        d="M32 6 A26 26 0 1 1 18 53 C14 58 9 59 11 58 C14 55 14 52 13 50 A26 26 0 0 1 32 6 Z"
+        d="M50 14C28.4 14 11 28.7 11 46.8c0 9.9 5.2 18.8 13.4 24.8 0 4.6-1.6 10.3-5.1 15.2 7.6-.7 15.2-3.4 21-7.7 3.1.7 6.3 1 9.7 1 21.6 0 39-14.7 39-32.8S71.6 14 50 14z"
         fill={`url(#${gradId})`}
       />
 
-      {/* 4 белых вертикальных «пилюли» — sound-wave / голос. */}
+      {/* 5 белых вертикальных «пилюль» — sound-wave / голос (по референсу). */}
       <g fill="white">
-        <rect x="21" y="24" width="3.5" height="12" rx="1.75" />
-        <rect x="28" y="19" width="3.5" height="22" rx="1.75" />
-        <rect x="35" y="22" width="3.5" height="16" rx="1.75" />
-        <rect x="42" y="26" width="3.5" height="8"  rx="1.75" />
+        <rect x="33" y="38" width="5" height="16" rx="2.5" />
+        <rect x="41" y="31" width="5" height="30" rx="2.5" />
+        <rect x="49" y="35" width="5" height="22" rx="2.5" />
+        <rect x="57" y="29" width="5" height="34" rx="2.5" />
+        <rect x="65" y="39" width="5" height="14" rx="2.5" />
       </g>
     </svg>
   );

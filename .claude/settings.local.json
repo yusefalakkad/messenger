@@ -245,7 +245,11 @@
       "Bash(cp \"_ \\(6\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref6.html\")",
       "Bash(cp \"_ \\(7\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref7.html\")",
       "Bash(cp \"_ \\(8\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref8.html\")",
-      "Bash(cp \"_ \\(9\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref9.html\")"
+      "Bash(cp \"_ \\(9\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref9.html\")",
+      "Bash(cp \"_ \\(10\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd10.html\")",
+      "Bash(cp \"_ \\(11\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd11.html\")",
+      "Bash(cp \"_ \\(12\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd12.html\")",
+      "Bash(cp \"_ _ _ \\(1\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd0.html\")"
     ],
     "defaultMode": "bypassPermissions"
   }
