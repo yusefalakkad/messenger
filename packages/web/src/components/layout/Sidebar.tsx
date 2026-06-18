@@ -177,7 +177,6 @@ export default function Sidebar() {
                 src={user?.avatar}
                 name={user?.displayName ?? '?'}
                 size="md"
-                online
               />
             </div>
           </div>
