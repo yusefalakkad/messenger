@@ -7,6 +7,7 @@ import { initTheme } from './lib/theme';
 import { initSentry } from './lib/sentry';
 import { initAppUpdateCheck } from './lib/appUpdate';
 import { primeAudioUnlock } from './lib/notificationSound';
+import '@fontsource-variable/inter'; // шрифт Inter (self-hosted) — как в дизайн-референсе
 import './lib/i18n'; // инициализация i18n (язык из localStorage/системы)
 import { queryClient } from './lib/queryClient';
 import './index.css';

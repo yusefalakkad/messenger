@@ -105,6 +105,12 @@ html.is-desktop input,
 html.is-desktop textarea,
 html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
+/* Парящие аватарки на велком-экране (по референсу): вертикальный float ±10px. */
+@keyframes dakkaFloatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
 /* ─── Активный чат: яркая «плашка» + 3D-наклон за курсором (десктоп) ──────────
    Заливка-градиент brand + внутренняя рамка + мягкое свечение. transform
    (наклон) ставится инлайном из ChatListItem; здесь только плавность возврата. */
