@@ -1,113 +1,129 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
 import DakkaIcon from '@/components/ui/DakkaIcon';
-import { popIn, SPRING, EASE } from '@/lib/motion';
+import { EASE, SPRING, tap } from '@/lib/motion';
+
+// Точный фирменный градиент из референса (coral → pink → periwinkle).
+const BRAND = 'linear-gradient(135deg, #FF7A78 0%, #FF4E86 46%, #7A82FF 100%)';
+
+// Парящие аватарки-плитки (декор) — фирменные градиенты из референса.
+const FLOATERS: { t: string; g: string; cls: string; delay: number }[] = [
+  { t: 'ДР', g: 'linear-gradient(150deg,#9aa0ff,#5b5bf5)', cls: 'left-5 top-[8%] -rotate-[8deg]',  delay: 0.05 },
+  { t: 'СВ', g: 'linear-gradient(150deg,#46e5cf,#13a6be)', cls: 'right-7 top-[15%] rotate-[7deg]',  delay: 0.12 },
+  { t: 'АП', g: 'linear-gradient(150deg,#ffd06b,#ff8a3d)', cls: 'left-9 top-[27%] rotate-[5deg]',   delay: 0.19 },
+  { t: 'НК', g: 'linear-gradient(150deg,#c98dff,#8a45e6)', cls: 'right-10 top-[31%] -rotate-[5deg]', delay: 0.26 },
+];
 
 export default function AuthPage() {
   const { t } = useTranslation();
-  return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Глубокий ambient-фон: три парящих градиентных пятна, медленно дышат */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{ x: [0, 30, 0], y: [0, 20, 0], scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -top-40 -left-40 w-[520px] h-[520px] bg-spot-violet blur-3xl"
-        />
-        <motion.div
-          animate={{ x: [0, -25, 0], y: [0, -15, 0], scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
-          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -bottom-40 -right-40 w-[520px] h-[520px] bg-spot-pink blur-3xl"
-        />
-        <motion.div
-          animate={{ x: [0, 18, 0], y: [0, -10, 0], scale: [1, 1.06, 1] }}
-          transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-1/3 left-1/2 w-[360px] h-[360px] bg-spot-orange blur-3xl opacity-70"
-        />
-      </div>
+  const [started, setStarted] = useState(false);
 
-      {/* Лёгкая виньетка для фокуса по центру */}
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-dark-bg text-content flex flex-col">
+      {/* Тёплое свечение сверху по референсу */}
       <div
-        className="fixed inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(120% 80% at 50% 40%, transparent 40%, rgba(0,0,0,0.35) 100%)' }}
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(125% 55% at 50% -8%, rgba(255,110,140,0.18), transparent 62%)' }}
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: EASE.soft }}
-        className="relative w-full max-w-md z-base"
-      >
-        {/* Логотип */}
-        <div className="text-center mb-8">
+      <AnimatePresence mode="wait">
+        {!started ? (
           <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ ...SPRING.gentle, delay: 0.05 }}
-            className="relative inline-block mb-5"
+            key="welcome"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.35, ease: EASE.out }}
+            className="relative flex-1 flex flex-col px-6 pt-[var(--sat)] pb-[calc(var(--sab)+1.5rem)]"
           >
-            {/* Брендовое свечение под иконкой — пульсирует в такт float */}
-            <motion.div
-              aria-hidden
-              animate={{ opacity: [0.4, 0.62, 0.4], scale: [1, 1.12, 1] }}
-              transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute inset-0 bg-brand-gradient blur-2xl"
-              style={{ borderRadius: '40%' }}
-            />
-            <div className="relative animate-float drop-shadow-[0_10px_30px_rgba(154,77,255,0.45)]">
-              <DakkaIcon size={88} />
+            {/* Парящие аватарки */}
+            {FLOATERS.map((f) => (
+              <motion.div
+                key={f.t}
+                initial={{ opacity: 0, scale: 0.6, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ ...SPRING.gentle, delay: f.delay }}
+                className={`absolute w-14 h-14 rounded-[18px] flex items-center justify-center text-white font-semibold text-[15px] shadow-[0_12px_26px_-8px_rgba(0,0,0,0.35)] ${f.cls}`}
+                style={{ background: f.g }}
+              >
+                <motion.div animate={{ y: [0, -6, 0] }} transition={{ duration: 4 + f.delay * 6, repeat: Infinity, ease: 'easeInOut' }}>
+                  {f.t}
+                </motion.div>
+              </motion.div>
+            ))}
+
+            {/* Низ экрана: лого + заголовок + кнопки */}
+            <div className="relative mt-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18, duration: 0.5, ease: EASE.out }}
+              >
+                <div className="flex items-center gap-2.5 mb-6">
+                  <DakkaIcon size={52} />
+                  <span className="text-[34px] font-extrabold tracking-[-0.03em] lowercase">dakka</span>
+                </div>
+
+                <h1 className="text-[28px] font-bold leading-[1.16] tracking-[-0.02em]">
+                  Сообщения, которые<br />хочется открывать
+                </h1>
+                <p className="text-content/50 text-[15px] leading-relaxed mt-3 max-w-[330px]">
+                  Голос, видео и текст — в одном красивом, быстром и приватном приложении.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5, ease: EASE.out }}
+                className="mt-8 space-y-3"
+              >
+                <motion.button
+                  onClick={() => setStarted(true)} whileTap={tap} transition={SPRING.snappy}
+                  className="w-full h-[58px] rounded-full text-white font-semibold text-[16px] flex items-center justify-center gap-2"
+                  style={{ background: BRAND, boxShadow: '0 16px 34px -12px rgba(255,78,134,0.55)' }}
+                >
+                  Создать аккаунт <ArrowRight size={18} />
+                </motion.button>
+                <motion.button
+                  onClick={() => setStarted(true)} whileTap={tap} transition={SPRING.snappy}
+                  className="w-full h-[58px] rounded-full bg-dark-card border border-dark-border text-content font-semibold text-[16px] shadow-[0_8px_20px_-12px_rgba(0,0,0,0.3)]"
+                >
+                  У меня уже есть аккаунт
+                </motion.button>
+              </motion.div>
+
+              <p className="text-center text-content/35 text-[12px] leading-relaxed mt-5 px-4">
+                {t('auth.terms')}
+              </p>
             </div>
           </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.18, duration: 0.4, ease: EASE.out }}
-            className="text-3xl font-bold tracking-tight"
-          >
-            <span className="text-gradient">Dakka</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.28, duration: 0.4, ease: EASE.out }}
-            className="text-content/45 text-sm mt-2"
-          >
-            {t('auth.tagline')}
-          </motion.p>
+        ) : (
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ delay: 0.4, ...SPRING.snappy }}
-            className="chip-brand mt-4"
+            key="form"
+            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: EASE.out }}
+            className="relative flex-1 flex flex-col px-6 pt-[calc(var(--sat)+1rem)] pb-[calc(var(--sab)+1.5rem)]"
           >
-            <ShieldCheck size={12} className="text-primary-600 dark:text-primary-300" />
-            {t('auth.e2eBadge')}
+            <button
+              onClick={() => setStarted(false)}
+              className="w-11 h-11 -ml-1 rounded-full flex items-center justify-center text-content/70 hover:bg-content/[0.06] transition-colors"
+              aria-label="Назад"
+            >
+              <ArrowLeft size={22} />
+            </button>
+
+            <div className="flex items-center gap-2.5 mt-4 mb-8">
+              <DakkaIcon size={44} />
+              <span className="text-[26px] font-extrabold tracking-[-0.03em] lowercase">dakka</span>
+            </div>
+
+            <div className="flex-1">
+              <PhoneAuthForm />
+            </div>
           </motion.div>
-        </div>
-
-        {/* Карточка формы */}
-        <motion.div
-          variants={popIn}
-          initial="hidden"
-          animate="visible"
-          transition={{ ...SPRING.smooth, delay: 0.32 }}
-          className="glass-card p-6 relative"
-        >
-          <PhoneAuthForm />
-        </motion.div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
-          className="text-center text-content/30 text-xs mt-6 px-4"
-        >
-          {t('auth.terms')}
-        </motion.p>
-      </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

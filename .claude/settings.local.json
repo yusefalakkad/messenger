@@ -240,7 +240,12 @@
       "Bash(DEBUG=electron-builder npx electron-builder --mac)",
       "Bash(cd \"/Users/usefalakkad/Desktop/Месенджер/apps/desktop\" && echo \"=== build proc running? ===\" && pgrep -fl \"electron-builder|app-builder|vite build\" | grep -v grep | wc -l; echo \"=== current app timestamps ===\" && ls -lh release/Dakka-1.0.0-arm64.dmg release/Dakka-Setup-1.0.0.exe 2>/dev/null | awk '{print $5, $6, $7, $8, $9}'; echo \"=== stale dmg volume? ===\" && ls /Volumes/ | grep -i dakka || echo \"none\")",
       "Bash(tar czf *)",
-      "Bash(tar xzf *)"
+      "Bash(tar xzf *)",
+      "Bash(cp \"_ \\(5\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref5.html\")",
+      "Bash(cp \"_ \\(6\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref6.html\")",
+      "Bash(cp \"_ \\(7\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref7.html\")",
+      "Bash(cp \"_ \\(8\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref8.html\")",
+      "Bash(cp \"_ \\(9\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/ref9.html\")"
     ],
     "defaultMode": "bypassPermissions"
   }
