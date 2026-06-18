@@ -115,6 +115,7 @@ const THEME_OPTIONS: { mode: ThemeMode; key: string; Icon: typeof Moon }[] = [
 const LANG_OPTIONS: { lang: Lang; label: string }[] = [
   { lang: 'ru', label: 'Русский' },
   { lang: 'en', label: 'English' },
+  { lang: 'ar', label: 'العربية' },
 ];
 
 function AppearanceSection() {

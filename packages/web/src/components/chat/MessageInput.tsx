@@ -1458,9 +1458,10 @@ export default function MessageInput({ chatId }: Props) {
                 uploading && 'opacity-40 cursor-not-allowed',
               )}
             >
-              {pttState === 'recording'
-                ? <Mic size={18} />
-                : recMode === 'voice' ? <Mic size={18} /> : <CircleDot size={18} />}
+              {/* При записи КРУЖКА показываем камеру/кружок, а не микрофон. */}
+              {recMode === 'circle'
+                ? <CircleDot size={18} />
+                : <Mic size={18} />}
             </button>
           )}
 
