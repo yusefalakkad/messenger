@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Search, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -19,6 +20,7 @@ interface Person { id: string; username: string; displayName: string; avatar?: s
  */
 export default function ContactsView() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const chats = useChatStore((s) => s.chats);
   const addChat = useChatStore((s) => s.addChat);
   const myId = useAuthStore((s) => s.user?.id);
@@ -34,8 +36,8 @@ export default function ContactsView() {
       .filter((c) => c.type === 'direct')
       .map((c) => c.members.find((m) => m.userId !== myId)?.user)
       .filter((u): u is NonNullable<typeof u> => !!u)
-      .map((u) => ({ id: u.id, username: u.username ?? '', displayName: u.displayName ?? 'Без имени', avatar: u.avatar ?? undefined }));
-  }, [chats, myId]);
+      .map((u) => ({ id: u.id, username: u.username ?? '', displayName: u.displayName ?? t('contacts.noName'), avatar: u.avatar ?? undefined }));
+  }, [chats, myId, t]);
 
   const search = async (q: string) => {
     setQuery(q);
@@ -69,7 +71,7 @@ export default function ContactsView() {
   return (
     <div className="h-full w-full bg-dark-bg flex flex-col pt-[var(--sat)]">
       <header className="flex-shrink-0 h-14 flex items-center px-5 liquid-glass">
-        <h1 className="text-[22px] font-bold tracking-[-0.02em]">Контакты</h1>
+        <h1 className="text-[22px] font-bold tracking-[-0.02em]">{t('contacts.title')}</h1>
       </header>
 
       <div className="px-3 py-3 flex-shrink-0">
@@ -78,7 +80,7 @@ export default function ContactsView() {
           <input
             autoFocus
             className="input-pill w-full"
-            placeholder="Найти по имени или @username"
+            placeholder={t('contacts.searchPlaceholder')}
             value={query}
             onChange={(e) => search(e.target.value)}
           />
@@ -87,7 +89,7 @@ export default function ContactsView() {
 
       <div className="flex-1 overflow-y-auto px-2 pb-28">
         {!query.trim() && myContacts.length > 0 && (
-          <p className="px-3 pb-1.5 text-[12px] font-medium text-content/40 uppercase tracking-wide">Недавние</p>
+          <p className="px-3 pb-1.5 text-[12px] font-medium text-content/40 uppercase tracking-wide">{t('contacts.recent')}</p>
         )}
 
         {showEmpty ? (
@@ -96,7 +98,7 @@ export default function ContactsView() {
               <UserPlus size={24} className="text-content/45" />
             </div>
             <p className="text-content/55 text-[14px] max-w-[240px]">
-              {query.trim() ? 'Никого не нашли. Проверьте @username.' : 'Начните вводить имя или @username, чтобы найти людей.'}
+              {query.trim() ? t('contacts.notFound') : t('contacts.startTyping')}
             </p>
           </div>
         ) : (

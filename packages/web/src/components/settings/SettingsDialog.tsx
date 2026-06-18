@@ -21,6 +21,7 @@ interface Props { open: boolean; onClose: () => void; }
 type Status = { enabled: boolean; remainingRecoveryCodes: number } | null;
 
 export default function SettingsDialog({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<Status>(null);
   const userId = useAuthStore((s) => s.user?.id);
 
@@ -45,7 +46,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             className="relative z-modal bg-dark-card border border-dark-border rounded-3xl shadow-e3 w-full max-w-md mx-4 max-h-[85vh] flex flex-col overflow-hidden"
           >
             <div className="flex items-center justify-between px-5 h-16 border-b border-dark-border bg-dark-card/80 backdrop-blur-xl flex-shrink-0 z-header">
-              <h3 className="font-semibold text-base">Настройки</h3>
+              <h3 className="font-semibold text-base">{t('settings.title')}</h3>
               <IconBtn size="sm" onClick={onClose}><X size={16} /></IconBtn>
             </div>
 
@@ -55,17 +56,17 @@ export default function SettingsDialog({ open, onClose }: Props) {
               className="flex-1 overflow-y-auto p-4 space-y-3"
             >
               <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
-                <SectionTitle>Внешний вид</SectionTitle>
+                <SectionTitle>{t('settings.appearance')}</SectionTitle>
                 <AppearanceSection />
               </motion.section>
 
               <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
-                <SectionTitle>Профиль</SectionTitle>
+                <SectionTitle>{t('settings.profile')}</SectionTitle>
                 <ProfileSection open={open} />
               </motion.section>
 
               <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2 space-y-5">
-                <SectionTitle>Безопасность</SectionTitle>
+                <SectionTitle>{t('settings.security')}</SectionTitle>
                 <TwoFactorSection status={status} onChange={setStatus} />
                 <div className="h-px bg-dark-border" aria-hidden />
                 <CloudPasswordSection />
@@ -183,6 +184,7 @@ function AppearanceSection() {
 // при каждом открытии настроек (GET /users/:id отдаёт bio).
 
 function ProfileSection({ open }: { open: boolean }) {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [bio,      setBio]      = useState('');
   const [savedBio, setSavedBio] = useState('');
@@ -211,9 +213,9 @@ function ProfileSection({ open }: { open: boolean }) {
       const b: string = data.data?.bio ?? bio.trim();
       setBio(b);
       setSavedBio(b);
-      setOk('Сохранено');
+      setOk(t('settings.saved'));
     } catch (e: unknown) {
-      setErr(errMsg(e, 'Не удалось сохранить'));
+      setErr(errMsg(e, t('settings.saveFailed')));
     } finally { setBusy(false); }
   };
 
@@ -222,11 +224,11 @@ function ProfileSection({ open }: { open: boolean }) {
   return (
     <div className="space-y-3">
       <div>
-        <h4 className="font-semibold text-sm">О себе</h4>
+        <h4 className="font-semibold text-sm">{t('settings.bio')}</h4>
         <textarea
           value={bio}
           onChange={(e) => { setBio(e.target.value.slice(0, 140)); setOk(''); setErr(''); }}
-          placeholder="Пара слов о себе…"
+          placeholder={t('settings.bioPlaceholder')}
           rows={2}
           maxLength={140}
           className="input-base w-full mt-2 resize-none"
@@ -241,7 +243,7 @@ function ProfileSection({ open }: { open: boolean }) {
             className="btn-primary btn-sm disabled:opacity-40"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Сохранить
+            {t('common.save')}
           </motion.button>
         </div>
         {err && <p className="text-red-400 text-sm mt-1">{err}</p>}
@@ -256,7 +258,7 @@ function ProfileSection({ open }: { open: boolean }) {
           className="btn-secondary btn-block"
         >
           <QrCodeIcon size={15} />
-          Мой QR-код
+          {t('settings.myQr')}
         </motion.button>
       )}
 
@@ -277,6 +279,7 @@ function ProfileSection({ open }: { open: boolean }) {
 // ─── 2FA секция ──────────────────────────────────────────────────────────────
 
 function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: Status) => void }) {
+  const { t } = useTranslation();
   const [setup,  setSetup]  = useState<{ secret: string; qr: string } | null>(null);
   const [code,   setCode]   = useState('');
   const [busy,   setBusy]   = useState(false);
@@ -294,7 +297,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
       const qr = await QRCode.toDataURL(data.data.otpauthUrl, { margin: 1, scale: 4 });
       setSetup({ secret: data.data.secret, qr });
     } catch (e: unknown) {
-      setErr((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? 'Ошибка');
+      setErr((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? t('settings.error'));
     } finally { setBusy(false); }
   };
 
@@ -308,7 +311,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
       const fresh = await api.get('/auth/2fa/status');
       onChange(fresh.data.data);
     } catch (e: unknown) {
-      setErr((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? 'Неверный код');
+      setErr((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? t('settings.wrongCode'));
     } finally { setBusy(false); }
   };
 
@@ -321,7 +324,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
       setShowDisable(false);
       setDisablePwd(''); setDisableCode('');
     } catch (e: unknown) {
-      setErr((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? 'Ошибка');
+      setErr((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? t('settings.error'));
     } finally { setBusy(false); }
   };
 
@@ -337,21 +340,21 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
     return (
       <div className="space-y-4">
         <div>
-          <h4 className="font-semibold text-sm mb-1">Шаг 1 — отсканируй QR</h4>
-          <p className="text-xs text-content/50">Google Authenticator, Authy, 1Password — любое TOTP-приложение.</p>
+          <h4 className="font-semibold text-sm mb-1">{t('settings.twoFaStep1')}</h4>
+          <p className="text-xs text-content/50">{t('settings.twoFaStep1Hint')}</p>
         </div>
         <div className="bg-white p-3 rounded-2xl flex items-center justify-center shadow-e2">
           <img src={setup.qr} alt="QR" className="w-48 h-48" />
         </div>
         <div>
-          <p className="text-xs text-content/40 mb-1">Или введи секрет вручную:</p>
+          <p className="text-xs text-content/40 mb-1">{t('settings.twoFaManual')}</p>
           <code className="block bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-xs font-mono break-all text-content/80">
             {setup.secret}
           </code>
         </div>
 
         <div className="border-t border-dark-border pt-4">
-          <h4 className="font-semibold text-sm mb-2">Шаг 2 — введи 6-значный код из приложения</h4>
+          <h4 className="font-semibold text-sm mb-2">{t('settings.twoFaStep2')}</h4>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -370,7 +373,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
             transition={SPRING.snappy}
             className="btn-secondary flex-1"
           >
-            Отмена
+            {t('common.cancel')}
           </motion.button>
           <motion.button
             onClick={confirmEnable}
@@ -380,7 +383,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
             className="btn-primary flex-1 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Включить
+            {t('settings.enable')}
           </motion.button>
         </div>
       </div>
@@ -391,30 +394,30 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
   if (showDisable) {
     return (
       <div className="space-y-4">
-        <h4 className="font-semibold text-sm">Отключить двухфакторную аутентификацию?</h4>
-        <p className="text-xs text-content/50">Подтверди паролем и текущим кодом из приложения.</p>
+        <h4 className="font-semibold text-sm">{t('settings.disableTitle')}</h4>
+        <p className="text-xs text-content/50">{t('settings.disableHint')}</p>
         <input
           type="password"
           value={disablePwd}
           onChange={(e) => setDisablePwd(e.target.value)}
-          placeholder="Пароль"
+          placeholder={t('settings.password')}
           className="input-base w-full"
         />
         <input
           value={disableCode}
           onChange={(e) => setDisableCode(e.target.value)}
-          placeholder="Код из приложения"
+          placeholder={t('settings.codeFromApp')}
           inputMode="numeric"
           className="input-base w-full text-center tracking-widest font-mono"
         />
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <div className="flex gap-2">
           <motion.button onClick={() => setShowDisable(false)} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
-            Отмена
+            {t('common.cancel')}
           </motion.button>
           <motion.button onClick={disable} disabled={busy} whileTap={tap} transition={SPRING.snappy} className="btn-danger flex-1 disabled:opacity-50">
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Отключить
+            {t('settings.disable')}
           </motion.button>
         </div>
       </div>
@@ -429,11 +432,11 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
           {status?.enabled ? <ShieldCheck size={22} /> : <ShieldOff size={22} />}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-sm">Двухфакторная аутентификация</h4>
+          <h4 className="font-semibold text-sm">{t('settings.twoFactor')}</h4>
           <p className="text-xs text-content/50 mt-0.5">
             {status?.enabled
-              ? `Включена. Осталось ${status.remainingRecoveryCodes} recovery-кодов.`
-              : 'Пароль + одноразовый код из приложения при каждом входе.'}
+              ? t('settings.twoFactorOn', { n: status.remainingRecoveryCodes })
+              : t('settings.twoFactorOff')}
           </p>
         </div>
       </div>
@@ -447,7 +450,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
           className="btn-primary btn-block disabled:opacity-50"
         >
           {busy && <Loader2 size={14} className="animate-spin" />}
-          Включить 2FA
+          {t('settings.enable2fa')}
         </motion.button>
       ) : (
         <motion.button
@@ -456,7 +459,7 @@ function TwoFactorSection({ status, onChange }: { status: Status; onChange: (s: 
           transition={SPRING.snappy}
           className="btn-secondary btn-block hover:bg-red-500/20 hover:text-red-400"
         >
-          Отключить 2FA
+          {t('settings.disable2fa')}
         </motion.button>
       )}
 
@@ -481,6 +484,7 @@ function errMsg(e: unknown, fallback: string): string {
 }
 
 function CloudPasswordSection() {
+  const { t } = useTranslation();
   const userId = useAuthStore((s) => s.user?.id);
   const [hasPassword, setHasPassword] = useState(() => getCloudPwdFlag(userId));
   const [mode, setMode] = useState<'idle' | 'edit' | 'delete'>('idle');
@@ -508,14 +512,14 @@ function CloudPasswordSection() {
         newPassword: pwd1,
       });
       setCloudPwdFlag(userId, true);
-      setOk(hasPassword ? 'Пароль изменён' : 'Облачный пароль установлен');
+      setOk(hasPassword ? t('settings.pwdChanged') : t('settings.cloudSet'));
       setHasPassword(true);
       setNeedCurrent(false);
       closeForm();
     } catch (e: unknown) {
       // Бэк требует текущий пароль, а мы его не слали — флаг устарел.
       if (!askCurrent) setNeedCurrent(true);
-      setErr(errMsg(e, 'Не удалось сохранить пароль'));
+      setErr(errMsg(e, t('settings.cloudSaveFailed')));
     } finally { setBusy(false); }
   };
 
@@ -524,12 +528,12 @@ function CloudPasswordSection() {
     try {
       await api.delete('/users/me/cloud-password', { data: { currentPassword: current } });
       setCloudPwdFlag(userId, false);
-      setOk('Облачный пароль удалён');
+      setOk(t('settings.cloudRemoved'));
       setHasPassword(false);
       setNeedCurrent(false);
       closeForm();
     } catch (e: unknown) {
-      setErr(errMsg(e, 'Не удалось удалить пароль'));
+      setErr(errMsg(e, t('settings.cloudRemoveFailed')));
     } finally { setBusy(false); }
   };
 
@@ -538,14 +542,14 @@ function CloudPasswordSection() {
     const mismatch = pwd2.length > 0 && pwd1 !== pwd2;
     return (
       <div className="space-y-3">
-        <h4 className="font-semibold text-sm">{hasPassword ? 'Сменить облачный пароль' : 'Установить облачный пароль'}</h4>
-        <p className="text-xs text-content/50">Будет запрашиваться после кода при входе на новом устройстве.</p>
+        <h4 className="font-semibold text-sm">{hasPassword ? t('settings.changeCloudTitle') : t('settings.setCloudTitle')}</h4>
+        <p className="text-xs text-content/50">{t('settings.cloudPwdFormHint')}</p>
         {askCurrent && (
           <input
             type="password"
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
-            placeholder="Текущий пароль"
+            placeholder={t('settings.currentPwd')}
             autoComplete="current-password"
             className="input-base w-full"
           />
@@ -554,7 +558,7 @@ function CloudPasswordSection() {
           type="password"
           value={pwd1}
           onChange={(e) => setPwd1(e.target.value)}
-          placeholder="Новый пароль (мин. 8 символов)"
+          placeholder={t('settings.newPwd')}
           autoComplete="new-password"
           className="input-base w-full"
         />
@@ -562,15 +566,15 @@ function CloudPasswordSection() {
           type="password"
           value={pwd2}
           onChange={(e) => setPwd2(e.target.value)}
-          placeholder="Повторите новый пароль"
+          placeholder={t('settings.repeatPwd')}
           autoComplete="new-password"
           className="input-base w-full"
         />
-        {mismatch && <p className="text-red-400 text-xs">Пароли не совпадают</p>}
+        {mismatch && <p className="text-red-400 text-xs">{t('settings.pwdMismatch')}</p>}
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <div className="flex gap-2">
           <motion.button onClick={closeForm} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
-            Отмена
+            {t('common.cancel')}
           </motion.button>
           <motion.button
             onClick={save}
@@ -580,7 +584,7 @@ function CloudPasswordSection() {
             className="btn-primary flex-1 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Сохранить
+            {t('common.save')}
           </motion.button>
         </div>
       </div>
@@ -591,20 +595,20 @@ function CloudPasswordSection() {
   if (mode === 'delete') {
     return (
       <div className="space-y-3">
-        <h4 className="font-semibold text-sm">Удалить облачный пароль?</h4>
-        <p className="text-xs text-content/50">Вход останется только по коду из Telegram. Подтвердите текущим паролем.</p>
+        <h4 className="font-semibold text-sm">{t('settings.deleteCloudTitle')}</h4>
+        <p className="text-xs text-content/50">{t('settings.deleteCloudHint')}</p>
         <input
           type="password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          placeholder="Текущий пароль"
+          placeholder={t('settings.currentPwd')}
           autoComplete="current-password"
           className="input-base w-full"
         />
         {err && <p className="text-red-400 text-sm">{err}</p>}
         <div className="flex gap-2">
           <motion.button onClick={closeForm} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
-            Отмена
+            {t('common.cancel')}
           </motion.button>
           <motion.button
             onClick={remove}
@@ -614,7 +618,7 @@ function CloudPasswordSection() {
             className="btn-danger flex-1 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Удалить
+            {t('common.delete')}
           </motion.button>
         </div>
       </div>
@@ -629,11 +633,11 @@ function CloudPasswordSection() {
           <KeyRound size={22} />
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-sm">Облачный пароль</h4>
+          <h4 className="font-semibold text-sm">{t('settings.cloudPwd')}</h4>
           <p className="text-xs text-content/50 mt-0.5">
             {hasPassword
-              ? 'Установлен. Запрашивается после кода при входе с нового устройства.'
-              : 'Не установлен. Дополнительная защита поверх кода из Telegram.'}
+              ? t('settings.cloudPwdOn')
+              : t('settings.cloudPwdOff')}
           </p>
         </div>
       </div>
@@ -645,7 +649,7 @@ function CloudPasswordSection() {
           transition={SPRING.snappy}
           className="btn-primary flex-1"
         >
-          {hasPassword ? 'Сменить' : 'Установить'}
+          {hasPassword ? t('settings.changePwd') : t('settings.setPwd')}
         </motion.button>
         {hasPassword && (
           <motion.button
@@ -654,7 +658,7 @@ function CloudPasswordSection() {
             transition={SPRING.snappy}
             className="btn-secondary flex-1 hover:bg-red-500/20 hover:text-red-400"
           >
-            Удалить
+            {t('common.delete')}
           </motion.button>
         )}
       </div>
@@ -667,6 +671,7 @@ function CloudPasswordSection() {
 // ─── Recovery codes display ──────────────────────────────────────────────────
 
 function RecoveryCodesView({ codes, onDone }: { codes: string[]; onDone: () => void }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const copyAll = () => {
@@ -680,11 +685,10 @@ function RecoveryCodesView({ codes, onDone }: { codes: string[]; onDone: () => v
       <div>
         <h4 className="font-semibold text-sm flex items-center gap-2">
           <ShieldCheck size={16} className="text-green-400" />
-          2FA включена
+          {t('settings.twoFaOnTitle')}
         </h4>
         <p className="text-xs text-content/60 mt-2">
-          <strong className="text-red-400">Сохрани эти 10 recovery-кодов сейчас.</strong> Каждый можно использовать
-          один раз вместо TOTP-кода, если потеряешь телефон. Больше они не покажутся.
+          <strong className="text-red-400">{t('settings.recoveryWarn')}</strong>{t('settings.recoveryHint')}
         </p>
       </div>
 
@@ -699,7 +703,7 @@ function RecoveryCodesView({ codes, onDone }: { codes: string[]; onDone: () => v
           transition={SPRING.snappy}
           className="btn-secondary flex-1"
         >
-          {copied ? <><Check size={14} /> Скопировано</> : <><Copy size={14} /> Скопировать все</>}
+          {copied ? <><Check size={14} /> {t('settings.copied')}</> : <><Copy size={14} /> {t('settings.copyAll')}</>}
         </motion.button>
         <motion.button
           onClick={onDone}
@@ -707,7 +711,7 @@ function RecoveryCodesView({ codes, onDone }: { codes: string[]; onDone: () => v
           transition={SPRING.snappy}
           className="btn-primary flex-1"
         >
-          Сохранил
+          {t('settings.savedIt')}
         </motion.button>
       </div>
     </div>

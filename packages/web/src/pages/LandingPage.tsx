@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   motion, AnimatePresence, useMotionValue, useSpring, useTransform,
   useScroll, useMotionTemplate,
@@ -137,6 +138,7 @@ function AmbientGlows() {
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 function Header({ onSignIn }: { onSignIn: () => void }) {
+  const { t } = useTranslation();
   return (
     <header className="relative z-20 px-6 lg:px-12 py-6 flex items-center justify-between max-w-[1480px] mx-auto">
       <div className="flex items-center gap-2.5">
@@ -145,9 +147,9 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
       </div>
 
       <nav className="hidden md:flex items-center gap-9 text-sm text-content/60">
-        <a href="#features" className="hover:text-content transition">Возможности</a>
-        <a href="#privacy"  className="hover:text-content transition">Приватность</a>
-        <a href="#download" className="hover:text-content transition">Загрузить</a>
+        <a href="#features" className="hover:text-content transition">{t('landing.nav_features')}</a>
+        <a href="#privacy"  className="hover:text-content transition">{t('landing.nav_privacy')}</a>
+        <a href="#download" className="hover:text-content transition">{t('landing.nav_download')}</a>
       </nav>
 
       <div className="flex items-center gap-3">
@@ -155,13 +157,13 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
           onClick={onSignIn}
           className="hidden sm:inline-flex text-sm text-content/70 hover:text-content px-3 py-2 rounded-lg transition"
         >
-          Войти
+          {t('landing.signIn')}
         </button>
         <button
           onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
           className="text-sm text-content bg-content/[0.06] hover:bg-content/[0.10] border border-content/[0.10] px-4 py-2 rounded-xl transition"
         >
-          Скачать
+          {t('landing.download')}
         </button>
       </div>
     </header>
@@ -171,6 +173,7 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 function Hero() {
+  const { t } = useTranslation();
   return (
     <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-6 lg:pt-10 pb-16 lg:pb-20">
       <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
@@ -188,25 +191,25 @@ function Hero() {
             className="inline-flex items-center gap-2 text-xs text-content/65 bg-content/[0.05] border border-content/[0.09] rounded-full px-3 py-1.5"
           >
             <Sparkles size={12} className="text-accent-pink" />
-            Приватность по умолчанию · бесплатно
+            {t('landing.heroBadge')}
           </motion.div>
 
           {/* HUGE typography — выровнено по базовой линии, читается в обеих темах */}
           <h1 className="font-extrabold leading-[0.9] tracking-[-0.04em] text-[15vw] sm:text-[12vw] lg:text-[7.4vw] xl:text-[112px]">
             <span className="block text-content">
-              ПИШИ<span className="text-content/35">.</span>
+              {t('landing.heroWrite')}<span className="text-content/35">.</span>
             </span>
             <span
               className="block bg-clip-text text-transparent"
               style={{ backgroundImage: 'linear-gradient(90deg, #ff4d8d 0%, #ff8a3d 100%)' }}
             >
-              ГОВОРИ<span className="text-accent-pink/80">.</span>
+              {t('landing.heroTalk')}<span className="text-accent-pink/80">.</span>
             </span>
             <span
               className="block bg-clip-text text-transparent"
               style={{ backgroundImage: 'linear-gradient(90deg, #7c4dff 0%, #34e0d0 100%)' }}
             >
-              ЖИВИ<span className="text-accent-violet/80">.</span>
+              {t('landing.heroLive')}<span className="text-accent-violet/80">.</span>
             </span>
           </h1>
 
@@ -216,8 +219,7 @@ function Hero() {
             transition={{ delay: 0.35 }}
             className="text-content/60 text-lg max-w-md mx-auto lg:mx-0 leading-relaxed"
           >
-            Мессенджер, в котором каждое сообщение дышит. Реакции, голос, видео —
-            в одном живом холсте.
+            {t('landing.heroSub')}
           </motion.p>
 
           <motion.div
@@ -230,7 +232,7 @@ function Hero() {
               onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
               className="group inline-flex items-center justify-center gap-2 bg-brand-gradient hover:opacity-95 active:scale-[0.98] transition px-8 py-4 rounded-full text-base font-medium text-white shadow-glow-violet"
             >
-              Скачать бесплатно
+              {t('landing.downloadFree')}
               <ArrowRight size={18} className="-ml-0.5 group-hover:translate-x-1 transition-transform" />
             </button>
           </motion.div>
@@ -255,6 +257,7 @@ function Hero() {
 // Видна на всех секциях, прячется только у самого низа страницы.
 
 function ScrollDownButton() {
+  const { t } = useTranslation();
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const onScroll = () => {
@@ -295,9 +298,9 @@ function ScrollDownButton() {
     <button
       onClick={goNext}
       className="hidden lg:flex fixed left-1/2 -translate-x-1/2 bottom-6 z-30 flex-col items-center gap-1.5 text-content/70 hover:text-content transition-colors"
-      aria-label="Листать вниз"
+      aria-label={t('landing.scrollDown')}
     >
-      <span className="text-[11px] tracking-wide uppercase">Листайте</span>
+      <span className="text-[11px] tracking-wide uppercase">{t('landing.scrollDown')}</span>
       <motion.span
         animate={{ y: [0, 6, 0] }}
         transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
@@ -384,14 +387,14 @@ function IntroBeam() {
 // ─── Объёмный живой телефон: переписка по кругу + 3D-наклон + блик ────────────
 
 type ScriptMsg =
-  | { id: number; kind: 'in' | 'out'; text: string }
+  | { id: number; kind: 'in' | 'out'; textKey: string }
   | { id: number; kind: 'voice' };
 
 const SCRIPT: ScriptMsg[] = [
-  { id: 0, kind: 'in',  text: 'Видел новый Dakka? Интерфейс просто 🔥' },
-  { id: 1, kind: 'out', text: 'Да! Живые реакции и стекло — топ' },
+  { id: 0, kind: 'in',  textKey: 'landing.demoMsg0' },
+  { id: 1, kind: 'out', textKey: 'landing.demoMsg1' },
   { id: 2, kind: 'voice' },
-  { id: 3, kind: 'in',  text: 'созвон вечером? 🎧' },
+  { id: 3, kind: 'in',  textKey: 'landing.demoMsg3' },
 ];
 
 const TIMELINE: Array<{ at: number; type: 'typing' | 'msg' | 'react' | 'reset'; i?: number }> = [
@@ -406,6 +409,7 @@ const TIMELINE: Array<{ at: number; type: 'typing' | 'msg' | 'react' | 'reset'; 
 ];
 
 function LivePhone() {
+  const { t } = useTranslation();
   const [shown,   setShown]   = useState<number[]>([]);
   const [typing,  setTyping]  = useState(false);
   const [reacted, setReacted] = useState(false);
@@ -463,8 +467,8 @@ function LivePhone() {
                 МК
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white">Майя</div>
-                <div className="text-[10px] text-accent-pink/85">{typing ? 'печатает…' : 'в сети'}</div>
+                <div className="text-sm font-medium text-white">{t('landing.demoPeer')}</div>
+                <div className="text-[10px] text-accent-pink/85">{typing ? t('chat.typing') : t('chat.online')}</div>
               </div>
               <VideoIcon size={16} className="text-white/55" />
             </div>
@@ -505,7 +509,7 @@ function LivePhone() {
                           : 'relative self-start bg-white/[0.06] text-white/95 rounded-2xl rounded-bl-md px-3 py-2 text-[12px] max-w-[74%] border border-white/[0.05]'
                       }
                     >
-                      {m.text}
+                      {t(m.textKey)}
                       {m.id === 0 && (
                         <AnimatePresence>
                           {reacted && (
@@ -550,7 +554,7 @@ function LivePhone() {
             <div className="px-4 pb-5 pt-1 flex items-center gap-2">
               <button className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/55 flex-shrink-0">+</button>
               <div className="flex-1 h-9 rounded-full bg-white/[0.04] border border-white/[0.06] px-4 flex items-center text-[12px] text-white/35">
-                Сообщение
+                {t('landing.demoComposer')}
               </div>
               <button className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center flex-shrink-0">
                 <Mic size={14} fill="white" className="text-white" />
@@ -587,20 +591,21 @@ function LiveWaveform() {
 // ─── Feature grid (magnetic-наклон карточек к курсору) ────────────────────────
 
 function FeatureGrid() {
+  const { t } = useTranslation();
   const items = [
-    { icon: Lock,      title: 'Защита данных',       desc: 'TLS-шифрование трафика, приватные медиа и 2FA. Доступ к чату — только у участников.' },
-    { icon: Mic,       title: 'Голосовые сообщения', desc: 'Жмёшь и говоришь — мгновенно, с волной и автостопом.' },
-    { icon: VideoIcon, title: 'Звонки и видео',      desc: 'Один-на-один + групповые до 8. Без задержек, через свой TURN/SFU.' },
-    { icon: Smile,     title: 'Живые реакции',       desc: 'Эмодзи, ответы, цитаты, пересылка — всё под пальцем.' },
-    { icon: Phone,     title: 'По номеру',           desc: 'Вход одним кодом через Telegram. Никаких паролей.' },
-    { icon: Globe,     title: 'Web, iOS, Android',   desc: 'Один аккаунт, бесшовная синхронизация между устройствами.' },
+    { icon: Lock,      title: t('landing.feat_security_t'), desc: t('landing.feat_security_d') },
+    { icon: Mic,       title: t('landing.feat_voice_t'),    desc: t('landing.feat_voice_d') },
+    { icon: VideoIcon, title: t('landing.feat_calls_t'),    desc: t('landing.feat_calls_d') },
+    { icon: Smile,     title: t('landing.feat_react_t'),    desc: t('landing.feat_react_d') },
+    { icon: Phone,     title: t('landing.feat_phone_t'),    desc: t('landing.feat_phone_d') },
+    { icon: Globe,     title: t('landing.feat_cross_t'),    desc: t('landing.feat_cross_d') },
   ];
   return (
     <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <SectionHeader
-        chip="Возможности"
-        title="Всё для живого общения"
-        sub="Стандарт большой тройки — без рекламы, без слежки, без компромиссов в дизайне."
+        chip={t('landing.featuresChip')}
+        title={t('landing.featuresTitle')}
+        sub={t('landing.featuresSub')}
       />
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
@@ -648,6 +653,7 @@ function TiltCard({ children, index }: { children: React.ReactNode; index: numbe
 // ─── Privacy section ──────────────────────────────────────────────────────────
 
 function PrivacySection() {
+  const { t } = useTranslation();
   return (
     <section id="privacy" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <div className="grid lg:grid-cols-2 gap-14 items-center">
@@ -658,23 +664,22 @@ function PrivacySection() {
           transition={{ duration: 0.7 }}
         >
           <div className="inline-flex items-center gap-2 text-xs text-accent-violet bg-accent-violet/[0.12] border border-accent-violet/[0.22] rounded-full px-3 py-1.5 mb-6">
-            <ShieldCheck size={12} /> Приватность
+            <ShieldCheck size={12} /> {t('landing.privacyChip')}
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[0.95] mb-6">
-            Ваши слова —<br />
-            только <span className="bg-clip-text text-transparent bg-brand-gradient">ваши</span>.
+            {t('landing.privacyTitle1')}<br />
+            {t('landing.privacyTitle2')} <span className="bg-clip-text text-transparent bg-brand-gradient">{t('landing.privacyTitleHi')}</span>.
           </h2>
           <p className="text-content/60 text-lg leading-relaxed max-w-md">
-            Соединение защищено TLS, медиафайлы приватны и доступны только участникам чата.
-            Пароли хранятся как Argon2-хеши, вход — по одноразовому коду, плюс 2FA.
+            {t('landing.privacySub')}
           </p>
 
           <div className="mt-8 space-y-3 text-sm text-content/70">
             {[
-              'TLS 1.2/1.3, HSTS и строгие security-заголовки',
-              'TURN с эфемерными HMAC-credentials, TTL 10 минут',
-              'Приватное хранилище медиа: доступ только участникам чата',
-              'Двухфакторная защита через TOTP (Google Authenticator)',
+              t('landing.privacyP1'),
+              t('landing.privacyP2'),
+              t('landing.privacyP3'),
+              t('landing.privacyP4'),
             ].map((line) => (
               <div key={line} className="flex items-center gap-3">
                 <span className="w-5 h-5 rounded-full bg-accent-pink/15 flex items-center justify-center flex-shrink-0">
@@ -700,8 +705,8 @@ function PrivacySection() {
                 <Lock size={28} className="text-white" />
               </div>
               <div>
-                <div className="text-2xl font-semibold">Защищённое соединение</div>
-                <div className="text-sm text-content/55">TLS · приватные медиа · 2FA</div>
+                <div className="text-2xl font-semibold">{t('landing.privacyCardT')}</div>
+                <div className="text-sm text-content/55">{t('landing.privacyCardS')}</div>
               </div>
             </div>
 
@@ -721,13 +726,14 @@ function PrivacySection() {
 // ─── Download section ─────────────────────────────────────────────────────────
 
 function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
+  const { t } = useTranslation();
   const dl = desktopDownload();
   return (
     <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
       <SectionHeader
-        chip="Загрузить"
-        title="Везде, где вы есть"
-        sub="Установите Dakka на любое устройство — все ваши чаты автоматически появятся."
+        chip={t('landing.downloadChip')}
+        title={t('landing.downloadTitle')}
+        sub={t('landing.downloadSub')}
       />
 
       {/* Главная кнопка — сразу под текущую ОС (macOS/Windows). Иначе — открыть в браузере. */}
@@ -748,17 +754,17 @@ function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
             className="inline-flex items-center gap-2.5 h-14 px-8 rounded-2xl bg-brand-gradient text-white font-semibold text-base shadow-glow-violet hover:opacity-95"
           >
-            <Globe size={20} /> Открыть в браузере
+            <Globe size={20} /> {t('landing.openInBrowser')}
           </motion.button>
         )}
       </div>
 
       <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-12">
-        <DownloadCard icon={Apple}      title="macOS"         sub="Apple Silicon · .dmg"   href={DESKTOP_DOWNLOADS.mac}     highlight={dl.os === 'mac'} />
-        <DownloadCard icon={Monitor}    title="Windows"       sub="x64 · установщик .exe"  href={DESKTOP_DOWNLOADS.windows} highlight={dl.os === 'windows'} />
-        <DownloadCard icon={Apple}      title="iPhone & iPad" sub="iOS 16.4+"              onClick={onSignIn} />
-        <DownloadCard icon={Smartphone} title="Android"       sub="Android 8+"             onClick={onSignIn} />
-        <DownloadCard icon={Globe}      title="Web"           sub="Браузер — прямо здесь"  onClick={onSignIn} />
+        <DownloadCard icon={Apple}      title="macOS"               sub={t('landing.dl_mac')}     href={DESKTOP_DOWNLOADS.mac}     highlight={dl.os === 'mac'} />
+        <DownloadCard icon={Monitor}    title="Windows"             sub={t('landing.dl_win')}     href={DESKTOP_DOWNLOADS.windows} highlight={dl.os === 'windows'} />
+        <DownloadCard icon={Apple}      title="iPhone & iPad"       sub={t('landing.dl_ios')}     onClick={onSignIn} />
+        <DownloadCard icon={Smartphone} title="Android"             sub={t('landing.dl_android')} onClick={onSignIn} />
+        <DownloadCard icon={Globe}      title={t('landing.webTitle')} sub={t('landing.dl_web')}   onClick={onSignIn} />
       </div>
     </section>
   );
@@ -769,6 +775,7 @@ function DownloadCard({
 }: {
   icon: typeof Apple; title: string; sub: string; onClick?: () => void; href?: string; highlight?: boolean;
 }) {
+  const { t } = useTranslation();
   const className = `group relative block text-left p-6 rounded-2xl border transition-colors overflow-hidden
     ${highlight
       ? 'bg-brand-gradient-soft border-accent-violet/40 ring-1 ring-accent-violet/30'
@@ -779,11 +786,11 @@ function DownloadCard({
       <Icon size={32} className="mb-4 text-content/85 group-hover:scale-110 transition" />
       <div className="text-base font-medium mb-1 flex items-center gap-2">
         {title}
-        {highlight && <span className="text-[10px] font-semibold text-accent-violet bg-accent-violet/15 px-1.5 py-0.5 rounded-full">ваша ОС</span>}
+        {highlight && <span className="text-[10px] font-semibold text-accent-violet bg-accent-violet/15 px-1.5 py-0.5 rounded-full">{t('landing.yourOs')}</span>}
       </div>
       <div className="text-sm text-content/55">{sub}</div>
       <div className="flex items-center gap-1 mt-3 text-xs text-accent-pink opacity-0 group-hover:opacity-100 transition">
-        {href ? 'Скачать' : 'Открыть'} <ArrowRight size={12} />
+        {href ? t('landing.dlDownload') : t('landing.dlOpen')} <ArrowRight size={12} />
       </div>
     </>
   );
@@ -796,47 +803,31 @@ function DownloadCard({
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
 function Footer() {
+  const { t } = useTranslation();
   return (
     <footer className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-12 pb-16 border-t border-content/[0.07] space-y-8">
       {/* Юридический дисклеймер — снимаем ответственность с сервиса/разработчиков. */}
       <div className="text-[12px] leading-relaxed text-content/40 space-y-3 max-w-3xl">
+        <p>{t('landing.footerAs')}</p>
+        <p>{t('landing.footerRisk')}</p>
         <p>
-          Dakka предоставляется на условиях «как есть» (as is) и «как доступно» (as available),
-          без каких-либо гарантий, явных или подразумеваемых, включая, помимо прочего, гарантии
-          пригодности для определённой цели, бесперебойной и безошибочной работы, сохранности данных
-          и безопасности.
-        </p>
-        <p>
-          Используя сервис, вы соглашаетесь, что делаете это на свой страх и риск. Администрация и
-          разработчики в максимально допустимой законом степени не несут ответственности за любой
-          прямой, косвенный, случайный или последующий ущерб, утрату данных, сообщений, медиафайлов
-          либо упущенную выгоду, возникшие в результате использования или невозможности использования
-          сервиса.
-        </p>
-        <p>
-          Сервис не предназначен для экстренной связи. Пользователи несут полную ответственность за
-          размещаемый ими контент и обязуются соблюдать применимое законодательство. Продолжая
-          использование, вы принимаете{' '}
-          <a href="#" className="text-content/60 underline hover:text-content/90">Пользовательское соглашение</a> и{' '}
-          <a href="#" className="text-content/60 underline hover:text-content/90">Политику конфиденциальности</a>.
+          {t('landing.footerEmergency')}{' '}
+          <a href="#" className="text-content/60 underline hover:text-content/90">{t('landing.footerAgreement')}</a> {t('landing.footerAnd')}{' '}
+          <a href="#" className="text-content/60 underline hover:text-content/90">{t('landing.footerPrivacy')}</a>.
         </p>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-content/45 pt-6 border-t border-content/[0.05]">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-brand-gradient flex items-center justify-center">
-            <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
-              <path d="M4 8C4 6.9 4.9 6 6 6h20c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H18l-4 4-2-4H6c-1.1 0-2-.9-2-2V8z" fill="white"/>
-            </svg>
-          </div>
+          <DakkaIcon size={24} />
           <span className="text-content/70 font-medium">Dakka</span>
-          <span>© 2026 · Все права защищены</span>
+          <span>{t('landing.footerRights')}</span>
         </div>
         <div className="flex items-center gap-5 flex-wrap justify-center">
-          <a href="#" className="hover:text-content/80 transition">Соглашение</a>
-          <a href="#" className="hover:text-content/80 transition">Конфиденциальность</a>
-          <a href="#" className="hover:text-content/80 transition">Оферта</a>
-          <a href="mailto:hello@akkdmsg.online" className="hover:text-content/80 transition">Связаться</a>
+          <a href="#" className="hover:text-content/80 transition">{t('landing.footerLinkAgreement')}</a>
+          <a href="#" className="hover:text-content/80 transition">{t('landing.footerLinkPrivacy')}</a>
+          <a href="#" className="hover:text-content/80 transition">{t('landing.footerLinkOffer')}</a>
+          <a href="mailto:hello@akkdmsg.online" className="hover:text-content/80 transition">{t('landing.footerLinkContact')}</a>
         </div>
       </div>
     </footer>

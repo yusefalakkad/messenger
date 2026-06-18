@@ -145,7 +145,7 @@ export default function Sidebar() {
       {/* ── Mobile header — как в Telegram: компактный, заголовок по центру,
              «написать» справа. Настройки/аватар/выход живут в таб-баре. ── */}
       <div className="lg:hidden relative flex items-center justify-center px-3 h-14 flex-shrink-0 border-b border-dark-border">
-        <h1 className="text-[17px] font-semibold tracking-[-0.01em]">Чаты</h1>
+        <h1 className="text-[17px] font-semibold tracking-[-0.01em]">{t('nav.chats')}</h1>
         <div className="absolute right-2 top-1/2 -translate-y-1/2">
           <motion.button
             onClick={() => setShowPlus((v) => !v)}
@@ -153,15 +153,15 @@ export default function Sidebar() {
             transition={SPRING.snappy}
             className="w-9 h-9 rounded-full text-white flex items-center justify-center active:opacity-90"
             style={{ background: 'linear-gradient(142deg, #ff6b72, #ff9a5c)', boxShadow: '0 4px 14px -4px rgba(255,107,114,0.6)' }}
-            title="Новый чат"
-            aria-label="Новый чат"
+            title={t('chat.newChat')}
+            aria-label={t('chat.newChat')}
           >
             <MessageSquarePlus size={18} />
           </motion.button>
           <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
-            <DropdownItem icon={<MessageSquarePlus size={16} />} label="Новый чат"   onClick={() => { setShowNewChat(true); setShowPlus(false); }} />
-            <DropdownItem icon={<Users size={16} />}            label="Новая группа" onClick={() => { setShowNewGroup(true); setShowPlus(false); }} />
-            <DropdownItem icon={<Megaphone size={16} />}        label="Новый канал"  onClick={() => { setShowNewChannel(true); setShowPlus(false); }} />
+            <DropdownItem icon={<MessageSquarePlus size={16} />} label={t('chat.newChat')}    onClick={() => { setShowNewChat(true); setShowPlus(false); }} />
+            <DropdownItem icon={<Users size={16} />}            label={t('chat.newGroup')}   onClick={() => { setShowNewGroup(true); setShowPlus(false); }} />
+            <DropdownItem icon={<Megaphone size={16} />}        label={t('chat.newChannel')} onClick={() => { setShowNewChannel(true); setShowPlus(false); }} />
           </Dropdown>
         </div>
       </div>
@@ -184,7 +184,7 @@ export default function Sidebar() {
             onClick={() => avatarInputRef.current?.click()}
             disabled={uploadingAvatar}
             className="absolute inset-1 rounded-full bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-            title="Сменить фото"
+            title={t('chat.changePhoto')}
           >
             {uploadingAvatar
               ? <div className="w-3.5 h-3.5 border-2 border-white/60 border-t-white rounded-full animate-spin" />
@@ -207,30 +207,30 @@ export default function Sidebar() {
 
         <div className="flex items-center gap-1">
           <div className="relative">
-            <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title="Новый чат или группа">
+            <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title={t('chat.newChatOrGroup')}>
               <Plus size={18} />
             </IconBtn>
             <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
               <DropdownItem
-                icon={<MessageSquarePlus size={16} />} label="Новый чат"
+                icon={<MessageSquarePlus size={16} />} label={t('chat.newChat')}
                 onClick={() => { setShowNewChat(true); setShowPlus(false); }}
               />
               <DropdownItem
-                icon={<Users size={16} />} label="Новая группа"
+                icon={<Users size={16} />} label={t('chat.newGroup')}
                 onClick={() => { setShowNewGroup(true); setShowPlus(false); }}
               />
               <DropdownItem
-                icon={<Megaphone size={16} />} label="Новый канал"
+                icon={<Megaphone size={16} />} label={t('chat.newChannel')}
                 onClick={() => { setShowNewChannel(true); setShowPlus(false); }}
               />
             </Dropdown>
           </div>
 
-          <IconBtn onClick={() => setSettingsOpen(true)} title="Настройки">
+          <IconBtn onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
             <Settings size={18} />
           </IconBtn>
 
-          <IconBtn onClick={handleLogout} title="Выйти">
+          <IconBtn onClick={handleLogout} title={t('chat.logout')}>
             <LogOut size={18} />
           </IconBtn>
         </div>
@@ -264,7 +264,7 @@ export default function Sidebar() {
           whileTap={tap}
           transition={SPRING.snappy}
           className="flex-1 lg:flex-none min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-2xl lg:rounded-lg text-left group max-lg:liquid-card lg:hover:bg-dark-hover/60 transition-colors"
-          title="Архивные чаты"
+          title={t('chat.archivedChats')}
         >
           <span className="w-10 h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
             <Archive size={18} />
@@ -280,7 +280,7 @@ export default function Sidebar() {
           whileTap={tap}
           transition={SPRING.snappy}
           className="flex-1 lg:flex-none min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-2xl lg:rounded-lg text-left group max-lg:liquid-card lg:hover:bg-dark-hover/60 transition-colors"
-          title="Избранное"
+          title={t('chat.saved')}
         >
           <span className="w-10 h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
             <Bookmark size={18} />
@@ -325,9 +325,9 @@ export default function Sidebar() {
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-content/90 text-[15px] font-semibold">Здесь пока тихо</p>
+                <p className="text-content/90 text-[15px] font-semibold">{t('chat.emptyTitle')}</p>
                 <p className="text-content/45 text-[13px] leading-5 max-w-[220px]">
-                  Начните переписку — ваши чаты появятся здесь
+                  {t('chat.emptyHint')}
                 </p>
               </div>
               <motion.button
@@ -338,7 +338,7 @@ export default function Sidebar() {
                 className="btn-primary btn-sm mt-1"
               >
                 <MessageSquarePlus size={15} />
-                Начать переписку
+                {t('chat.startChat')}
               </motion.button>
             </motion.div>
           ) : (

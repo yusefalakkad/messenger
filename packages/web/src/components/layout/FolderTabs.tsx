@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { useFoldersStore } from '@/stores/folders.store';
@@ -22,6 +23,7 @@ function FolderTab({
   onSelect: () => void;
   onEdit?: () => void;
 }) {
+  const { t } = useTranslation();
   const longPressTimer = useRef<number | null>(null);
   const longPressTriggered = useRef(false);
 
@@ -64,7 +66,7 @@ function FolderTab({
       }`}
     >
       {folder?.emoji && <span className="text-[14px] leading-none">{folder.emoji}</span>}
-      <span className="whitespace-nowrap">{folder ? folder.name : 'Все'}</span>
+      <span className="whitespace-nowrap">{folder ? folder.name : t('chat.all')}</span>
       {unread > 0 && (
         <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand-gradient text-white text-[11px] font-semibold leading-[18px] text-center tabular-nums">
           {unread > 99 ? '99+' : unread}
@@ -86,6 +88,7 @@ function FolderTab({
  * «Все» + пользовательские папки (emoji + имя + бейдж непрочитанных) + «+».
  */
 export default function FolderTabs({ onEditFolder }: Props) {
+  const { t } = useTranslation();
   const folders        = useFoldersStore((s) => s.folders);
   const activeFolderId = useFoldersStore((s) => s.activeFolderId);
   const setActiveFolder = useFoldersStore((s) => s.setActiveFolder);
@@ -120,7 +123,7 @@ export default function FolderTabs({ onEditFolder }: Props) {
       ))}
       <button
         onClick={() => onEditFolder(null)}
-        title="Новая папка"
+        title={t('chat.newFolder')}
         className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-content/55 hover:text-content hover:bg-content/[0.06] active:scale-95 transition"
       >
         <Plus size={16} />

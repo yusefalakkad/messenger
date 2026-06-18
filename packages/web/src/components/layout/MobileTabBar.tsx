@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Phone, Users, Settings, MessageCircle } from 'lucide-react';
 import { useUIStore } from '@/stores/ui.store';
@@ -18,15 +19,16 @@ import { SPRING, tap } from '@/lib/motion';
  */
 type TabKey = 'contacts' | 'calls' | 'chats' | 'settings';
 
-const TABS: { key: TabKey; label: string; Icon: typeof Users }[] = [
-  { key: 'contacts', label: 'Контакты',  Icon: Users },
-  { key: 'calls',    label: 'Звонки',    Icon: Phone },
-  { key: 'chats',    label: 'Чаты',      Icon: MessageCircle },
-  { key: 'settings', label: 'Настройки', Icon: Settings },
+const TABS: { key: TabKey; i18nKey: string; Icon: typeof Users }[] = [
+  { key: 'contacts', i18nKey: 'nav.contacts', Icon: Users },
+  { key: 'calls',    i18nKey: 'nav.calls',    Icon: Phone },
+  { key: 'chats',    i18nKey: 'nav.chats',    Icon: MessageCircle },
+  { key: 'settings', i18nKey: 'nav.settings', Icon: Settings },
 ];
 
 export default function MobileTabBar() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { settingsOpen, contactsOpen, callsOpen,
           setSettingsOpen, setContactsOpen, setCallsOpen } = useUIStore();
 
@@ -53,9 +55,10 @@ export default function MobileTabBar() {
         className="pointer-events-auto w-full max-w-md flex items-stretch gap-1 px-2 py-1.5
                    rounded-[28px] liquid-glass"
         role="tablist"
-        aria-label="Навигация"
+        aria-label={t('nav.chats')}
       >
-        {TABS.map(({ key, label, Icon }) => {
+        {TABS.map(({ key, i18nKey, Icon }) => {
+          const label = t(i18nKey);
           const isActive = active === key;
           const showBadge = key === 'chats' && unread > 0;
           return (
