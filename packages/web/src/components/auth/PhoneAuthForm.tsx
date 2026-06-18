@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Lock, User as UserIcon, Loader2, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -73,6 +74,7 @@ interface CompleteResp {
  * Старого выбора Login/Register больше нет.
  */
 export default function PhoneAuthForm() {
+  const { t } = useTranslation();
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [step, setStep] = useState<Step>('phone');
@@ -342,14 +344,14 @@ export default function PhoneAuthForm() {
         {step === 'phone' && (
           <form onSubmit={handlePhoneSubmit} className="space-y-4">
             <h2 className="text-content text-xl font-semibold leading-tight">
-              Введите ваш номер
+              {t('auth.enterPhone')}
             </h2>
             <p className="text-content/50 text-sm">
-              Мы отправим одноразовый код через Telegram.
+              {t('auth.phoneHint')}
             </p>
 
             <label className="block">
-              <div className="text-content/55 text-xs mb-1.5">Номер телефона</div>
+              <div className="text-content/55 text-xs mb-1.5">{t('auth.phoneLabel')}</div>
               <div className="flex items-center gap-2 bg-content/[0.04] border border-dark-border rounded-xl pl-2 pr-4 h-14
                               transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
                               focus-within:ring-2 focus-within:ring-primary-500/15">
@@ -374,7 +376,7 @@ export default function PhoneAuthForm() {
             <FieldError message={error} />
 
             <BrandSubmit loading={loading} disabled={phone.replace(/\D/g, '').length < 6}>
-              Отправить код <ArrowRight size={16} />
+              {t('auth.sendCode')} <ArrowRight size={16} />
             </BrandSubmit>
           </form>
         )}
@@ -433,10 +435,10 @@ export default function PhoneAuthForm() {
           <form onSubmit={handleCodeSubmit} className="space-y-4">
             <BackButton onClick={() => { setStep('phone'); setCode(''); setError(null); }} />
             <h2 className="text-content text-xl font-semibold leading-tight">
-              Введите код
+              {t('auth.enterCode')}
             </h2>
             <p className="text-content/50 text-sm">
-              Мы отправили 6-значный код на <span className="text-content/80 tabular-nums">{fullPhone}</span>
+              {t('auth.codeSentTo')} <span className="text-content/80 tabular-nums">{fullPhone}</span>
             </p>
 
             {devOtpHint && ((import.meta as any).env?.DEV) && (

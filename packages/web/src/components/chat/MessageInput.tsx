@@ -1028,8 +1028,9 @@ export default function MessageInput({ chatId }: Props) {
               'relative w-56 h-56 rounded-full overflow-hidden border-4 shadow-e4 bg-black transition-colors',
               pttState === 'locked' ? 'border-primary-400' : 'border-rose-500',
             )}>
+              {/* Зеркалим live-превью (селфи) — как и воспроизведение кружка. */}
               <video ref={circleVideoRef} autoPlay playsInline muted
-                className="w-full h-full object-cover" />
+                className="w-full h-full object-cover -scale-x-100" />
 
               {/* свайп влево → отмена: красный оверлей с корзиной */}
               {showCancel && (

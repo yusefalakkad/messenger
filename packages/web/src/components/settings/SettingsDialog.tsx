@@ -157,15 +157,15 @@ function AppearanceSection() {
         })}
       </div>
 
-      {/* Язык интерфейса */}
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] text-content/60 flex-1">{t('settings.language')}</span>
-        <div className="relative grid grid-cols-2 gap-1 p-1 rounded-lg bg-content/[0.05] border border-dark-border">
+      {/* Язык интерфейса — ровный сегмент-контрол из 3 на своей строке. */}
+      <div className="flex flex-col gap-2">
+        <span className="text-[13px] text-content/60">{t('settings.language')}</span>
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-content/[0.05] border border-dark-border">
           {LANG_OPTIONS.map(({ lang: l, label }) => {
             const active = lang === l;
             return (
               <button key={l} onClick={() => chooseLang(l)}
-                className={`relative px-3 h-8 rounded-md text-[13px] font-medium transition-colors ${
+                className={`flex items-center justify-center h-9 rounded-lg text-[13px] font-medium transition-colors ${
                   active ? 'bg-brand-gradient shadow-glow-violet text-white' : 'text-content/60 hover:text-content/90'
                 }`}>
                 {label}

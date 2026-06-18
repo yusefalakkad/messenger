@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { ShieldCheck } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
 import DakkaIcon from '@/components/ui/DakkaIcon';
 import { popIn, SPRING, EASE } from '@/lib/motion';
 
 export default function AuthPage() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden">
       {/* Глубокий ambient-фон: три парящих градиентных пятна, медленно дышат */}
@@ -73,7 +75,7 @@ export default function AuthPage() {
             transition={{ delay: 0.28, duration: 0.4, ease: EASE.out }}
             className="text-content/45 text-sm mt-2"
           >
-            Общение, которое чувствуешь
+            {t('auth.tagline')}
           </motion.p>
           <motion.div
             initial={{ opacity: 0, scale: 0.92, y: 6 }}
@@ -82,7 +84,7 @@ export default function AuthPage() {
             className="chip-brand mt-4"
           >
             <ShieldCheck size={12} className="text-primary-600 dark:text-primary-300" />
-            Приватность по умолчанию
+            {t('auth.e2eBadge')}
           </motion.div>
         </div>
 
@@ -103,7 +105,7 @@ export default function AuthPage() {
           transition={{ delay: 0.6, duration: 0.5 }}
           className="text-center text-content/30 text-xs mt-6 px-4"
         >
-          Продолжая, вы соглашаетесь с условиями использования
+          {t('auth.terms')}
         </motion.p>
       </motion.div>
     </div>
