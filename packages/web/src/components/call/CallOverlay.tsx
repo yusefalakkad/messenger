@@ -11,6 +11,27 @@ import { startRing, stopRing, startRingback, stopRingback } from '@/lib/notifica
 import { toast } from '@/lib/toast';
 import Avatar from '@/components/ui/Avatar';
 
+// Телефон ли это (узкий экран / мобильный UA) — для ориентации камеры.
+function isPhoneDevice(): boolean {
+  return typeof window !== 'undefined'
+    && (window.innerWidth < 900 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+}
+
+// Видео под устройство: комп — горизонтально 16:9 (1280×720), телефон — вертикально
+// 9:16 (720×1280), 30 fps. Всё через ideal (не exact) — строгие камеры иначе кидают
+// OverconstrainedError. front-камера (facingMode user).
+function videoTrackConstraints(): MediaTrackConstraints {
+  return isPhoneDevice()
+    ? { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 30 }, aspectRatio: { ideal: 9 / 16 } }
+    : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, aspectRatio: { ideal: 16 / 9 } };
+}
+
+// Чистый звук: эхо-/шумоподавление + авто-громкость (заметно поднимает качество).
+function callMediaConstraints(callType: 'audio' | 'video'): MediaStreamConstraints {
+  const audio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  return { audio, video: callType === 'video' ? videoTrackConstraints() : false };
+}
+
 export default function CallOverlay() {
   const incoming  = useCallStore((s) => s.incoming);
   const active    = useCallStore((s) => s.active);
@@ -214,10 +235,7 @@ export default function CallOverlay() {
 
     let stream: MediaStream | null = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: callType === 'video',
-      });
+      stream = await navigator.mediaDevices.getUserMedia(callMediaConstraints(callType));
     } catch (err) {
       // Микро/камера недоступны — пользователь должен это видеть, а не залипший экран.
       const name = (err as DOMException)?.name;
@@ -244,6 +262,20 @@ export default function CallOverlay() {
       localStreamRef.current = stream;
       stream.getTracks().forEach((t) => pc.addTrack(t, stream!));
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      // Поднимаем видео-битрейт до 2 Мбит/с — по умолчанию WebRTC жмёт картинку
+      // слишком сильно («мыло»). Аудио уже чистится в constraints.
+      if (callType === 'video') {
+        const vSender = pc.getSenders().find((s) => s.track?.kind === 'video');
+        if (vSender) {
+          try {
+            const params = vSender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+            params.encodings[0].maxBitrate = 2_000_000;
+            params.encodings[0].maxFramerate = 30;
+            void vSender.setParameters(params);
+          } catch { /* setParameters не поддержан — не критично */ }
+        }
+      }
     }
 
     // Если offer пришёл ДО того, как мы успели поднять треки (race на медленных
@@ -444,7 +476,7 @@ export default function CallOverlay() {
       // ВЫКЛ → ВКЛ: запрашиваем камеру заново.
       let newTrack: MediaStreamTrack | null = null;
       try {
-        const fresh = await navigator.mediaDevices.getUserMedia({ video: true });
+        const fresh = await navigator.mediaDevices.getUserMedia({ video: videoTrackConstraints() });
         newTrack = fresh.getVideoTracks()[0] ?? null;
       } catch {
         toast.error('Не удалось включить камеру');
@@ -470,7 +502,7 @@ export default function CallOverlay() {
     // Если оригинальный трек был остановлен (например, при паузе), получаем новый.
     if (!cameraTrack || cameraTrack.readyState === 'ended') {
       try {
-        const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const camStream = await navigator.mediaDevices.getUserMedia({ video: videoTrackConstraints(), audio: false });
         cameraTrack = camStream.getVideoTracks()[0] ?? null;
       } catch {
         cameraTrack = null;
