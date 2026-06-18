@@ -216,6 +216,12 @@ export const useChatStore = create<ChatState>((set) => ({
           return { ...m, readBy: [...others, { userId, readAt }] };
         }),
       },
+      // Синхронизируем галочку в списке чатов, если прочитано ПОСЛЕДНЕЕ сообщение.
+      chats: s.chats.map((c) => {
+        if (c.id !== chatId || c.lastMessage?.id !== messageId) return c;
+        const others = (c.lastMessage.readBy ?? []).filter((r) => r.userId !== userId);
+        return { ...c, lastMessage: { ...c.lastMessage, readBy: [...others, { userId, readAt }] } };
+      }),
     })),
 
   toggleMessageSelection: (messageId) =>

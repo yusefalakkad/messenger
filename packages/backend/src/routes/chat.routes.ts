@@ -65,7 +65,11 @@ async function listUserChats(
       messages: {
         orderBy: { createdAt: 'desc' },
         take: 1,
-        include: { sender: { select: { id: true, displayName: true } } },
+        include: {
+          sender: { select: { id: true, displayName: true } },
+          // Для галочки статуса в списке чатов (отправлено/прочитано последнее своё).
+          reads:  { select: { userId: true, readAt: true } },
+        },
       },
     },
   });

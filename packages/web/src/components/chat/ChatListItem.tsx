@@ -4,12 +4,12 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { format, isToday } from 'date-fns';
 import { clsx } from 'clsx';
-import { Pin, BellOff, Bookmark, Megaphone } from 'lucide-react';
+import { Pin, BellOff, Bookmark, Megaphone, Check, CheckCheck } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
 import { formatMessagePreview } from '@/lib/messagePreview';
-import type { Chat } from '@messenger/shared';
+import type { Chat, Message, MessageRead } from '@messenger/shared';
 import ChatItemContextMenu from './ChatItemContextMenu';
 
 interface Props {
@@ -74,11 +74,19 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const draft = typeof window !== 'undefined' && user?.id
     ? localStorage.getItem(`draft:${user.id}:${chat.id}`)
     : null;
-  const lastMsg = chat.lastMessage;
+  const lastMsg = chat.lastMessage ?? (chat as Chat & { messages?: Message[] }).messages?.[0];
 
   // Если есть черновик — показываем его вместо последнего сообщения.
   // E2E-сообщения не расшифровываем синхронно — formatMessagePreview маркирует 🔒.
   const previewText = draft ? draft : formatMessagePreview(lastMsg);
+
+  // Галочка статуса в списке (как в TG): только если ПОСЛЕДНЕЕ сообщение — моё.
+  // Прочитано = кто-то кроме меня отметил прочитанным (поля readBy/reads).
+  const lastOwn = !!lastMsg && lastMsg.senderId === user?.id;
+  const lastReaders: MessageRead[] = lastMsg
+    ? ((lastMsg.readBy && lastMsg.readBy.length ? lastMsg.readBy : (lastMsg as Message & { reads?: MessageRead[] }).reads) ?? [])
+    : [];
+  const lastRead = lastOwn && lastReaders.some((r) => r.userId !== user?.id);
 
   // Время как в Telegram: сегодня → ЧЧ:ММ, иначе → дд.ММ (без «0 секунд назад»).
   const lastTs = lastMsg ? new Date(lastMsg.createdAt) : null;
@@ -175,6 +183,10 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
             </span>
             <span className="text-content/45 text-[12px] leading-4 flex-shrink-0 font-medium flex items-center gap-1 tabular-nums">
               {isMuted && <BellOff size={11} className="text-content/40 opacity-70" />}
+              {/* Статус последнего своего сообщения: ✓ отправлено / ✓✓ прочитано */}
+              {lastOwn && (lastRead
+                ? <CheckCheck size={14} className="text-sky-400 -mr-0.5 flex-shrink-0" />
+                : <Check size={13} className="text-content/45 -mr-0.5 flex-shrink-0" />)}
               {timeStr}
             </span>
           </div>
