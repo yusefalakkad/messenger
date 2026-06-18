@@ -36,7 +36,7 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const sheenRef = useRef<HTMLSpanElement>(null);
   const tiltRaf = useRef<number | null>(null);
   const onTilt = (e: React.PointerEvent) => {
-    if (!active || e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse') return; // 3D-наклон на наведение — для любой плашки
     const el = btnRef.current; if (!el) return;
     const r = el.getBoundingClientRect();
     const nx = (e.clientX - r.left) / r.width - 0.5;
@@ -55,8 +55,8 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
     if (btnRef.current) btnRef.current.style.transform = '';
     if (sheenRef.current) sheenRef.current.style.background = 'transparent';
   };
-  // Снимаем inline-трансформ, когда чат перестаёт быть активным.
-  useEffect(() => { if (!active) resetTilt(); }, [active]);
+  // Снимаем inline-трансформ при смене активного состояния (чтобы наклон не «залип»).
+  useEffect(() => { resetTilt(); }, [active]);
 
   const otherMember = chat.type === 'direct'
     ? chat.members.find((m) => m.userId !== user?.id)
@@ -149,10 +149,8 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >
-        {/* Бегущий блик на активной плашке — двигается за курсором (десктоп) */}
-        {active && (
-          <span ref={sheenRef} aria-hidden className="hidden lg:block absolute inset-0 rounded-lg pointer-events-none" style={{ background: 'transparent' }} />
-        )}
+        {/* Бегущий блик — двигается за курсором при наведении (десктоп, любая плашка) */}
+        <span ref={sheenRef} aria-hidden className="hidden lg:block absolute inset-0 rounded-lg pointer-events-none" style={{ background: 'transparent' }} />
         {/* Активный чат — выраженная brand-полоса слева (в RTL — справа) */}
         {active && (
           <span className="absolute left-0 rtl:left-auto rtl:right-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow z-10" />
