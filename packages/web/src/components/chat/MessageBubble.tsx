@@ -875,8 +875,9 @@ function CircleMessage({
         )}
       </div>
 
-      {/* Время отправки под кружком */}
-      <div className="flex items-center gap-1 mt-1 mr-1">
+      {/* Время отправки под кружком — как в Telegram: со стороны, обращённой к
+          центру чата. У своих (справа) → слева; у собеседника (слева) → справа. */}
+      <div className={clsx('flex items-center gap-1 mt-1', isOwn ? 'self-start ml-1.5' : 'self-end mr-1.5')}>
         <span className="text-[11px] text-content/40 leading-none">{time}</span>
       </div>
     </div>
