@@ -76,15 +76,19 @@ export default function MobileTabBar() {
               {isActive && (
                 <motion.span
                   layoutId="tabbar-active"
-                  transition={SPRING.smooth}
+                  transition={{ type: 'spring', stiffness: 480, damping: 26, mass: 0.7 }}
                   className="absolute inset-0 rounded-[22px] bg-[#7A82FF]/25 ring-1 ring-[#7A82FF]/45"
                 />
               )}
               <span className="relative z-10 flex flex-col items-center gap-1">
-                <span className="relative">
+                <motion.span
+                  className="relative"
+                  animate={{ scale: isActive ? 1.14 : 1, y: isActive ? -1 : 0 }}
+                  transition={{ type: 'spring', stiffness: 520, damping: 15 }}
+                >
                   <Icon
                     size={24}
-                    className={isActive ? 'text-[#aeb4ff]' : 'text-content/55'}
+                    className={`transition-colors duration-200 ${isActive ? 'text-[#aeb4ff]' : 'text-content/55'}`}
                     fill="currentColor"
                     strokeWidth={1.6}
                   />
@@ -95,8 +99,8 @@ export default function MobileTabBar() {
                       {unread > 99 ? '99+' : unread}
                     </span>
                   )}
-                </span>
-                <span className={`text-[10px] leading-none ${isActive ? 'text-[#aeb4ff] font-semibold' : 'text-content/55'}`}>
+                </motion.span>
+                <span className={`text-[10px] leading-none transition-colors duration-200 ${isActive ? 'text-[#aeb4ff] font-semibold' : 'text-content/55'}`}>
                   {label}
                 </span>
               </span>

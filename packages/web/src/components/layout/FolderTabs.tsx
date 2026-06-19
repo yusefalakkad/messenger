@@ -75,7 +75,7 @@ function FolderTab({
       {active && (
         <motion.span
           layoutId="folder-tab-indicator"
-          transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+          transition={{ type: 'spring', stiffness: 480, damping: 26, mass: 0.7 }}
           className="absolute left-3 right-3 -bottom-1 h-0.5 rounded-full bg-brand-gradient"
         />
       )}
