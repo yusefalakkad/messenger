@@ -148,8 +148,8 @@ export default function Sidebar() {
 
   return (
     <aside className="w-full h-full flex flex-col border-r border-white/10 lg:border-dark-border bg-dark-surface/40 lg:bg-dark-surface/80 backdrop-blur-xl relative pt-[var(--sat)]">
-      {/* Ambient свечение в шапке сайдбара */}
-      <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
+      {/* Ambient свечение в шапке сайдбара — только десктоп (на мобиле фон чистый тёмный) */}
+      <div className="hidden lg:block absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 
       {/* ── Mobile header (по дизайну ref0): приветствие + крупный «Чаты»,
              справа — «написать». ── */}
@@ -272,20 +272,21 @@ export default function Sidebar() {
       {/* ── Архив + Избранное — мобила: в линию (две половинки); десктоп: в столбик
              во всю ширину (без обрезки длинных подписей вроде «Saved Messages»). ── */}
       {!activeFolderId && (
-      <div className="flex gap-2 lg:flex-col lg:gap-0.5 px-2 mb-1.5 flex-shrink-0">
+      <div className="flex gap-2 lg:flex-col lg:gap-0.5 px-2 mb-1 lg:mb-1.5 flex-shrink-0">
         <motion.button
           onClick={() => setShowArchive(true)}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 lg:flex-none min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-2xl lg:rounded-lg text-left group max-lg:liquid-card lg:hover:bg-dark-hover/60 transition-colors"
+          className="flex-1 lg:flex-none min-w-0 flex items-center gap-2.5 lg:gap-3 px-2.5 lg:px-3 py-1.5 lg:py-2.5 rounded-xl lg:rounded-lg text-left group max-lg:bg-content/[0.04] lg:hover:bg-dark-hover/60 transition-colors"
           title={t('chat.archivedChats')}
         >
-          <span className="w-10 h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
-            <Archive size={18} />
+          <span className="w-7 h-7 lg:w-10 lg:h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
+            <Archive size={15} className="lg:hidden" />
+            <Archive size={18} className="hidden lg:block" />
           </span>
-          <span className="flex-1 min-w-0 truncate text-content/85 font-medium text-[14px]">{t('chat.archive')}</span>
+          <span className="flex-1 min-w-0 truncate text-content/80 font-medium text-[13px] lg:text-[14px]">{t('chat.archive')}</span>
           {archivedCount > 0 && (
-            <span className="text-[12px] font-medium text-content/50 tabular-nums">{archivedCount}</span>
+            <span className="text-[12px] font-medium text-content/45 tabular-nums">{archivedCount}</span>
           )}
         </motion.button>
 
@@ -293,13 +294,14 @@ export default function Sidebar() {
           onClick={openSaved}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 lg:flex-none min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-2xl lg:rounded-lg text-left group max-lg:liquid-card lg:hover:bg-dark-hover/60 transition-colors"
+          className="flex-1 lg:flex-none min-w-0 flex items-center gap-2.5 lg:gap-3 px-2.5 lg:px-3 py-1.5 lg:py-2.5 rounded-xl lg:rounded-lg text-left group max-lg:bg-content/[0.04] lg:hover:bg-dark-hover/60 transition-colors"
           title={t('chat.saved')}
         >
-          <span className="w-10 h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
-            <Bookmark size={18} />
+          <span className="w-7 h-7 lg:w-10 lg:h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
+            <Bookmark size={15} className="lg:hidden" />
+            <Bookmark size={18} className="hidden lg:block" />
           </span>
-          <span className="flex-1 min-w-0 truncate text-content/85 font-medium text-[14px]">{t('chat.saved')}</span>
+          <span className="flex-1 min-w-0 truncate text-content/80 font-medium text-[13px] lg:text-[14px]">{t('chat.saved')}</span>
         </motion.button>
       </div>
       )}

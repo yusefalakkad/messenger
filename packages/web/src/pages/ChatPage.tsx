@@ -73,20 +73,16 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
-      {/* Фон по референсу — тёмно-фиолетовый градиент со свечениями. ТОЛЬКО МОБИЛА:
-          на десктопе мобильный card-дизайн смотрится плохо, там оставляем чистый
-          компактный layout. */}
+      {/* Фон — чистый графитово-тёмный как в утверждённом мобильном макете.
+          ТОЛЬКО МОБИЛА: на десктопе свой компактный layout (Violet Sunset). */}
       <div
         className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden"
-        style={{ background: 'radial-gradient(120% 90% at 22% 6%, #38336a 0%, #221b3a 52%, #361b44 100%)' }}
+        style={{ background: 'radial-gradient(135% 60% at 50% -6%, #15141c 0%, #0d0d12 58%, #0b0b0f 100%)' }}
       >
+        {/* Едва заметный тёплый блик сверху по центру (как в welcome-референсе) */}
         <div
-          className="absolute -top-10 -left-10 w-80 h-80 rounded-full blur-3xl opacity-50"
-          style={{ background: 'radial-gradient(circle, #5a6bff, transparent 62%)' }}
-        />
-        <div
-          className="absolute bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl opacity-45"
-          style={{ background: 'radial-gradient(circle, #c8418f, transparent 62%)' }}
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[120%] h-72 blur-3xl opacity-[0.07]"
+          style={{ background: 'radial-gradient(circle, #ff6e8c, transparent 60%)' }}
         />
       </div>
 
