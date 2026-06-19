@@ -42,7 +42,7 @@ export default function AuthPage() {
             key="welcome"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.35, ease: EASE.out }}
-            className="relative flex flex-col min-h-screen px-5 pb-[calc(var(--sab)+1.25rem)]"
+            className="relative flex flex-col min-h-screen px-5 pb-[calc(var(--sab)+1.25rem)] w-full lg:max-w-[420px] lg:mx-auto"
           >
             {/* ── Парящие аватарки: точные позиции, размеры, float-анимация ── */}
             {FLOATERS.map((f) => (
@@ -103,22 +103,13 @@ export default function AuthPage() {
               transition={{ delay: 0.3, duration: 0.5, ease: EASE.out }}
               className="mt-auto pt-7"
             >
-              <div className="space-y-3">
-                <motion.button
-                  onClick={() => setStarted(true)} whileTap={tap} transition={SPRING.snappy}
-                  className="w-full flex items-center justify-center gap-2 text-white"
-                  style={{ height: 58, borderRadius: 29, fontSize: 17, fontWeight: 700, background: BRAND, boxShadow: '0 12px 28px rgba(255,78,134,0.4), inset 0 1px 1px rgba(255,255,255,0.5)' }}
-                >
-                  Создать аккаунт <ArrowRight size={18} strokeWidth={2.4} />
-                </motion.button>
-                <motion.button
-                  onClick={() => setStarted(true)} whileTap={tap} transition={SPRING.snappy}
-                  className="w-full bg-dark-card border border-dark-border text-content"
-                  style={{ height: 58, borderRadius: 29, fontSize: 17, fontWeight: 600, boxShadow: '0 8px 20px -12px rgba(0,0,0,0.3)' }}
-                >
-                  У меня уже есть аккаунт
-                </motion.button>
-              </div>
+              <motion.button
+                onClick={() => setStarted(true)} whileTap={tap} transition={SPRING.snappy}
+                className="w-full flex items-center justify-center gap-2 text-white"
+                style={{ height: 58, borderRadius: 29, fontSize: 17, fontWeight: 700, background: BRAND, boxShadow: '0 12px 28px rgba(255,78,134,0.4), inset 0 1px 1px rgba(255,255,255,0.5)' }}
+              >
+                Войти <ArrowRight size={18} strokeWidth={2.4} />
+              </motion.button>
               <p className="text-center text-content/[0.4] text-[12px] leading-relaxed mt-5 px-4">
                 {t('auth.terms')}
               </p>
@@ -129,7 +120,7 @@ export default function AuthPage() {
             key="form"
             initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.35, ease: EASE.out }}
-            className="relative flex-1 flex flex-col px-6 pt-[calc(var(--sat)+1rem)] pb-[calc(var(--sab)+1.5rem)]"
+            className="relative flex-1 flex flex-col px-6 pt-[calc(var(--sat)+1rem)] pb-[calc(var(--sab)+1.5rem)] w-full lg:max-w-[420px] lg:mx-auto"
           >
             <button
               onClick={() => setStarted(false)}
