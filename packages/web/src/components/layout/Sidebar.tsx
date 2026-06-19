@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone, Download } from 'lucide-react';
+import { Search, Plus, LogOut, Users, MessageSquarePlus, Camera, Settings, Archive, Bookmark, Megaphone, Download, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listParent, listChild, tap, SPRING } from '@/lib/motion';
 import { useChatStore } from '@/stores/chat.store';
@@ -49,7 +49,9 @@ export default function Sidebar() {
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [showPlus,    setShowPlus]    = useState(false);
-  const [showArchive,  setShowArchive]  = useState(false);
+  // Архив открывается из мобильной строки И из нав-рейла (десктоп) → общий ui-стор.
+  const archiveOpen = useUIStore((s) => s.archiveOpen);
+  const setArchiveOpen = useUIStore((s) => s.setArchiveOpen);
   // Настройки открываются и из сайдбара, и из мобильного таб-бара → общий ui-стор.
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -87,7 +89,9 @@ export default function Sidebar() {
 
   const archivedCount = chats.filter((c) => !!c.archivedAt).length;
 
-  const filtered = visibleChats.filter((c) => {
+  const savedChat = chats.find((c) => c.type === 'saved');
+
+  const matches = visibleChats.filter((c) => {
     if (!search) return true;
     const name = c.type === 'saved'
       ? 'избранное'
@@ -96,6 +100,12 @@ export default function Sidebar() {
         : c.members.find((m) => m.userId !== user?.id)?.user.displayName;
     return name?.toLowerCase().includes(search.toLowerCase());
   });
+
+  // В режиме поиска «Избранное» (saved) всегда показываем первым результатом —
+  // как в Telegram, чтобы к своим сохранённым всегда можно было быстро перейти.
+  const filtered = search && savedChat
+    ? [savedChat, ...matches.filter((c) => c.id !== savedChat.id)]
+    : matches;
 
   // Глобальный поиск активен от 2 символов — оверлей поверх списка чатов
   const showGlobalSearch = search.trim().length >= 2;
@@ -224,39 +234,39 @@ export default function Sidebar() {
       {/* ── Folder tabs — «Все» + папки + «+» ── */}
       <FolderTabs onEditFolder={(id) => setEditFolder({ open: true, id })} />
 
-      {/* ── Архив + Избранное — мобила: в линию (две половинки); десктоп: в столбик
-             во всю ширину (без обрезки длинных подписей вроде «Saved Messages»). ── */}
+      {/* ── Архив + Избранное — ТОЛЬКО МОБИЛА, тонкие строки как в Telegram.
+             На десктопе они живут в нав-рейле слева, поэтому здесь lg:hidden. ── */}
       {!activeFolderId && (
-      <div className="flex gap-2 lg:flex-col lg:gap-0.5 px-2 mb-1 lg:mb-1.5 flex-shrink-0">
+      <div className="lg:hidden px-2 mb-1 flex-shrink-0 space-y-0.5">
         <motion.button
-          onClick={() => setShowArchive(true)}
+          onClick={() => setArchiveOpen(true)}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 lg:flex-none min-w-0 flex items-center gap-2.5 lg:gap-3 px-2.5 lg:px-3 py-1.5 lg:py-2.5 rounded-xl lg:rounded-lg text-left group max-lg:bg-content/[0.04] lg:hover:bg-dark-hover/60 transition-colors"
+          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left active:bg-content/[0.05] transition-colors"
           title={t('chat.archivedChats')}
         >
-          <span className="w-7 h-7 lg:w-10 lg:h-10 flex-shrink-0 rounded-full bg-accent-violet/15 flex items-center justify-center text-accent-violet group-hover:scale-105 transition-transform">
-            <Archive size={15} className="lg:hidden" />
-            <Archive size={18} className="hidden lg:block" />
+          <span className="w-9 h-9 flex-shrink-0 rounded-full bg-content/[0.07] flex items-center justify-center text-content/70">
+            <Archive size={17} />
           </span>
-          <span className="flex-1 min-w-0 truncate text-content/80 font-medium text-[13px] lg:text-[14px]">{t('chat.archive')}</span>
+          <span className="flex-1 min-w-0 truncate text-content/90 font-medium text-[15px]">{t('chat.archive')}</span>
           {archivedCount > 0 && (
-            <span className="text-[12px] font-medium text-content/45 tabular-nums">{archivedCount}</span>
+            <span className="text-[13px] font-medium text-content/45 tabular-nums">{archivedCount}</span>
           )}
+          <ChevronRight size={16} className="text-content/25 flex-shrink-0" />
         </motion.button>
 
         <motion.button
           onClick={openSaved}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="flex-1 lg:flex-none min-w-0 flex items-center gap-2.5 lg:gap-3 px-2.5 lg:px-3 py-1.5 lg:py-2.5 rounded-xl lg:rounded-lg text-left group max-lg:bg-content/[0.04] lg:hover:bg-dark-hover/60 transition-colors"
+          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left active:bg-content/[0.05] transition-colors"
           title={t('chat.saved')}
         >
-          <span className="w-7 h-7 lg:w-10 lg:h-10 flex-shrink-0 rounded-full bg-primary-500/15 flex items-center justify-center text-primary-400 group-hover:scale-105 transition-transform">
-            <Bookmark size={15} className="lg:hidden" />
-            <Bookmark size={18} className="hidden lg:block" />
+          <span className="w-9 h-9 flex-shrink-0 rounded-full bg-brand-gradient flex items-center justify-center text-white">
+            <Bookmark size={16} />
           </span>
-          <span className="flex-1 min-w-0 truncate text-content/80 font-medium text-[13px] lg:text-[14px]">{t('chat.saved')}</span>
+          <span className="flex-1 min-w-0 truncate text-content/90 font-medium text-[15px]">{t('chat.saved')}</span>
+          <ChevronRight size={16} className="text-content/25 flex-shrink-0" />
         </motion.button>
       </div>
       )}
@@ -368,7 +378,7 @@ export default function Sidebar() {
         )}
       </AnimatePresence>
 
-      <ArchivedChatsDialog open={showArchive} onClose={() => setShowArchive(false)} />
+      <ArchivedChatsDialog open={archiveOpen} onClose={() => setArchiveOpen(false)} />
     </aside>
   );
 }

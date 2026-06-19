@@ -98,6 +98,8 @@ function highlightMatch(text: string, q: string) {
 
 export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
   const myUserId = useAuthStore((s) => s.user?.id);
+  // «Избранное» (Saved Messages) всегда показываем в поиске первым (как в Telegram).
+  const savedChat = useChatStore((s) => s.chats.find((c) => c.type === 'saved'));
   const [results, setResults] = useState<SearchResults | null>(null);
   const [channels, setChannels] = useState<ChannelSearchResult[]>([]);
   const [users, setUsers] = useState<UserResult[]>([]);
@@ -186,8 +188,14 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
   });
   const freshUsers = users.filter((u) => !knownPeerIds.has(u.id));
 
+  // «Избранное» всегда первым в результатах поиска (если уже создано).
+  const baseChats = results?.chats ?? [];
+  const chatsToShow = savedChat
+    ? [savedChat, ...baseChats.filter((c) => c.id !== savedChat.id)]
+    : baseChats;
+
   const isEmpty = !loading && results !== null
-    && results.chats.length === 0 && results.messages.length === 0
+    && chatsToShow.length === 0 && results.messages.length === 0
     && channels.length === 0 && freshUsers.length === 0;
 
   return (
@@ -236,12 +244,12 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
         </motion.div>
       )}
 
-      {!loading && results !== null && results.chats.length > 0 && (
+      {!loading && results !== null && chatsToShow.length > 0 && (
         <motion.section variants={listParent} initial="hidden" animate="visible">
           <h4 className="px-4 pt-3 pb-1.5 text-[11px] uppercase tracking-wider text-content/45 font-semibold">
             Чаты
           </h4>
-          {results.chats.map((chat) => {
+          {chatsToShow.map((chat) => {
             const title = chatTitle(chat, myUserId);
             return (
               <motion.button

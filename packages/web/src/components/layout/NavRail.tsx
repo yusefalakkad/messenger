@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { MessageCircle, Phone, Bookmark, Users, Settings } from 'lucide-react';
+import { MessageCircle, Phone, Bookmark, Users, Settings, Archive } from 'lucide-react';
 import { clsx } from 'clsx';
 import Avatar from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/auth.store';
@@ -17,7 +17,7 @@ import type { Chat } from '@messenger/shared';
  * снизу — настройки и аватар пользователя. Только десктоп (`hidden lg:flex`);
  * на мобиле навигация живёт в нижнем таб-баре.
  */
-type RailKey = 'chats' | 'calls' | 'saved' | 'contacts';
+type RailKey = 'chats' | 'calls' | 'saved' | 'archive' | 'contacts';
 
 /** Белый знак-лого (чат-бабл с вырезанной волной) на градиентной плитке. */
 function RailMark() {
@@ -45,8 +45,8 @@ export default function NavRail() {
   const user = useAuthStore((s) => s.user);
   const chats = useChatStore((s) => s.chats);
   const addChat = useChatStore((s) => s.addChat);
-  const { settingsOpen, contactsOpen, callsOpen,
-          setSettingsOpen, setContactsOpen, setCallsOpen } = useUIStore();
+  const { settingsOpen, contactsOpen, callsOpen, archiveOpen,
+          setSettingsOpen, setContactsOpen, setCallsOpen, setArchiveOpen } = useUIStore();
 
   const closeAll = () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(false); };
 
@@ -66,11 +66,12 @@ export default function NavRail() {
 
   const active: RailKey = contactsOpen ? 'contacts' : callsOpen ? 'calls' : 'chats';
 
-  const items: { key: RailKey; Icon: typeof Users; label: string; onClick: () => void }[] = [
-    { key: 'chats',    Icon: MessageCircle, label: t('nav.chats'),    onClick: () => { closeAll(); navigate('/'); } },
-    { key: 'calls',    Icon: Phone,         label: t('nav.calls'),    onClick: () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(true); } },
-    { key: 'saved',    Icon: Bookmark,      label: t('chat.saved'),   onClick: openSaved },
-    { key: 'contacts', Icon: Users,         label: t('nav.contacts'), onClick: () => { setSettingsOpen(false); setCallsOpen(false); setContactsOpen(true); } },
+  const items: { key: RailKey; Icon: typeof Users; label: string; on: boolean; onClick: () => void }[] = [
+    { key: 'chats',    Icon: MessageCircle, label: t('nav.chats'),    on: active === 'chats' && !archiveOpen, onClick: () => { closeAll(); navigate('/'); } },
+    { key: 'calls',    Icon: Phone,         label: t('nav.calls'),    on: active === 'calls',    onClick: () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(true); } },
+    { key: 'saved',    Icon: Bookmark,      label: t('chat.saved'),   on: false,                 onClick: openSaved },
+    { key: 'archive',  Icon: Archive,       label: t('chat.archive'), on: archiveOpen,           onClick: () => setArchiveOpen(true) },
+    { key: 'contacts', Icon: Users,         label: t('nav.contacts'), on: active === 'contacts', onClick: () => { setSettingsOpen(false); setCallsOpen(false); setContactsOpen(true); } },
   ];
 
   return (
@@ -91,8 +92,7 @@ export default function NavRail() {
 
       {/* Навигация */}
       <div className="flex flex-col gap-2.5">
-        {items.map(({ key, Icon, label, onClick }) => {
-          const on = active === key;
+        {items.map(({ key, Icon, label, on, onClick }) => {
           return (
             <motion.button
               key={key}
