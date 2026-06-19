@@ -84,7 +84,7 @@ export default function SettingsSessions() {
         // Skeleton-плейсхолдеры вместо спиннера
         <div className="space-y-1">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="list-item cursor-default">
+            <div key={i} className="list-row cursor-default">
               <div className="skeleton w-10 h-10 rounded-md flex-shrink-0" />
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="skeleton h-3.5 w-32 rounded" />
@@ -106,7 +106,7 @@ export default function SettingsSessions() {
             <motion.div
               key={s.id}
               variants={listChild}
-              className="list-item cursor-default"
+              className="list-row cursor-default"
             >
               <div className="w-10 h-10 rounded-md bg-dark-card border border-dark-border flex items-center justify-center text-content/65 flex-shrink-0">
                 {isMobileUA(s.userAgent) ? <Smartphone size={18} /> : <Monitor size={18} />}

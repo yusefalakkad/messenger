@@ -218,7 +218,7 @@ export default function NewGroupModal({ onClose }: Props) {
                       key={u.id}
                       variants={listChild}
                       onClick={() => toggle(u)}
-                      className="list-item w-full min-h-[48px] text-left"
+                      className="list-row w-full min-h-[48px] text-left"
                     >
                       <Avatar src={u.avatar} name={u.displayName} size="sm" />
                       <div className="flex-1 min-w-0">

@@ -155,7 +155,7 @@ export default function FolderEditModal({ folderId, onClose }: Props) {
                 <button
                   key={chat.id}
                   onClick={() => toggleChat(chat.id)}
-                  className={`list-item w-full text-left ${selected ? 'list-item-active' : ''}`}
+                  className={`list-row w-full text-left ${selected ? 'list-row-active' : ''}`}
                 >
                   <Avatar src={avatar} name={chatName} size="md" />
                   <span className="flex-1 min-w-0 truncate text-[15px] text-content/90">{chatName}</span>

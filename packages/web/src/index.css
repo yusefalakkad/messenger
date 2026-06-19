@@ -221,9 +221,11 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
       0 18px 50px -22px rgba(0,0,0,0.5);
   }
 
-  /* Карточка со стеклом + внутреннее свечение */
+  /* Карточка со стеклом + внутреннее свечение.
+     Фон — на токене surface (НЕ bg-content/0.035: в светлой теме это давало
+     почти прозрачную карточку → нечитаемый текст в диалогах папок и т.п.). */
   .glass-card {
-    @apply rounded-2xl border border-dark-border bg-content/[0.035];
+    @apply rounded-2xl border border-dark-border bg-dark-surface/90;
     backdrop-filter: blur(28px) saturate(190%);
     -webkit-backdrop-filter: blur(28px) saturate(190%);
     box-shadow:
@@ -410,12 +412,15 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      List item — ячейка списка (sidebar, settings, members).
      Высота ≥56px, паддинг x16/y8, gap=12px. Hit-target ОК.
   ───────────────────────────────────────────── */
-  .list-item {
+  /* ВАЖНО: НЕ называть класс .list-item — это встроенная Tailwind-утилита
+     (display:list-item) из utilities-слоя, она перебивает наш display:flex →
+     строки ломаются «столбиком». Используем .list-row. */
+  .list-row {
     @apply flex items-center gap-3 px-4 py-2 min-h-[56px] rounded-lg
            cursor-pointer transition
            hover:bg-content/[0.04] active:bg-content/[0.06];
   }
-  .list-item-active { @apply bg-content/[0.06]; }
+  .list-row-active { @apply bg-content/[0.06]; }
 
   /* Item в выпадающих меню — компактнее списка. */
   .menu-item {

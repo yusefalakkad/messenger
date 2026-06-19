@@ -205,7 +205,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
             <div className="skeleton h-3 w-20 rounded-md" />
           </div>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="list-item">
+            <div key={i} className="list-row">
               <div className="skeleton w-10 h-10 rounded-full flex-shrink-0" />
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="skeleton h-3.5 rounded-md" style={{ width: `${55 + (i % 3) * 12}%` }} />
@@ -248,7 +248,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
                 variants={listChild}
                 key={chat.id}
                 onClick={() => onOpenChat(chat.id)}
-                className="list-item w-full text-left"
+                className="list-row w-full text-left"
               >
                 <Avatar src={chatAvatar(chat, myUserId)} name={title} size="md" />
                 <span className="flex-1 min-w-0 text-[15px] font-semibold text-content/95 truncate">
@@ -273,7 +273,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
                 key={u.id}
                 onClick={() => handleOpenUser(u)}
                 disabled={startingUserId === u.id}
-                className="list-item w-full text-left"
+                className="list-row w-full text-left"
               >
                 <Avatar src={u.avatar} name={title} size="md" />
                 <div className="flex-1 min-w-0">
@@ -303,7 +303,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
             Каналы и группы
           </h4>
           {channels.map((channel) => (
-            <motion.div variants={listChild} key={channel.id} className="list-item w-full">
+            <motion.div variants={listChild} key={channel.id} className="list-row w-full">
               {channel.avatar ? (
                 <Avatar src={channel.avatar} name={channel.name} size="md" />
               ) : (
@@ -360,7 +360,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
                 variants={listChild}
                 key={msg.id}
                 onClick={() => onOpenChat(msg.chatId, msg.id)}
-                className="list-item w-full text-left"
+                className="list-row w-full text-left"
               >
                 <Avatar src={msg.sender?.avatar} name={msg.sender?.displayName ?? '?'} size="md" />
                 <div className="flex-1 min-w-0">

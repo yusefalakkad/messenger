@@ -200,7 +200,7 @@ export default function ForwardDialog({ messages, onClose }: Props) {
                     variants={listChild}
                     disabled={sending === c.id}
                     onClick={() => startForward(c.id)}
-                    className="list-item w-full min-h-[48px] text-left disabled:opacity-50"
+                    className="list-row w-full min-h-[48px] text-left disabled:opacity-50"
                   >
                     <Avatar src={avatar} name={name ?? '?'} size="sm" />
                     <span className="flex-1 text-[15px] font-medium truncate">{name}</span>

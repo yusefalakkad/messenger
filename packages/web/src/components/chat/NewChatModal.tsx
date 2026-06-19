@@ -109,7 +109,7 @@ export default function NewChatModal({ onClose }: Props) {
                     key={u.id}
                     variants={listChild}
                     onClick={() => startChat(u.id)}
-                    className="list-item w-full text-left"
+                    className="list-row w-full text-left"
                   >
                     <Avatar src={u.avatar} name={u.displayName} size="md" />
                     <div className="min-w-0">
