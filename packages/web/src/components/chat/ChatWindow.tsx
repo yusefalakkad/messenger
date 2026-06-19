@@ -20,6 +20,7 @@ const EMPTY_MESSAGES: Message[] = [];
 // Пресеты обоев чата — ключи совпадают с валидными значениями
 // PUT /chats/:id/wallpaper на бэке. null/неизвестное = фон по умолчанию.
 const WALLPAPERS: Record<string, string> = {
+  coral:  'linear-gradient(165deg,#FF8A6B,#FF3D6E)', // фирменные обои из десктоп-дизайна
   aurora: 'linear-gradient(160deg,#1a1430,#251c4a 50%,#1a2438)',
   sunset: 'linear-gradient(160deg,#2a1626,#3a1e2e 55%,#332220)',
   ocean:  'linear-gradient(160deg,#0f1d2b,#16283d 55%,#0f2233)',
@@ -122,10 +123,11 @@ export default function ChatWindow() {
       <ChatHeader chat={chat} otherMember={otherMember ?? undefined} />
       <PinnedMessagesBar chatId={chatId} onJump={(id) => requestJump(chatId, id)} />
 
-      {/* Обои чата: фон области сообщений по chat.wallpaper (self-настройка ChatMember) */}
+      {/* Обои чата: кастомные (chat.wallpaper) или фирменный коралловый фон по
+          десктоп-дизайну (chat-wall-default — только на десктопе, мобила без него). */}
       <div
-        className="flex-1 min-h-0 flex flex-col"
-        style={wallpaperStyle(chat.wallpaper)}
+        className={`flex-1 min-h-0 flex flex-col ${!chat.wallpaper ? 'chat-wall-default' : ''}`}
+        style={chat.wallpaper ? wallpaperStyle(chat.wallpaper) : undefined}
       >
         <MessageList chatId={chatId} messages={messages} />
       </div>

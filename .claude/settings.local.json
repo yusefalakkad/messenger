@@ -249,7 +249,12 @@
       "Bash(cp \"_ \\(10\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd10.html\")",
       "Bash(cp \"_ \\(11\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd11.html\")",
       "Bash(cp \"_ \\(12\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd12.html\")",
-      "Bash(cp \"_ _ _ \\(1\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd0.html\")"
+      "Bash(cp \"_ _ _ \\(1\\).html\" \"/Users/usefalakkad/Desktop/Месенджер/packages/web/public/refd0.html\")",
+      "Bash(qlmanage -t -s 2400 -o /tmp/dakka-pptx/preview \"/Users/usefalakkad/Downloads/Dakka-desktop.pptx\")",
+      "Bash(ls -la preview/)",
+      "Bash(qlmanage -t -s 2400 -o preview \"/Users/usefalakkad/Downloads/Dakka-desktop.pptx\")",
+      "Bash(mkdir -p preview)",
+      "Bash(file preview/*)"
     ],
     "defaultMode": "bypassPermissions"
   }
