@@ -111,11 +111,6 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   50%      { transform: translateY(-10px); }
 }
 
-/* Коралловый фон-обои чата по десктоп-дизайну — ТОЛЬКО десктоп (мобила без него). */
-@media (min-width: 1024px) {
-  .chat-wall-default { background: linear-gradient(165deg, #FF8A6B, #FF3D6E); }
-}
-
 /* ─── Активный чат: яркая «плашка» + 3D-наклон за курсором (десктоп) ──────────
    Заливка-градиент brand + внутренняя рамка + мягкое свечение. transform
    (наклон) ставится инлайном из ChatListItem; здесь только плавность возврата. */
