@@ -116,20 +116,21 @@ function ScrollBeam() {
 function AmbientGlows() {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none">
+      {/* Aurora: мягкие угловые блумы коралл/индиго/бирюза на графитовом базисе. */}
       <motion.div
         animate={{ x: [0, 30, 0], y: [0, 20, 0], scale: [1, 1.08, 1] }}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-accent-violet/15 dark:bg-accent-violet/30 blur-3xl"
+        className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-[#FF6B72]/[0.07] dark:bg-[#FF6B72]/[0.12] blur-3xl"
       />
       <motion.div
         animate={{ x: [0, -25, 0], y: [0, -15, 0], scale: [1, 1.05, 1] }}
         transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute top-1/3 -right-40 w-[640px] h-[640px] rounded-full bg-accent-pink/12 dark:bg-accent-pink/25 blur-3xl"
+        className="absolute top-1/4 -right-40 w-[640px] h-[640px] rounded-full bg-[#8A91FF]/[0.06] dark:bg-[#8A91FF]/[0.11] blur-3xl"
       />
       <motion.div
         animate={{ x: [0, 18, 0], y: [0, -10, 0] }}
         transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute bottom-0 left-1/3 w-[440px] h-[440px] rounded-full bg-accent-orange/10 dark:bg-accent-orange/20 blur-3xl"
+        className="absolute bottom-0 left-1/3 w-[440px] h-[440px] rounded-full bg-[#2FD0C4]/[0.05] dark:bg-[#2FD0C4]/[0.08] blur-3xl"
       />
     </div>
   );
@@ -143,7 +144,7 @@ function Header({ onSignIn }: { onSignIn: () => void }) {
     <header className="relative z-20 px-6 lg:px-12 py-6 flex items-center justify-between max-w-[1480px] mx-auto">
       <div className="flex items-center gap-2.5">
         <DakkaIcon size={40} className="drop-shadow-[0_6px_18px_rgba(154,77,255,0.45)]" />
-        <span className="text-xl font-semibold tracking-tight">Dakka</span>
+        <span className="text-xl font-extrabold tracking-[-0.04em]">dakka</span>
       </div>
 
       <nav className="hidden md:flex items-center gap-9 text-sm text-content/60">
@@ -820,7 +821,7 @@ function Footer() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-content/45 pt-6 border-t border-content/[0.05]">
         <div className="flex items-center gap-2">
           <DakkaIcon size={24} />
-          <span className="text-content/70 font-medium">Dakka</span>
+          <span className="text-content/70 font-extrabold tracking-[-0.04em]">dakka</span>
           <span>{t('landing.footerRights')}</span>
         </div>
         <div className="flex items-center gap-5 flex-wrap justify-center">

@@ -24,10 +24,13 @@ export default {
         },
         // Акцентные тона для градиентов
         accent: {
-          pink:   '#ff4d8d',
+          pink:   '#ff4e86',  // Aurora pink (середина бренд-градиента)
           fuchsia:'#d946ef',
           orange: '#ff8a3d',
-          violet: '#7c4dff',
+          violet: '#8a91ff',  // Aurora indigo (бывший violet — единый акцент)
+          coral:  '#ff6b72',  // Aurora coral
+          indigo: '#8a91ff',  // Aurora indigo
+          teal:   '#2fd0c4',  // Aurora teal («в сети»)
         },
         // Поверхности — через CSS-переменные (см. index.css :root / [data-theme=light]).
         // Один и тот же класс bg-dark-bg меняет цвет по теме автоматически.
