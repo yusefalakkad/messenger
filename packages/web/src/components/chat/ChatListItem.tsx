@@ -95,9 +95,10 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const isPinned = !!chat.pinnedAt;
   const isMuted  = !!chat.mutedUntil && (chat.mutedUntil === 'forever' || new Date(chat.mutedUntil).getTime() > Date.now());
 
-  // Мобильный дизайн (как в макете/TG): непрочитанные и активный — приподнятая
-  // стеклянная карточка; прочитанные — плоская строка с тонким разделителем.
-  const isUnreadCard = (chat.unreadCount ?? 0) > 0 || (chat.unreadMentions ?? 0) > 0 || isPinned;
+  // Мобильный дизайн (Aurora): непрочитанные и активный — приподнятая
+  // стеклянная карточка; прочитанные — плоская прозрачная строка.
+  const hasUnread = (chat.unreadCount ?? 0) > 0 || (chat.unreadMentions ?? 0) > 0;
+  const isUnreadCard = hasUnread || isPinned;
 
   const openMenuAt = (x: number, y: number) => {
     setMenu({ x, y });
@@ -150,7 +151,7 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
         onPointerMove={onTilt}
         onPointerLeave={resetTilt}
         className={clsx(
-          'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 text-left group',
+          'relative w-full flex items-center gap-3.5 lg:gap-3 px-3 py-2.5 mx-2 text-left group',
           'transition-[transform,background-color,box-shadow] duration-200 ease-out',
           !active && 'active:scale-[0.985] active:duration-75',
           // Десктоп — компактная плотная строка.
@@ -172,24 +173,33 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
           <span className="absolute left-0 rtl:left-auto rtl:right-0 top-2 bottom-2 w-[3px] rounded-full bg-brand-gradient shadow-glow-violet animate-pulse-glow z-10" />
         )}
         {isSaved ? (
-          <span className="w-10 h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
-            <Bookmark size={18} className="text-white" />
+          <span className="w-12 h-12 lg:w-10 lg:h-10 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
+            <Bookmark size={20} className="text-white lg:hidden" />
+            <Bookmark size={18} className="text-white hidden lg:block" />
           </span>
         ) : (
-          <Avatar
-            src={avatar}
-            name={name ?? '?'}
-            size="md"
-            online={chat.type === 'direct' ? isOnline : undefined}
-          />
+          <>
+            {/* Мобила — аватар крупнее (48px, по дизайну Aurora); десктоп — компактный 40px */}
+            <Avatar className="lg:hidden" src={avatar} name={name ?? '?'} size="lg"
+                    online={chat.type === 'direct' ? isOnline : undefined} />
+            <Avatar className="hidden lg:block" src={avatar} name={name ?? '?'} size="md"
+                    online={chat.type === 'direct' ? isOnline : undefined} />
+          </>
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-[15px] leading-5 truncate text-content/95 flex items-center gap-1.5">
+            <span className={clsx(
+              'truncate text-content/95 flex items-center gap-1.5 leading-5',
+              'text-[16.5px] lg:text-[15px]',
+              hasUnread ? 'font-bold' : 'font-semibold',
+            )}>
               {isChannel && <Megaphone size={13} className="text-content/45 flex-shrink-0" />}
               {name}
             </span>
-            <span className="text-content/45 text-[12px] leading-4 flex-shrink-0 font-medium flex items-center gap-1 tabular-nums">
+            <span className={clsx(
+              'text-[12.5px] lg:text-[12px] leading-4 flex-shrink-0 flex items-center gap-1 tabular-nums',
+              hasUnread ? 'text-accent-pink font-semibold lg:text-content/45 lg:font-medium' : 'text-content/45 font-medium',
+            )}>
               {isMuted && <BellOff size={11} className="text-content/40 opacity-70" />}
               {/* Статус последнего своего сообщения: ✓ отправлено / ✓✓ прочитано */}
               {lastOwn && (lastRead
@@ -200,11 +210,11 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
           </div>
           <div className="flex items-center justify-between gap-2 mt-1">
             {typing ? (
-              <span className="text-[13px] leading-[18px] truncate text-primary-600 dark:text-primary-300 italic animate-pulse">
+              <span className="text-[14.5px] lg:text-[13px] leading-[18px] truncate text-primary-600 dark:text-primary-300 font-medium animate-pulse">
                 {t('chat.typing')}
               </span>
             ) : (
-              <span className="text-[13px] leading-[18px] truncate flex items-center gap-1">
+              <span className="text-[14.5px] lg:text-[13px] leading-[18px] truncate flex items-center gap-1">
                 {draft && <span className="text-red-400/90 font-medium">{t('chat.draft')}</span>}
                 <span className={clsx('truncate', draft ? 'text-content/60' : 'text-content/55')}>
                   {previewText}
@@ -233,10 +243,6 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
             </span>
           </div>
         </div>
-        {/* Тонкий разделитель под плоской (прочитанной) строкой — только мобила, как в TG */}
-        {!active && !isUnreadCard && (
-          <span aria-hidden className="lg:hidden absolute bottom-0 left-16 right-3 h-px bg-content/[0.07]" />
-        )}
         {/* Pin glyph в углу — только если есть unread, чтобы не дублировать иконку */}
         {isPinned && (chat.unreadCount ?? 0) > 0 && (
           <span className="absolute top-1.5 right-1.5 pointer-events-none">

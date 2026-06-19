@@ -77,14 +77,16 @@ export default function ChatPage() {
           ТОЛЬКО МОБИЛА: на десктопе свой компактный layout (Violet Sunset). */}
       <div
         className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden"
-        style={{ background: 'radial-gradient(135% 60% at 50% -6%, #15141c 0%, #0d0d12 58%, #0b0b0f 100%)' }}
-      >
-        {/* Едва заметный тёплый блик сверху по центру (как в welcome-референсе) */}
-        <div
-          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[120%] h-72 blur-3xl opacity-[0.07]"
-          style={{ background: 'radial-gradient(circle, #ff6e8c, transparent 60%)' }}
-        />
-      </div>
+        style={{
+          background: '#0d0d12',
+          // Aurora dark: мягкие угловые mesh-блумы (коралл сверху-слева, индиго
+          // сверху-справа, бирюза снизу) — тонко, на графитовом базисе.
+          backgroundImage:
+            'radial-gradient(50% 30% at 8% 2%, rgba(255,107,114,0.14), transparent 70%),' +
+            'radial-gradient(48% 30% at 96% 8%, rgba(122,130,255,0.14), transparent 70%),' +
+            'radial-gradient(70% 40% at 60% 106%, rgba(47,208,196,0.10), transparent 72%)',
+        }}
+      />
 
       {/* Плавающий кружок-PiP — на уровне страницы (portal в body), переживает смену чата */}
       <FloatingCircle />
