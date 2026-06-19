@@ -25,6 +25,15 @@ import FolderEditModal from '@/components/layout/FolderEditModal';
 import GroupCallPill from '@/components/call/GroupCallPill';
 import type { Chat } from '@messenger/shared';
 
+// Приветствие по времени суток (как в мобильном дизайне: «Добрый день 👋»).
+function mobileGreeting(): { text: string; emoji: string } {
+  const h = new Date().getHours();
+  if (h < 6)  return { text: 'Доброй ночи',  emoji: '🌙' };
+  if (h < 12) return { text: 'Доброе утро',  emoji: '👋' };
+  if (h < 18) return { text: 'Добрый день',  emoji: '👋' };
+  return { text: 'Добрый вечер', emoji: '🌙' };
+}
+
 export default function Sidebar() {
   const { chatId } = useParams();
   const navigate = useNavigate();
@@ -142,21 +151,26 @@ export default function Sidebar() {
       {/* Ambient свечение в шапке сайдбара */}
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-spot-violet blur-3xl opacity-40 pointer-events-none" />
 
-      {/* ── Mobile header — как в Telegram: компактный, заголовок по центру,
-             «написать» справа. Настройки/аватар/выход живут в таб-баре. ── */}
-      <div className="lg:hidden relative flex items-center justify-center px-3 h-14 flex-shrink-0 border-b border-dark-border">
-        <h1 className="text-[17px] font-semibold tracking-[-0.01em]">{t('nav.chats')}</h1>
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+      {/* ── Mobile header (по дизайну ref0): приветствие + крупный «Чаты»,
+             справа — «написать». ── */}
+      <div className="lg:hidden flex items-end justify-between px-4 pt-[calc(var(--sat)+0.7rem)] pb-2.5 flex-shrink-0">
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold text-content/35 flex items-center gap-1.5 leading-none">
+            {mobileGreeting().text} <span className="text-[15px]">{mobileGreeting().emoji}</span>
+          </div>
+          <h1 className="text-[30px] font-extrabold tracking-[-0.7px] leading-none mt-1.5">{t('nav.chats')}</h1>
+        </div>
+        <div className="relative flex-shrink-0 pb-0.5">
           <motion.button
             onClick={() => setShowPlus((v) => !v)}
             whileTap={tap}
             transition={SPRING.snappy}
-            className="w-9 h-9 rounded-full text-white flex items-center justify-center active:opacity-90"
-            style={{ background: 'linear-gradient(142deg, #ff6b72, #ff9a5c)', boxShadow: '0 4px 14px -4px rgba(255,107,114,0.6)' }}
+            className="w-11 h-11 rounded-full text-white flex items-center justify-center active:opacity-90"
+            style={{ background: 'linear-gradient(135deg,#FF7A78,#FF4E86 46%,#7A82FF)', boxShadow: '0 10px 22px -8px rgba(255,78,134,0.6)' }}
             title={t('chat.newChat')}
             aria-label={t('chat.newChat')}
           >
-            <MessageSquarePlus size={18} />
+            <MessageSquarePlus size={20} />
           </motion.button>
           <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
             <DropdownItem icon={<MessageSquarePlus size={16} />} label={t('chat.newChat')}    onClick={() => { setShowNewChat(true); setShowPlus(false); }} />

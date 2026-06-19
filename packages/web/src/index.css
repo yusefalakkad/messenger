@@ -145,7 +145,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   body {
     @apply bg-dark-bg antialiased;
     color: rgb(var(--content-rgb));
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 20px;
     /* Только сплошной фон. Ambient-засветки — на отдельном fixed-слое ниже,
