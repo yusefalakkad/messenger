@@ -95,6 +95,10 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
   const isPinned = !!chat.pinnedAt;
   const isMuted  = !!chat.mutedUntil && (chat.mutedUntil === 'forever' || new Date(chat.mutedUntil).getTime() > Date.now());
 
+  // Мобильный дизайн (как в макете/TG): непрочитанные и активный — приподнятая
+  // стеклянная карточка; прочитанные — плоская строка с тонким разделителем.
+  const isUnreadCard = (chat.unreadCount ?? 0) > 0 || (chat.unreadMentions ?? 0) > 0 || isPinned;
+
   const openMenuAt = (x: number, y: number) => {
     setMenu({ x, y });
   };
@@ -149,11 +153,15 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
           'relative w-full flex items-center gap-3 px-3 py-2.5 mx-2 text-left group',
           'transition-[transform,background-color,box-shadow] duration-200 ease-out',
           !active && 'active:scale-[0.985] active:duration-75',
-          // Мобила — стеклянная карточка; десктоп — компактная плотная строка.
-          'max-lg:liquid-card max-lg:rounded-2xl max-lg:mb-1.5 lg:rounded-lg',
+          // Десктоп — компактная плотная строка.
+          'lg:rounded-lg',
+          // Мобила: активный/непрочитанный — приподнятая стеклянная карточка;
+          //         прочитанный — плоская строка (разделитель ниже отдельным span).
           active
-            ? 'max-lg:ring-1 max-lg:ring-white/35 max-lg:-translate-y-px lg:chat-active-plaque'
-            : 'hover:-translate-y-px lg:hover:bg-dark-hover/60',
+            ? 'max-lg:liquid-card max-lg:rounded-2xl max-lg:mb-1.5 max-lg:ring-1 max-lg:ring-white/35 max-lg:-translate-y-px lg:chat-active-plaque'
+            : isUnreadCard
+              ? 'max-lg:liquid-card max-lg:rounded-2xl max-lg:mb-1.5 hover:-translate-y-px lg:hover:bg-dark-hover/60'
+              : 'max-lg:rounded-xl hover:-translate-y-px lg:hover:bg-dark-hover/60 max-lg:active:bg-content/[0.05]',
         )}
         style={{ width: 'calc(100% - 1rem)' }}
       >
@@ -225,6 +233,10 @@ export default function ChatListItem({ chat, active, onClick }: Props) {
             </span>
           </div>
         </div>
+        {/* Тонкий разделитель под плоской (прочитанной) строкой — только мобила, как в TG */}
+        {!active && !isUnreadCard && (
+          <span aria-hidden className="lg:hidden absolute bottom-0 left-16 right-3 h-px bg-content/[0.07]" />
+        )}
         {/* Pin glyph в углу — только если есть unread, чтобы не дублировать иконку */}
         {isPinned && (chat.unreadCount ?? 0) > 0 && (
           <span className="absolute top-1.5 right-1.5 pointer-events-none">
