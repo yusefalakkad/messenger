@@ -180,73 +180,28 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* ── Desktop header (h=64px, hit-target ≥44px): аватар, имя, +, настройки, выход ── */}
-      <div className="electron-sb-header hidden lg:flex relative items-center gap-3 px-4 h-16 flex-shrink-0">
-
-        {/* Аватар в градиентном кольце с возможностью смены */}
-        <div className="relative flex-shrink-0 group">
-          <div className="ring-gradient">
-            <div className="rounded-full bg-dark-surface p-[2px]">
-              <Avatar
-                src={user?.avatar}
-                name={user?.displayName ?? '?'}
-                size="md"
-              />
-            </div>
-          </div>
-          <button
-            onClick={() => avatarInputRef.current?.click()}
-            disabled={uploadingAvatar}
-            className="absolute inset-1 rounded-full bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-            title={t('chat.changePhoto')}
-          >
-            {uploadingAvatar
-              ? <div className="w-3.5 h-3.5 border-2 border-white/60 border-t-white rounded-full animate-spin" />
-              : <Camera size={14} className="text-white" />
-            }
-          </button>
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleAvatarChange}
-          />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate leading-tight">{user?.displayName}</p>
-          <p className="text-content/45 text-[12px] truncate mt-0.5">@{user?.username}</p>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <div className="relative">
-            <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title={t('chat.newChatOrGroup')}>
-              <Plus size={18} />
-            </IconBtn>
-            <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
-              <DropdownItem
-                icon={<MessageSquarePlus size={16} />} label={t('chat.newChat')}
-                onClick={() => { setShowNewChat(true); setShowPlus(false); }}
-              />
-              <DropdownItem
-                icon={<Users size={16} />} label={t('chat.newGroup')}
-                onClick={() => { setShowNewGroup(true); setShowPlus(false); }}
-              />
-              <DropdownItem
-                icon={<Megaphone size={16} />} label={t('chat.newChannel')}
-                onClick={() => { setShowNewChannel(true); setShowPlus(false); }}
-              />
-            </Dropdown>
-          </div>
-
-          <IconBtn onClick={() => setSettingsOpen(true)} title={t('nav.settings')}>
-            <Settings size={18} />
+      {/* ── Desktop header (Aurora): крупный «Чаты» + кнопка нового чата.
+             Аватар/настройки/выход переехали в нав-рейл слева. ── */}
+      <div className="hidden lg:flex relative items-center justify-between px-[18px] h-[68px] flex-shrink-0">
+        <h1 className="text-[24px] font-extrabold tracking-[-0.03em] text-content leading-none">{t('nav.chats')}</h1>
+        <div className="relative">
+          <IconBtn onClick={() => setShowPlus((v) => !v)} active={showPlus} title={t('chat.newChatOrGroup')}>
+            <MessageSquarePlus size={18} />
           </IconBtn>
-
-          <IconBtn onClick={handleLogout} title={t('chat.logout')}>
-            <LogOut size={18} />
-          </IconBtn>
+          <Dropdown open={showPlus} onClose={() => setShowPlus(false)}>
+            <DropdownItem
+              icon={<MessageSquarePlus size={16} />} label={t('chat.newChat')}
+              onClick={() => { setShowNewChat(true); setShowPlus(false); }}
+            />
+            <DropdownItem
+              icon={<Users size={16} />} label={t('chat.newGroup')}
+              onClick={() => { setShowNewGroup(true); setShowPlus(false); }}
+            />
+            <DropdownItem
+              icon={<Megaphone size={16} />} label={t('chat.newChannel')}
+              onClick={() => { setShowNewChannel(true); setShowPlus(false); }}
+            />
+          </Dropdown>
         </div>
       </div>
 

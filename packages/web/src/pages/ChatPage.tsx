@@ -3,6 +3,7 @@ import { Routes, Route, useMatch, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import Sidebar from '@/components/layout/Sidebar';
+import NavRail from '@/components/layout/NavRail';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 import ContactsView from '@/components/layout/ContactsView';
 import CallsView from '@/components/layout/CallsView';
@@ -30,9 +31,16 @@ export default function ChatPage() {
   const contactsOpen = useUIStore((s) => s.contactsOpen);
   const callsOpen    = useUIStore((s) => s.callsOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const setContactsOpen = useUIStore((s) => s.setContactsOpen);
+  const setCallsOpen    = useUIStore((s) => s.setCallsOpen);
 
   // Внутри чата (и join/user) на мобиле скрываем таб-бар, чтобы он не перекрывал ввод.
   const inThread = !!(inChat || inJoin || inUser);
+
+  // При открытии конкретного чата закрываем панели Контакты/Звонки (десктоп-рейл).
+  useEffect(() => {
+    if (inThread) { setContactsOpen(false); setCallsOpen(false); }
+  }, [inThread, setContactsOpen, setCallsOpen]);
 
   // ── Ширина списка чатов (десктоп): тянется за разделитель, как в Telegram.
   // По умолчанию пошире (340px), хранится в localStorage. Зажата 280–560.
@@ -92,6 +100,9 @@ export default function ChatPage() {
       <FloatingCircle />
 
       <div className="relative flex flex-1 min-h-0">
+        {/* Десктопный нав-рейл (76px) — Aurora; на мобиле скрыт (есть таб-бар). */}
+        <NavRail />
+
         <div
           className={clsx(
             'flex-shrink-0 w-full lg:w-[var(--sbw)] h-full',
@@ -124,6 +135,14 @@ export default function ChatPage() {
         )}>
           {/* Плашка «сейчас играет» — вне роут-анимации, поэтому переживает смену чата */}
           <NowPlayingBar />
+          {/* Десктоп: Контакты/Звонки открываются как панель в зоне переписки
+              (прячутся, когда открыт конкретный чат). */}
+          {!inThread && contactsOpen && (
+            <div className="hidden lg:block absolute inset-0 z-30"><ContactsView /></div>
+          )}
+          {!inThread && callsOpen && (
+            <div className="hidden lg:block absolute inset-0 z-30"><CallsView /></div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

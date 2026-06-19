@@ -10,16 +10,16 @@
   --sar: env(safe-area-inset-right, 0px);
   --keyboard-height: 0px;
 
-  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) ──────────────────────────────────────────
-     Мягкий «приподнятый» dark — НЕ чёрный, слабо-фиолетовый подмес.
-     Поверхности заданы как RGB-каналы → работает opacity-модификатор
-     (bg-dark-surface/80 и т.п. через <alpha-value> в tailwind.config). */
-  --bg-rgb:      23 21 30;          /* #17151e */
-  --surface-rgb: 31 29 42;          /* #1f1d2a */
-  --card-rgb:    40 37 58;          /* #28253a */
-  --border-rgb:  53 47 74;          /* #352f4a */
-  --hover-rgb:   44 41 64;          /* #2c2940 */
-  --input-rgb:   29 27 41;          /* #1d1b29 */
+  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) — язык «Aurora» ──────────────────────────
+     Глубокий графитово-тёплый базис (НЕ фиолетовый): bg #0B0B10, панели #111118,
+     карточки #15151D. Глубина — через тонкие hair/rim-границы и фон raise.
+     Поверхности заданы как RGB-каналы → работает opacity-модификатор. */
+  --bg-rgb:      11 11 16;          /* #0B0B10  Aurora bg */
+  --surface-rgb: 17 17 24;          /* #111118  Aurora panel (список, детали) */
+  --card-rgb:    21 21 29;          /* #15151D  Aurora panel2 (входящие, медиа) */
+  --border-rgb:  38 38 47;          /* #26262F  hair/rim */
+  --hover-rgb:   30 30 38;          /* #1E1E26  raise (ховер/активные подложки) */
+  --input-rgb:   17 17 24;          /* #111118 */
   /* Удобные «плоские» алиасы для прямых var(--bg) ссылок (body, html-бутстрап). */
   --bg:       rgb(var(--bg-rgb));
   --surface:  rgb(var(--surface-rgb));
@@ -27,13 +27,13 @@
   --border:   rgb(var(--border-rgb));
   --hover:    rgb(var(--hover-rgb));
   --input:    rgb(var(--input-rgb));
-  --content-rgb: 255 255 255;       /* текст/иконки — белый */
-  --bubble-in: #2c2939;             /* входящий пузырь */
-  --bubble-in-text: #ffffff;
+  --content-rgb: 243 243 248;       /* #F3F3F8 текст/иконки */
+  --bubble-in: #15151d;             /* входящий пузырь — Aurora panel2 */
+  --bubble-in-text: #f3f3f8;
   --app-bg-image:
-    radial-gradient(1200px 800px at 8% -12%, rgba(124,77,255,0.10), transparent 60%),
-    radial-gradient(1000px 800px at 112% 112%, rgba(255,77,141,0.07), transparent 60%);
-  --selection-bg: rgba(124,77,255,0.4);
+    radial-gradient(40% 30% at 20% 0%, rgba(255,107,114,0.07), transparent 70%),
+    radial-gradient(40% 30% at 90% 8%, rgba(122,130,255,0.07), transparent 70%);
+  --selection-bg: rgba(255,78,134,0.32);
   color-scheme: dark;
 }
 
@@ -61,20 +61,6 @@
     radial-gradient(1000px 800px at 112% 112%, rgba(255,90,143,0.05), transparent 60%);
   --selection-bg: rgba(138,82,255,0.22);
   color-scheme: light;
-}
-
-/* ─── Мобила: чистый тёмный фон как в макете ──────────────────────────────────
-   На телефоне (<lg) убираем фирменный фиолетово-розовый «вош» темы и делаем
-   графитово-чёрный фон — карточки/стекло становятся контрастнее, ближе к
-   утверждённому мобильному дизайну. ДЕСКТОП не трогаем (там остаётся Violet
-   Sunset). Только тёмная тема. */
-@media (max-width: 1023px) {
-  [data-theme="dark"] {
-    --bg-rgb:      13 13 18;          /* #0d0d12 графитово-чёрный */
-    --surface-rgb: 22 22 30;          /* #16161e — чуть светлее фона */
-    --app-bg-image:
-      radial-gradient(125% 50% at 50% -8%, rgba(255,110,140,0.055), transparent 62%);
-  }
 }
 
 /* ─── Арабский / RTL ──────────────────────────────────────────────────────────
