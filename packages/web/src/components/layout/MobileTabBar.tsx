@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'framer-motion';
+import { useRef, useState, useEffect, useLayoutEffect } from 'react';
+import { motion, useSpring, useVelocity, useTransform } from 'framer-motion';
 import { Phone, Users, Settings, MessageCircle } from 'lucide-react';
 import { useUIStore } from '@/stores/ui.store';
 import { useChatStore } from '@/stores/chat.store';
@@ -36,7 +37,32 @@ export default function MobileTabBar() {
     s.chats.reduce((n, c) => n + (c.archivedAt ? 0 : (c.unreadCount ?? 0)), 0));
 
   const active: TabKey = settingsOpen ? 'settings' : contactsOpen ? 'contacts' : callsOpen ? 'calls' : 'chats';
+  const activeIndex = TABS.findIndex((tb) => tb.key === active);
   const closeAll = () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(false); };
+
+  // ── «Liquid glass»: единая стеклянная пилюля едет за активной вкладкой и
+  //    РАСТЯГИВАЕТСЯ по скорости движения (эффект воды), затем оседает. ──
+  const btnRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [ready, setReady] = useState(false);
+  const left  = useSpring(0, { stiffness: 420, damping: 30, mass: 0.9 });
+  const width = useSpring(0, { stiffness: 420, damping: 30, mass: 0.9 });
+  useLayoutEffect(() => {
+    const b = btnRefs.current[activeIndex];
+    if (!b) return;
+    if (!ready) { left.jump(b.offsetLeft); width.jump(b.offsetWidth); setReady(true); }
+    else        { left.set(b.offsetLeft);  width.set(b.offsetWidth); }
+  }, [activeIndex, ready, left, width]);
+  useEffect(() => {
+    const onResize = () => {
+      const b = btnRefs.current[activeIndex];
+      if (b) { left.jump(b.offsetLeft); width.jump(b.offsetWidth); }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [activeIndex, left, width]);
+  const vx     = useVelocity(left);
+  const scaleX = useTransform(vx, (v) => 1 + Math.min(0.3, Math.abs(v) / 4800));    // растяжение в сторону движения
+  const scaleY = useTransform(vx, (v) => 1 - Math.min(0.13, Math.abs(v) / 9500));   // лёгкое сжатие по высоте
 
   const onTab = (key: TabKey) => {
     haptic.selection();
@@ -52,18 +78,29 @@ export default function MobileTabBar() {
     <div className="lg:hidden absolute inset-x-0 bottom-0 z-40 flex justify-center
                     px-3 pb-[calc(var(--sab)+0.55rem)] pointer-events-none">
       <nav
-        className="pointer-events-auto w-full max-w-md flex items-stretch gap-1 px-2 py-1.5
+        className="pointer-events-auto relative w-full max-w-md flex items-stretch gap-1 px-2 py-1.5
                    rounded-[28px] liquid-glass"
         role="tablist"
         aria-label={t('nav.chats')}
       >
-        {TABS.map(({ key, i18nKey, Icon }) => {
+        {/* Жидкая стеклянная пилюля — едет за активной вкладкой и растягивается «как вода» */}
+        {ready && (
+          <motion.span
+            aria-hidden
+            style={{ left, width, scaleX, scaleY }}
+            className="absolute top-1.5 bottom-1.5 rounded-[20px] pointer-events-none
+                       bg-[#7A82FF]/20 ring-1 ring-white/20 backdrop-blur-md
+                       shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_6px_18px_-6px_rgba(122,130,255,0.55)]"
+          />
+        )}
+        {TABS.map(({ key, i18nKey, Icon }, i) => {
           const label = t(i18nKey);
           const isActive = active === key;
           const showBadge = key === 'chats' && unread > 0;
           return (
             <motion.button
               key={key}
+              ref={(el) => { btnRefs.current[i] = el; }}
               type="button"
               role="tab"
               aria-selected={isActive}
@@ -73,13 +110,6 @@ export default function MobileTabBar() {
               transition={SPRING.snappy}
               className="relative flex-1 flex flex-col items-center justify-center gap-1 h-[50px] rounded-[22px]"
             >
-              {isActive && (
-                <motion.span
-                  layoutId="tabbar-active"
-                  transition={{ type: 'spring', stiffness: 480, damping: 26, mass: 0.7 }}
-                  className="absolute inset-0 rounded-[22px] bg-[#7A82FF]/25 ring-1 ring-[#7A82FF]/45"
-                />
-              )}
               <span className="relative z-10 flex flex-col items-center gap-1">
                 <motion.span
                   className="relative"
