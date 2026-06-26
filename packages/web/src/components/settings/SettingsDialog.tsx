@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, ShieldOff, Loader2, Copy, Check, KeyRound, QrCode as QrCodeIcon, Moon, Sun, Monitor } from 'lucide-react';
+import { X, ShieldCheck, ShieldOff, Loader2, Copy, Check, KeyRound, QrCode as QrCodeIcon, Moon, Sun, Monitor, Phone } from 'lucide-react';
 import QRCode from 'qrcode';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
@@ -70,6 +70,8 @@ export default function SettingsDialog({ open, onClose }: Props) {
                 <TwoFactorSection status={status} onChange={setStatus} />
                 <div className="h-px bg-dark-border" aria-hidden />
                 <CloudPasswordSection />
+                <div className="h-px bg-dark-border" aria-hidden />
+                <ChangePhoneSection />
               </motion.section>
 
               <motion.section variants={fadeUp} className="surface-1 rounded-2xl p-4 shadow-e2">
@@ -663,6 +665,162 @@ function CloudPasswordSection() {
         )}
       </div>
 
+      {ok && <p className="text-green-400 text-sm">{ok}</p>}
+    </div>
+  );
+}
+
+// ─── Смена номера телефона ───────────────────────────────────────────────────
+// Двухшаговый флоу: новый номер → код на новый номер (+ облачный пароль, если
+// установлен). Бэк: POST /auth/phone/change/request → /confirm.
+
+function ChangePhoneSection() {
+  const { t } = useTranslation();
+  const userId = useAuthStore((s) => s.user?.id);
+  const hasCloudPwd = getCloudPwdFlag(userId);
+
+  const [stage, setStage] = useState<'idle' | 'phone' | 'code'>('idle');
+  const [newPhone, setNewPhone] = useState('');
+  const [changeToken, setChangeToken] = useState('');
+  const [code, setCode] = useState('');
+  const [cloudPassword, setCloudPassword] = useState('');
+  const [devOtp, setDevOtp] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [ok, setOk] = useState('');
+
+  const reset = () => {
+    setStage('idle'); setNewPhone(''); setChangeToken(''); setCode('');
+    setCloudPassword(''); setDevOtp(''); setErr('');
+  };
+
+  const requestCode = async () => {
+    setBusy(true); setErr(''); setOk('');
+    try {
+      const { data } = await api.post('/auth/phone/change/request', { newPhone });
+      setChangeToken(data?.data?.changeToken ?? '');
+      if (data?.data?.devOtp) setDevOtp(data.data.devOtp);
+      setStage('code');
+    } catch (e: unknown) {
+      setErr(errMsg(e, t('settings.sendCodeFailed')));
+    } finally { setBusy(false); }
+  };
+
+  const confirm = async () => {
+    setBusy(true); setErr('');
+    try {
+      await api.post('/auth/phone/change/confirm', {
+        changeToken,
+        code,
+        ...(hasCloudPwd ? { cloudPassword } : {}),
+      });
+      setOk(t('settings.phoneChangedTo', { phone: newPhone }));
+      reset();
+    } catch (e: unknown) {
+      setErr(errMsg(e, t('settings.changePhoneFailed')));
+    } finally { setBusy(false); }
+  };
+
+  // ── Шаг 1: ввод нового номера ──────────────────────────────────────────────
+  if (stage === 'phone') {
+    return (
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm">{t('settings.newPhoneTitle')}</h4>
+        <p className="text-xs text-content/50">{t('settings.newPhoneHint')}</p>
+        <input
+          type="tel"
+          value={newPhone}
+          onChange={(e) => setNewPhone(e.target.value)}
+          placeholder="+7 999 123-45-67"
+          autoComplete="tel"
+          className="input-base w-full"
+        />
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <div className="flex gap-2">
+          <motion.button onClick={reset} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
+            {t('common.cancel')}
+          </motion.button>
+          <motion.button
+            onClick={requestCode}
+            disabled={busy || newPhone.replace(/\D/g, '').length < 10}
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-primary flex-1 disabled:opacity-50"
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            {t('settings.sendCodeBtn')}
+          </motion.button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Шаг 2: код (+ облачный пароль) ─────────────────────────────────────────
+  if (stage === 'code') {
+    return (
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm">{t('settings.confirmPhoneTitle')}</h4>
+        <p className="text-xs text-content/50">{t('settings.enterCodeSentTo', { phone: newPhone })}</p>
+        {devOtp && <p className="text-xs text-amber-400">dev: {devOtp}</p>}
+        <input
+          type="text"
+          inputMode="numeric"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+          placeholder={t('settings.codePlaceholder')}
+          autoComplete="one-time-code"
+          className="input-base w-full"
+        />
+        {hasCloudPwd && (
+          <input
+            type="password"
+            value={cloudPassword}
+            onChange={(e) => setCloudPassword(e.target.value)}
+            placeholder={t('settings.cloudPwdPlaceholder')}
+            autoComplete="current-password"
+            className="input-base w-full"
+          />
+        )}
+        {err && <p className="text-red-400 text-sm">{err}</p>}
+        <div className="flex gap-2">
+          <motion.button onClick={reset} whileTap={tap} transition={SPRING.snappy} className="btn-secondary flex-1">
+            {t('common.cancel')}
+          </motion.button>
+          <motion.button
+            onClick={confirm}
+            disabled={busy || code.length < 4 || (hasCloudPwd && !cloudPassword)}
+            whileTap={tap}
+            transition={SPRING.snappy}
+            className="btn-primary flex-1 disabled:opacity-50"
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            {t('settings.changePhone')}
+          </motion.button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Главный экран ──────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 text-content/40"><Phone size={22} /></div>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-semibold text-sm">{t('settings.phoneSection')}</h4>
+          <p className="text-xs text-content/50 mt-0.5">
+            {hasCloudPwd ? t('settings.phoneHintBoth') : t('settings.phoneHintCode')}
+          </p>
+        </div>
+      </div>
+      <motion.button
+        onClick={() => { setOk(''); setStage('phone'); }}
+        whileTap={tap}
+        transition={SPRING.snappy}
+        className="btn-primary w-full"
+      >
+        {t('settings.changePhone')}
+      </motion.button>
       {ok && <p className="text-green-400 text-sm">{ok}</p>}
     </div>
   );

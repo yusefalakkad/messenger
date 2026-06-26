@@ -18,6 +18,11 @@ const PWGATE_ATTEMPTS_KEY = (token: string) => `pwgate:attempts:${token}`;
 const PWGATE_TTL_SEC = 600;
 const PWGATE_MAX_ATTEMPTS = 5;
 
+// ── Смена номера: redis-гейт после запроса кода на НОВЫЙ номер ────────────────
+//   chgate:<token> → JSON {userId, newPhone, requirePassword}, TTL 10 мин
+const CHGATE_KEY = (token: string) => `chgate:${token}`;
+const CHGATE_TTL_SEC = 600;
+
 /** Нормализуем номер в E.164. Бросаем AppError если невалиден.
  *  Принимаем удобные форматы:
  *    8 (XXX) XXX-XX-XX → +7XXXXXXXXXX
@@ -328,6 +333,136 @@ export class PhoneAuthService {
 
     const tokens = await this._createSession(user.id, meta);
     return { ...tokens, user: shapeUser(user) };
+  }
+
+  // ── Смена номера телефона (для авторизованного юзера) ────────────────────────
+
+  /**
+   * Шаг A: запросить код подтверждения на НОВЫЙ номер.
+   * Код уходит на новый номер (надо доказать владение им). Активная сессия
+   * подтверждает, что это текущий владелец аккаунта. Если установлен облачный
+   * пароль — он потребуется на шаге confirm (доп. защита от угона сессии).
+   */
+  async requestPhoneChange(
+    userId: string,
+    rawNewPhone: string,
+  ): Promise<{ changeToken: string; cooldownSec: number; devOtp?: string; telegramDeepLink?: string }> {
+    const newPhone = normalizePhone(rawNewPhone);
+
+    const me = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { phone: true, cloudPasswordHash: true },
+    });
+    if (!me) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    if (me.phone === newPhone) {
+      throw new AppError(400, 'SAME_PHONE', 'This is already your current number');
+    }
+
+    const taken = await prisma.user.findUnique({ where: { phone: newPhone } });
+    if (taken) {
+      throw new AppError(409, 'PHONE_TAKEN', 'This number is already registered');
+    }
+
+    // Cooldown / rate-limit на новый номер — переиспользуем otpStore.
+    const cooldown = await otpStore.cooldownRemaining(newPhone);
+    if (cooldown > 0) {
+      throw new AppError(429, 'OTP_COOLDOWN', `Wait ${cooldown}s before requesting another code`);
+    }
+    const exceeded = await otpStore.exceededWindowLimit(newPhone);
+    if (exceeded) {
+      throw new AppError(429, 'OTP_RATE_LIMIT', 'Too many code requests, try later');
+    }
+
+    const code = generateOtp(config.sms.codeLength);
+    let providerRequestId: string | null = null;
+    let echoCodeForDevOnly: string | undefined;
+    let telegramDeepLink: string | undefined;
+    try {
+      const provider = getSmsProvider();
+      const r = await provider.sendCode(newPhone, code);
+      providerRequestId = r.providerRequestId;
+      echoCodeForDevOnly = r.echoCodeForDevOnly;
+      telegramDeepLink = r.needsTelegramLink?.deepLink;
+    } catch (err) {
+      if (err instanceof SmsDeliveryError) {
+        logger.error('SMS delivery failed (phone change)', { phone: maskPhone(newPhone), provider: err.providerName, err: err.message });
+        throw new AppError(502, 'SMS_DELIVERY_FAILED', 'Could not deliver code, try again');
+      }
+      throw err;
+    }
+    await otpStore.saveCode(newPhone, code, providerRequestId);
+
+    const changeToken = crypto.randomBytes(32).toString('hex');
+    await redis.set(
+      CHGATE_KEY(changeToken),
+      JSON.stringify({ userId, newPhone, requirePassword: !!me.cloudPasswordHash }),
+      'EX',
+      CHGATE_TTL_SEC,
+    );
+
+    return {
+      changeToken,
+      cooldownSec: config.sms.requestCooldownSeconds,
+      devOtp: config.isDev ? echoCodeForDevOnly : undefined,
+      telegramDeepLink,
+    };
+  }
+
+  /**
+   * Шаг B: подтвердить смену — код на новый номер + (если задан) облачный пароль.
+   */
+  async confirmPhoneChange(
+    userId: string,
+    changeToken: string,
+    code: string,
+    cloudPassword?: string,
+  ): Promise<{ phone: string }> {
+    const raw = await redis.get(CHGATE_KEY(changeToken));
+    if (!raw) {
+      throw new AppError(401, 'CHANGE_TOKEN_INVALID', 'Change request expired, start again');
+    }
+    const gate = JSON.parse(raw) as { userId: string; newPhone: string; requirePassword: boolean };
+    if (gate.userId !== userId) {
+      throw new AppError(403, 'CHANGE_TOKEN_MISMATCH', 'This change request belongs to another account');
+    }
+
+    // Проверяем код на новый номер.
+    const result = await otpStore.verifyCode(gate.newPhone, code);
+    if (!result.ok) {
+      if (result.reason === 'expired') throw new AppError(400, 'OTP_EXPIRED', 'Code expired, request a new one');
+      if (result.reason === 'locked') throw new AppError(429, 'OTP_LOCKED', 'Too many wrong attempts, request a new code');
+      throw new AppError(401, 'OTP_WRONG', `Wrong code, ${result.attemptsLeft} attempts left`);
+    }
+
+    // Если у юзера есть облачный пароль — требуем его (доп. фактор).
+    if (gate.requirePassword) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { cloudPasswordHash: true },
+      });
+      // Пароль могли снять, пока гейт висел — тогда пропускаем.
+      if (user?.cloudPasswordHash) {
+        if (!cloudPassword) {
+          throw new AppError(401, 'PASSWORD_REQUIRED', 'Cloud password required to change number');
+        }
+        const valid = await argon2.verify(user.cloudPasswordHash, cloudPassword);
+        if (!valid) throw new AppError(401, 'WRONG_PASSWORD', 'Wrong cloud password');
+      }
+    }
+
+    // Повторная проверка уникальности (вдруг номер заняли пока гейт висел).
+    const taken = await prisma.user.findUnique({ where: { phone: gate.newPhone } });
+    if (taken && taken.id !== userId) {
+      throw new AppError(409, 'PHONE_TAKEN', 'This number is already registered');
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { phone: gate.newPhone, phoneVerified: true },
+    });
+    await redis.del(CHGATE_KEY(changeToken));
+
+    return { phone: gate.newPhone };
   }
 
   // ── Private ────────────────────────────────────────────────────────────────

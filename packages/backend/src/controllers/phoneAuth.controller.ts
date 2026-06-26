@@ -66,6 +66,36 @@ export async function verifyCloudPassword(req: Request, res: Response, next: Nex
   } catch (err) { next(err); }
 }
 
+// ─── POST /auth/phone/change/request — код на новый номер (requireAuth) ───────
+export const changePhoneRequestValidators = [
+  body('newPhone').trim().isString().isLength({ min: 5, max: 30 }),
+];
+
+export async function changePhoneRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = (req as Request & { userId: string }).userId;
+    const { newPhone } = req.body;
+    const result = await phoneAuthService.requestPhoneChange(userId, newPhone);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+}
+
+// ─── POST /auth/phone/change/confirm — подтвердить смену (requireAuth) ─────────
+export const changePhoneConfirmValidators = [
+  body('changeToken').isString().isLength({ min: 32, max: 128 }),
+  body('code').trim().isString().isLength({ min: 4, max: 10 }),
+  body('cloudPassword').optional().isString().isLength({ min: 1, max: 128 }),
+];
+
+export async function changePhoneConfirm(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = (req as Request & { userId: string }).userId;
+    const { changeToken, code, cloudPassword } = req.body;
+    const result = await phoneAuthService.confirmPhoneChange(userId, changeToken, code, cloudPassword);
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+}
+
 // ─── POST /auth/phone/complete-profile — для новых юзеров ─────────────────────
 export const completeProfileValidators = [
   body('verifyToken').isString().isLength({ min: 32, max: 128 }),

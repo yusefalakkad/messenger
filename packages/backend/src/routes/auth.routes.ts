@@ -19,6 +19,8 @@ import {
   verifyCode, verifyCodeValidators,
   verifyCloudPassword, verifyCloudPasswordValidators,
   completeProfile, completeProfileValidators,
+  changePhoneRequest, changePhoneRequestValidators,
+  changePhoneConfirm, changePhoneConfirmValidators,
 } from '../controllers/phoneAuth.controller';
 
 const router = Router();
@@ -46,6 +48,10 @@ router.post('/phone/request',           authLimiter, validate(requestCodeValidat
 router.post('/phone/verify',            authLimiter, validate(verifyCodeValidators),      verifyCode);
 router.post('/phone/password',          authLimiter, validate(verifyCloudPasswordValidators), verifyCloudPassword);
 router.post('/phone/complete-profile',  authLimiter, validate(completeProfileValidators), completeProfile);
+
+// Смена номера телефона (требует авторизацию: меняет номер текущего аккаунта).
+router.post('/phone/change/request', authLimiter, requireAuth, validate(changePhoneRequestValidators), changePhoneRequest);
+router.post('/phone/change/confirm', authLimiter, requireAuth, validate(changePhoneConfirmValidators), changePhoneConfirm);
 
 // ─── Legacy email/password (deprecated, для миграции) ─────────────────────────
 router.post('/register',     authLimiter,    validate(registerValidators), register);
