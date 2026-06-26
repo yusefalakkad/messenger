@@ -8,7 +8,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ImagePlay, ChevronUp } from 'lucide-react';
+import { Paperclip, Mic, Send, Image as ImageIcon, Video, Camera, Film, CircleDot, X, Lock, Smile, Trash2, BarChart3, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import { sendMessage, sendTyping } from '@/lib/socket';
 import { api } from '@/lib/api';
 import { haptic } from '@/lib/native';
 import { toast } from '@/lib/toast';
+import { compressImage } from '@/lib/compressImage';
 import { encryptText, isChatE2E, getRecipientPublicKey } from '@/lib/e2e';
 import { formatReplyPreview } from '@/lib/messagePreview';
 import { useChatStore } from '@/stores/chat.store';
@@ -24,7 +25,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import { editMessage as socketEditMsg } from '@/lib/socket';
 import CircleRecorder from '@/components/media/CircleRecorder';
 import VideoRecorder from '@/components/chat/VideoRecorder';
-import GifPicker from '@/components/media/GifPicker';
 import ScheduleSendSheet from '@/components/chat/ScheduleSendSheet';
 import PollCreateModal from '@/components/chat/PollCreateModal';
 import MediaPreview, { type PendingMedia } from '@/components/media/MediaPreview';
@@ -52,7 +52,6 @@ export default function MessageInput({ chatId }: Props) {
   const [showCircle,   setShowCircle]   = useState(false);
   const [showVideoRec, setShowVideoRec] = useState(false);
   const [showPoll,     setShowPoll]     = useState(false);
-  const [showGif,      setShowGif]      = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false); // drag-and-drop overlay
@@ -761,7 +760,7 @@ export default function MessageInput({ chatId }: Props) {
 
   // ─── Файл (фото / видео) ──────────────────────────────────────────────────────
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
     const file = e.target.files?.[0];
     if (!file) return;
     // Лимит 100 МБ для видео
@@ -771,13 +770,15 @@ export default function MessageInput({ chatId }: Props) {
       e.target.value = '';
       return;
     }
-    setPendingMedia({ file, type, previewUrl: URL.createObjectURL(file) });
-    setShowAttach(false);
     e.target.value = '';
+    setShowAttach(false);
+    // Фото жмём в браузере перед загрузкой (экономия диска/трафика, скорость на мобиле)
+    const finalFile = type === 'image' ? await compressImage(file) : file;
+    setPendingMedia({ file: finalFile, type, previewUrl: URL.createObjectURL(finalFile) });
   };
 
   // ─── Drag & drop файла в окно чата ───────────────────────────────────────────
-  const handleDroppedFile = useCallback((file: File) => {
+  const handleDroppedFile = useCallback(async (file: File) => {
     const isVideo = file.type.startsWith('video');
     const isImage = file.type.startsWith('image');
     if (!isImage && !isVideo) {
@@ -789,7 +790,8 @@ export default function MessageInput({ chatId }: Props) {
       setTimeout(() => setUploadError(null), 3000);
       return;
     }
-    setPendingMedia({ file, type: isVideo ? 'video' : 'image', previewUrl: URL.createObjectURL(file) });
+    const finalFile = isImage ? await compressImage(file) : file;
+    setPendingMedia({ file: finalFile, type: isVideo ? 'video' : 'image', previewUrl: URL.createObjectURL(finalFile) });
   }, []);
 
   useEffect(() => {
@@ -1239,30 +1241,7 @@ export default function MessageInput({ chatId }: Props) {
                   icon={<BarChart3 size={16} />} label="Опрос"
                   onClick={() => { setShowPoll(true); setShowAttach(false); }}
                 />
-                <DropdownItem
-                  icon={<ImagePlay size={16} />} label="GIF"
-                  onClick={() => { setShowGif(true); setShowAttach(false); }}
-                />
               </Dropdown>
-
-              {/* GIF-пикер — absolute bottom-full над кнопкой прикрепления */}
-              <AnimatePresence>
-                {showGif && (
-                  <GifPicker
-                    onSelect={(gif) => {
-                      sendMessage({
-                        chatId,
-                        type: 'image',
-                        mediaData: {
-                          url: gif.url, mimeType: 'image/gif', size: 0,
-                          width: gif.width, height: gif.height,
-                        },
-                      });
-                    }}
-                    onClose={() => setShowGif(false)}
-                  />
-                )}
-              </AnimatePresence>
             </div>
           )}
 
