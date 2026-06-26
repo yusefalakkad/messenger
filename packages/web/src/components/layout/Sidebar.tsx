@@ -176,7 +176,7 @@ export default function Sidebar() {
             whileTap={tap}
             transition={SPRING.snappy}
             className="w-11 h-11 rounded-full text-white flex items-center justify-center active:opacity-90"
-            style={{ background: 'linear-gradient(135deg,#FF7A78,#FF4E86 46%,#7A82FF)', boxShadow: '0 10px 22px -8px rgba(255,78,134,0.6)' }}
+            style={{ background: 'linear-gradient(135deg,#42E6CE,#16B6E0 40%,#2D6BF0 74%,#1E40C8)', boxShadow: '0 10px 22px -8px rgba(45,107,240,0.6)' }}
             title={t('chat.newChat')}
             aria-label={t('chat.newChat')}
           >

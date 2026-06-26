@@ -81,18 +81,13 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
-      {/* Фон — чистый графитово-тёмный как в утверждённом мобильном макете.
-          ТОЛЬКО МОБИЛА: на десктопе свой компактный layout (Violet Sunset). */}
+      {/* Фон чата (ТОЛЬКО МОБИЛА) — океанский амбиент поверх абиссального базиса,
+          тема-aware через CSS-переменные. */}
       <div
         className="lg:hidden pointer-events-none absolute inset-0 z-0 overflow-hidden"
         style={{
-          background: '#0d0d12',
-          // Aurora dark: мягкие угловые mesh-блумы (коралл сверху-слева, индиго
-          // сверху-справа, бирюза снизу) — тонко, на графитовом базисе.
-          backgroundImage:
-            'radial-gradient(50% 30% at 8% 2%, rgba(255,107,114,0.14), transparent 70%),' +
-            'radial-gradient(48% 30% at 96% 8%, rgba(122,130,255,0.14), transparent 70%),' +
-            'radial-gradient(70% 40% at 60% 106%, rgba(47,208,196,0.10), transparent 72%)',
+          background: 'rgb(var(--bg-rgb))',
+          backgroundImage: 'var(--app-bg-image)',
         }}
       />
 

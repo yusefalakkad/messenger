@@ -10,16 +10,17 @@
   --sar: env(safe-area-inset-right, 0px);
   --keyboard-height: 0px;
 
-  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) — язык «Aurora» ──────────────────────────
-     Глубокий графитово-тёплый базис (НЕ фиолетовый): bg #0B0B10, панели #111118,
-     карточки #15151D. Глубина — через тонкие hair/rim-границы и фон raise.
+  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) — язык «ocean / бездна» ──────────────────
+     Океанская бездна: bg #070C16, панели #0C1421, приподнятые #111A2A. Глубина —
+     через волосяные rim-границы и океанские радиальные блики (mesh).
      Поверхности заданы как RGB-каналы → работает opacity-модификатор. */
-  --bg-rgb:      11 11 16;          /* #0B0B10  Aurora bg */
-  --surface-rgb: 17 17 24;          /* #111118  Aurora panel (список, детали) */
-  --card-rgb:    21 21 29;          /* #15151D  Aurora panel2 (входящие, медиа) */
-  --border-rgb:  38 38 47;          /* #26262F  hair/rim */
-  --hover-rgb:   30 30 38;          /* #1E1E26  raise (ховер/активные подложки) */
-  --input-rgb:   17 17 24;          /* #111118 */
+  --bg-rgb:      7 12 22;            /* #070C16  abyss bg */
+  --surface-rgb: 12 20 33;           /* #0C1421  panel (список, шапки, детали) */
+  --card-rgb:    17 26 42;           /* #111A2A  panel2 (входящие, медиа) */
+  --border-rgb:  31 43 61;           /* ≈ rim rgba(255,255,255,0.13) над panel */
+  --hover-rgb:   24 34 51;           /* raise/raiseHi (ховер/активные подложки) */
+  --input-rgb:   17 26 42;           /* #111A2A */
+  --rail-rgb:    10 17 31;           /* #0A111F нав-рельс */
   /* Удобные «плоские» алиасы для прямых var(--bg) ссылок (body, html-бутстрап). */
   --bg:       rgb(var(--bg-rgb));
   --surface:  rgb(var(--surface-rgb));
@@ -27,39 +28,46 @@
   --border:   rgb(var(--border-rgb));
   --hover:    rgb(var(--hover-rgb));
   --input:    rgb(var(--input-rgb));
-  --content-rgb: 243 243 248;       /* #F3F3F8 текст/иконки */
-  --bubble-in: #15151d;             /* входящий пузырь — Aurora panel2 */
-  --bubble-in-text: #f3f3f8;
+  --content-rgb: 234 241 250;        /* #EAF1FA ink */
+  --online: #34DCC8;                 /* индикатор «в сети» */
+  --shadow-window: 0 40px 120px rgba(0,0,0,0.66);   /* тень окна/устройств */
+  --shadow-card:   0 8px 22px -8px rgba(0,0,0,0.6); /* тень карточек */
+  --bubble-in: #141F31;              /* входящий пузырь — inBub */
+  --bubble-in-text: #EAF1FA;
   --app-bg-image:
-    radial-gradient(40% 30% at 20% 0%, rgba(255,107,114,0.07), transparent 70%),
-    radial-gradient(40% 30% at 90% 8%, rgba(122,130,255,0.07), transparent 70%);
-  --selection-bg: rgba(255,78,134,0.32);
+    radial-gradient(46% 36% at 16% 0%, rgba(45,107,240,0.13), transparent 66%),
+    radial-gradient(44% 34% at 92% 8%, rgba(52,220,200,0.10), transparent 66%);
+  --selection-bg: rgba(45,107,240,0.32);
   color-scheme: dark;
 }
 
-/* ─── СВЕТЛАЯ ТЕМА ──────────────────────────────────────────────────────────
-   Тёплый светлый фон (НЕ чисто-белый — мягче для глаз), брендовые засветки
-   приглушены. Текст near-black. Тот же фиолетово-розовый акцент. */
+/* ─── СВЕТЛАЯ ТЕМА — «морская пена» ─────────────────────────────────────────
+   Бледный сине-зелёный фон (мягче для глаз, чем чисто-белый), океанские
+   засветки приглушены. Текст near-black с синим подтоном. */
 [data-theme="light"] {
-  --bg-rgb:      244 242 247;       /* #f4f2f7 тёплый светло-серо-сиреневый */
-  --surface-rgb: 255 255 255;       /* sidebar, header — чистый белый */
-  --card-rgb:    255 255 255;       /* карточки */
-  --border-rgb:  230 226 238;       /* #e6e2ee мягкие границы */
-  --hover-rgb:   239 236 245;       /* #efecf5 hover/active */
-  --input-rgb:   240 237 245;       /* #f0edf5 input bg */
+  --bg-rgb:      234 241 247;       /* #EAF1F7 pale sea foam */
+  --surface-rgb: 255 255 255;       /* панели — чистый белый */
+  --card-rgb:    241 246 251;       /* #F1F6FB panel2 */
+  --border-rgb:  214 224 236;       /* ≈ rim rgba(16,58,110,0.16) над белым */
+  --hover-rgb:   232 238 245;       /* raiseHi */
+  --input-rgb:   241 246 251;       /* #F1F6FB */
+  --rail-rgb:    244 248 252;       /* #F4F8FC нав-рельс */
   --bg:       rgb(var(--bg-rgb));
   --surface:  rgb(var(--surface-rgb));
   --card:     rgb(var(--card-rgb));
   --border:   rgb(var(--border-rgb));
   --hover:    rgb(var(--hover-rgb));
   --input:    rgb(var(--input-rgb));
-  --content-rgb: 28 24 38;         /* текст — near-black с фиолетовым подтоном */
+  --content-rgb: 11 33 56;         /* #0B2138 ink — near-black с синим подтоном */
+  --online: #0FB5A6;               /* индикатор «в сети» (light) */
+  --shadow-window: 0 18px 50px -18px rgba(20,60,120,0.32);
+  --shadow-card:   0 6px 18px -8px rgba(20,60,120,0.30);
   --bubble-in: #ffffff;            /* входящий пузырь — белый с тенью */
-  --bubble-in-text: #1c1826;
+  --bubble-in-text: #0B2138;
   --app-bg-image:
-    radial-gradient(1200px 800px at 8% -12%, rgba(138,82,255,0.07), transparent 60%),
-    radial-gradient(1000px 800px at 112% 112%, rgba(255,90,143,0.05), transparent 60%);
-  --selection-bg: rgba(138,82,255,0.22);
+    radial-gradient(60% 50% at 12% 0%, rgba(66,230,206,0.18), transparent 60%),
+    radial-gradient(55% 50% at 95% 6%, rgba(45,107,240,0.16), transparent 62%);
+  --selection-bg: rgba(45,107,240,0.20);
   color-scheme: light;
 }
 
@@ -111,13 +119,31 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   50%      { transform: translateY(-10px); }
 }
 
+/* ─── Океанский фон-бэкдроп: дрейф орбов + плавные волны ──────────────────────
+   Параллакс по скроллу ставит framer (translateY на внешнем слое); здесь —
+   медленный дрейф орбов и горизонтальное колыхание волн (на внутреннем слое,
+   чтобы transform не конфликтовал). */
+@keyframes oceanDriftA { 0%, 100% { transform: translate(0, 0); }      50% { transform: translate(26px, -22px); } }
+@keyframes oceanDriftB { 0%, 100% { transform: translate(0, 0); }      50% { transform: translate(-32px, 26px); } }
+@keyframes oceanDriftC { 0%, 100% { transform: translate(0, 0); }      50% { transform: translate(22px, 30px); } }
+@keyframes oceanWaveSlow { 0%, 100% { transform: translateX(0); }      50% { transform: translateX(-44px); } }
+@keyframes oceanWaveFast { 0%, 100% { transform: translateX(0); }      50% { transform: translateX(40px); } }
+.animate-drift-a  { animation: oceanDriftA 16s ease-in-out infinite; will-change: transform; }
+.animate-drift-b  { animation: oceanDriftB 20s ease-in-out infinite; will-change: transform; }
+.animate-drift-c  { animation: oceanDriftC 24s ease-in-out infinite; will-change: transform; }
+.animate-wave-slow { animation: oceanWaveSlow 12s ease-in-out infinite; transform-box: fill-box; }
+.animate-wave-fast { animation: oceanWaveFast 9s ease-in-out infinite; transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-drift-a, .animate-drift-b, .animate-drift-c, .animate-wave-slow, .animate-wave-fast { animation: none; }
+}
+
 /* ─── Активный чат: яркая «плашка» + 3D-наклон за курсором (десктоп) ──────────
    Заливка-градиент brand + внутренняя рамка + мягкое свечение. transform
    (наклон) ставится инлайном из ChatListItem; здесь только плавность возврата. */
 @media (min-width: 1024px) {
   .chat-active-plaque {
-    background: linear-gradient(100deg, rgba(122,130,255,0.24), rgba(208,77,240,0.13));
-    box-shadow: inset 0 0 0 1px rgba(160,140,255,0.42), 0 12px 28px -12px rgba(122,130,255,0.55);
+    background: linear-gradient(100deg, rgba(45,107,240,0.24), rgba(22,182,224,0.14));
+    box-shadow: inset 0 0 0 1px rgba(91,130,255,0.42), 0 12px 28px -12px rgba(45,107,240,0.55);
     transition: transform 0.16s cubic-bezier(0.32,0.72,0,1), box-shadow 0.2s ease;
     will-change: transform;
   }
@@ -200,7 +226,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      Брендовый градиентный текст (анимированный)
   ───────────────────────────────────────────── */
   .text-gradient {
-    background: linear-gradient(135deg, #b794ff 0%, #ff6dbb 45%, #ff8a3d 100%);
+    background: linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 100%);
     background-size: 200% 200%;
     -webkit-background-clip: text;
     background-clip: text;
@@ -240,10 +266,10 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   .liquid-glass {
     position: relative;
     isolation: isolate;
-    /* Фиолетово-дымчатое стекло (по референсу): rgba(60,55,90,.55) + блик сверху. */
+    /* Океанско-дымчатое стекло: глубокая синь rgb(14 27 46 / .58) + блик сверху. */
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.10), transparent 46%),
-      rgb(56 51 84 / 0.58);
+      rgb(14 27 46 / 0.58);
     backdrop-filter: blur(22px) saturate(155%);
     -webkit-backdrop-filter: blur(22px) saturate(155%);
     border: 1px solid rgb(255 255 255 / 0.22);
@@ -271,7 +297,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
       0 1px 0 rgb(255 255 255 / 0.7) inset,
       0 14px 40px -18px rgb(0 0 0 / 0.18);
   }
-  /* Матовая стеклянная карточка (по референсу): фиолетово-дымчатое стекло
+  /* Матовая стеклянная карточка: океанско-дымчатое стекло
      rgba(60,55,90,.55) + светлая обводка .22 + блик сверху. Строки/поиск/плитки. */
   .liquid-card {
     position: relative;
@@ -281,7 +307,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
        поэтому полупрозрачная заливка выглядит так же «стеклянно», но без блюра. */
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.10), transparent 55%),
-      rgb(58 52 84 / 0.62);
+      rgb(15 28 47 / 0.62);
     border: 1px solid rgb(255 255 255 / 0.18);
     box-shadow:
       0 1px 0 rgb(255 255 255 / 0.18) inset,
@@ -300,8 +326,8 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   /* Брендовый чип-пилюля с градиентной обводкой */
   .chip-brand {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-white/85;
-    background: linear-gradient(rgba(20,18,30,0.6), rgba(20,18,30,0.6)) padding-box,
-                linear-gradient(135deg, #7c4dff, #ff4d8d 60%, #ff8a3d) border-box;
+    background: linear-gradient(rgba(8,14,24,0.6), rgba(8,14,24,0.6)) padding-box,
+                linear-gradient(135deg, #42E6CE, #16B6E0 50%, #2D6BF0) border-box;
     border: 1px solid transparent;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -312,10 +338,10 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      in:  плотная тёмная поверхность с тонкой светящейся границей и глубиной. */
   .bubble-out {
     @apply text-white rounded-[26px] rounded-br-[9px];
-    background: linear-gradient(140deg, #8d57ff 0%, #b24ce6 48%, #ff5b8d 100%);
+    background: linear-gradient(140deg, #42E6CE 0%, #16B6E0 38%, #2D6BF0 72%, #1E40C8 100%);
     box-shadow:
       0 1px 0 rgba(255,255,255,0.14) inset,
-      0 10px 28px -14px rgba(154,77,255,0.55),
+      0 10px 28px -14px rgba(45,107,240,0.6),
       0 2px 6px -2px rgba(0,0,0,0.25);
   }
   .bubble-in {
@@ -372,13 +398,13 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
   .btn-primary {
     @apply btn text-white shadow-glow-violet;
-    background: linear-gradient(135deg, #8a52ff 0%, #d04df0 60%, #ff5a8f 100%);
+    background: linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%);
     background-size: 200% 200%;
   }
   .btn-primary:hover:not(:disabled) {
     background-position: 100% 0%;
     filter: brightness(1.08);
-    box-shadow: 0 12px 36px -10px rgba(138,82,255,0.55);
+    box-shadow: 0 12px 36px -10px rgba(45,107,240,0.55);
   }
 
   .btn-secondary {
@@ -441,14 +467,14 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
   /* Кольцо-градиент вокруг аватара */
   .ring-gradient {
-    background: linear-gradient(135deg, #7c4dff, #ff4d8d 55%, #ff8a3d);
+    background: linear-gradient(135deg, #42E6CE, #16B6E0 55%, #2D6BF0);
     padding: 2px;
     border-radius: 9999px;
     transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.3s;
   }
   .ring-gradient:hover {
     transform: scale(1.04);
-    box-shadow: 0 0 24px -2px rgba(124,77,255,0.55);
+    box-shadow: 0 0 24px -2px rgba(45,107,240,0.55);
   }
 
   /* Анимированная градиентная обводка вокруг карточки */
@@ -461,7 +487,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
     position: absolute; inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(124,77,255,0.5), rgba(255,77,141,0.4), rgba(255,138,61,0.4));
+    background: linear-gradient(135deg, rgba(66,230,206,0.5), rgba(22,182,224,0.4), rgba(45,107,240,0.4));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
             mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
@@ -515,8 +541,8 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   }
 
   /* Световое пятно (как фон) */
-  .bg-spot-violet { background: radial-gradient(circle, rgba(124,77,255,0.3), transparent 60%); }
-  .bg-spot-pink   { background: radial-gradient(circle, rgba(255,77,141,0.25), transparent 60%); }
+  .bg-spot-violet { background: radial-gradient(circle, rgba(45,107,240,0.30), transparent 60%); }
+  .bg-spot-pink   { background: radial-gradient(circle, rgba(22,182,224,0.25), transparent 60%); }
   .bg-spot-orange { background: radial-gradient(circle, rgba(255,138,61,0.22), transparent 60%); }
 
   /* Hover-lift микро-интеракция */
@@ -530,7 +556,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
   /* Текст с градиентным подчёркиванием на hover */
   .link-grad {
-    background-image: linear-gradient(90deg, #b794ff, #ff6dbb, #ff8a3d);
+    background-image: linear-gradient(90deg, #42E6CE, #16B6E0, #2D6BF0);
     background-size: 100% 1px;
     background-position: 0 100%;
     background-repeat: no-repeat;

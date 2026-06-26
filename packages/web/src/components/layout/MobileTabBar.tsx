@@ -89,8 +89,8 @@ export default function MobileTabBar() {
             aria-hidden
             style={{ left, width, scaleX, scaleY }}
             className="absolute top-1.5 bottom-1.5 rounded-[20px] pointer-events-none
-                       bg-[#7A82FF]/20 ring-1 ring-white/20 backdrop-blur-md
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_6px_18px_-6px_rgba(122,130,255,0.55)]"
+                       bg-[#2D6BF0]/20 ring-1 ring-white/20 backdrop-blur-md
+                       shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_6px_18px_-6px_rgba(45,107,240,0.55)]"
           />
         )}
         {TABS.map(({ key, i18nKey, Icon }, i) => {

@@ -1,6 +1,6 @@
 {
-  "name": "Dakka",
-  "short_name": "Dakka",
+  "name": "ocean",
+  "short_name": "ocean",
   "description": "Общение, которое чувствуешь. E2E-шифрование, голос, видео, кружки.",
   "start_url": "/",
   "scope": "/",

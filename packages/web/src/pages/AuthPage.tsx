@@ -3,21 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
-import DakkaIcon from '@/components/ui/DakkaIcon';
+import OceanLogo from '@/components/ui/OceanLogo';
 import { EASE, SPRING, tap } from '@/lib/motion';
 
 const INTER = "'Inter Variable', -apple-system, system-ui, sans-serif";
-// Точный фирменный градиент из референса (coral → pink → periwinkle).
-const BRAND = 'linear-gradient(135deg, #FF7A78 0%, #FF4E86 46%, #7A82FF 100%)';
+// Океанский фирменный градиент (аква → циан → океанский синий → глубокая синь).
+const BRAND = 'linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%)';
 // «Текстура» плиток: верхний inset-блик + нижняя inset-тень + мягкая внешняя тень.
 const GLOSS = 'inset 0 1px 1px rgba(255,255,255,0.45), inset 0 -8px 16px rgba(0,0,0,0.18), 0 14px 28px -6px rgba(0,0,0,0.30)';
 
-// Парящие аватарки — ТОЧНЫЕ размеры/позиции/тайминги из референса (frame 390px).
+// Парящие аватарки — океанские акценты (aqua/cyan/ocean/violet + тёплый amber-всплеск).
 const FLOATERS: { t: string; g: string; size: number; top: number; left: number; dur: number; delay: number }[] = [
-  { t: 'ДР', g: 'linear-gradient(150deg,#9aa0ff,#5b5bf5)', size: 52, top: 150, left: 36,  dur: 4,   delay: 0   },
-  { t: 'СВ', g: 'linear-gradient(150deg,#46e5cf,#13a6be)', size: 58, top: 196, left: 300, dur: 4.6, delay: 0.6 },
-  { t: 'АП', g: 'linear-gradient(150deg,#ffd06b,#ff8a3d)', size: 46, top: 320, left: 60,  dur: 5.1, delay: 1.1 },
-  { t: 'НК', g: 'linear-gradient(150deg,#c98dff,#8a45e6)', size: 50, top: 360, left: 312, dur: 5.6, delay: 1.6 },
+  { t: 'ДР', g: 'linear-gradient(150deg,#6AA2FF,#2D5BF0)', size: 52, top: 150, left: 36,  dur: 4,   delay: 0   },
+  { t: 'СВ', g: 'linear-gradient(150deg,#5DEBD6,#13B6BE)', size: 58, top: 196, left: 300, dur: 4.6, delay: 0.6 },
+  { t: 'АП', g: 'linear-gradient(150deg,#FFD58A,#FF9A3D)', size: 46, top: 320, left: 60,  dur: 5.1, delay: 1.1 },
+  { t: 'НК', g: 'linear-gradient(150deg,#C79CFF,#7A45E6)', size: 50, top: 360, left: 312, dur: 5.6, delay: 1.6 },
 ];
 
 export default function AuthPage() {
@@ -33,7 +33,7 @@ export default function AuthPage() {
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(125% 55% at 50% -6%, rgba(255,110,140,0.16), transparent 60%)' }}
+        style={{ background: 'radial-gradient(120% 55% at 18% -8%, rgba(45,107,240,0.20), transparent 60%), radial-gradient(110% 50% at 92% 4%, rgba(52,220,200,0.14), transparent 62%)' }}
       />
 
       <AnimatePresence mode="wait">
@@ -68,17 +68,17 @@ export default function AuthPage() {
               </div>
             ))}
 
-            {/* ── Лого-локап: пузырь + вордмарк «dakka» по центру ── */}
+            {/* ── Лого-локап: пузырь + вордмарк «ocean» по центру ── */}
             <motion.div
               initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
               transition={{ ...SPRING.gentle, delay: 0.15 }}
               className="absolute left-0 right-0 flex flex-col items-center"
               style={{ top: 198 }}
             >
-              <div className="animate-float drop-shadow-[0_16px_32px_rgba(255,90,130,0.35)]">
-                <DakkaIcon size={92} />
+              <div className="animate-float drop-shadow-[0_16px_32px_rgba(45,107,240,0.4)]">
+                <OceanLogo size={92} />
               </div>
-              <span style={{ fontSize: 58, fontWeight: 800, letterSpacing: '-2.9px', lineHeight: 1 }} className="mt-2">dakka</span>
+              <span style={{ fontSize: 58, fontWeight: 800, letterSpacing: '-2.9px', lineHeight: 1 }} className="mt-2">ocean</span>
             </motion.div>
 
             {/* спейсер под верхний кластер */}
@@ -106,7 +106,7 @@ export default function AuthPage() {
               <motion.button
                 onClick={() => setStarted(true)} whileTap={tap} transition={SPRING.snappy}
                 className="w-full flex items-center justify-center gap-2 text-white"
-                style={{ height: 58, borderRadius: 29, fontSize: 17, fontWeight: 700, background: BRAND, boxShadow: '0 12px 28px rgba(255,78,134,0.4), inset 0 1px 1px rgba(255,255,255,0.5)' }}
+                style={{ height: 58, borderRadius: 29, fontSize: 17, fontWeight: 700, background: BRAND, boxShadow: '0 12px 28px rgba(45,107,240,0.45), inset 0 1px 1px rgba(255,255,255,0.5)' }}
               >
                 Войти <ArrowRight size={18} strokeWidth={2.4} />
               </motion.button>
@@ -131,8 +131,8 @@ export default function AuthPage() {
             </button>
 
             <div className="flex items-center gap-2.5 mt-4 mb-8">
-              <DakkaIcon size={40} />
-              <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1.5px' }}>dakka</span>
+              <OceanLogo size={40} />
+              <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1.5px' }}>ocean</span>
             </div>
 
             <div className="flex-1">

@@ -1260,7 +1260,7 @@ export default function MessageInput({ chatId }: Props) {
           <div className={clsx(
             'rounded-3xl transition-colors duration-200',
             'max-lg:liquid-card lg:bg-content/[0.04] lg:border lg:border-dark-border lg:backdrop-blur-sm',
-            !isRecording && 'focus-within:ring-2 focus-within:ring-[#7A82FF]/30 lg:focus-within:ring-primary-500/15 lg:focus-within:border-primary-500/50',
+            !isRecording && 'focus-within:ring-2 focus-within:ring-primary-500/30 lg:focus-within:ring-primary-500/15 lg:focus-within:border-primary-500/50',
           )}>
             {/* Обычный ввод текста */}
             {!isRecording && (

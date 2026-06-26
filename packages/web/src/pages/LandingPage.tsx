@@ -1,858 +1,506 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'framer-motion';
 import {
-  motion, AnimatePresence, useMotionValue, useSpring, useTransform,
-  useScroll, useMotionTemplate,
-} from 'framer-motion';
-import DakkaIcon from '@/components/ui/DakkaIcon';
-import {
-  ShieldCheck, Phone, Mic, Video as VideoIcon, Smile, Lock, Globe,
-  ArrowRight, Play, Apple, Smartphone, Sparkles, Heart, Check, ChevronDown,
-  Monitor, Download,
+  Download, Sun, Moon, Lock, Video, Mic, Waves, Users, Shield,
+  Phone, MoreHorizontal, Settings, Plus, Play, MessageCircle, ArrowRight,
 } from 'lucide-react';
-import { desktopDownload, DESKTOP_DOWNLOADS } from '@/lib/desktopDownload';
+import OceanLogo from '@/components/ui/OceanLogo';
+import { desktopDownload } from '@/lib/desktopDownload';
+import { getStoredMode, setMode as applyThemeMode } from '@/lib/theme';
 
 /**
- * Главная — редакторская типографика + ОБЪЁМНЫЙ 3D-телефон с живой перепиской,
- * влетающий брендовый луч со взрывом за телефоном, скролл-луч вдоль страницы,
- * курсор-glow и magnetic-карточки. Полностью тема-aware (text-content / dark-*).
- * Видна только неавторизованным; авторизованных роутер уводит в ChatPage.
+ * Лендинг ocean — точное воссоздание дизайн-хендоффа (landing-ocean.jsx +
+ * land-mock.jsx): nav · hero «Сообщения, что текут плавно» + кластер устройств ·
+ * статистика · фичи «Всё под одной волной» · showcase · CTA «Нырните в ocean» ·
+ * футер. Цвета — через CSS-переменные темы (живо реагируют на смену темы),
+ * бренд — океанский градиент. Кнопки завязаны на реальные действия (вход/скачать).
  */
-export default function LandingPage() {
-  const navigate = useNavigate();
 
-  // index.css держит `html, body, #root { overflow: hidden }` (чтобы чат не
-  // оверскроллил). Лендинг длинный — включаем нативный скролл документа классом
-  // `landing-scroll` (см. index.css): ОДИН скролл-контейнер (html), колёсико
-  // работает, системный скроллбар скрыт (его роль играет луч слева).
+const GRAD = 'linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%)';
+
+// Токены темы как ссылки на CSS-переменные → меняются вместе с data-theme без re-render.
+const C = {
+  bg:          'rgb(var(--bg-rgb))',
+  panel:       'rgb(var(--surface-rgb))',
+  card:        'rgb(var(--card-rgb))',
+  rail:        'rgb(var(--rail-rgb))',
+  ink:         'rgb(var(--content-rgb))',
+  ink2:        'rgb(var(--content-rgb) / 0.6)',
+  ink3:        'rgb(var(--content-rgb) / 0.4)',
+  hair:        'rgb(var(--border-rgb) / 0.7)',
+  rim:         'rgb(var(--border-rgb))',
+  raise:       'rgb(var(--content-rgb) / 0.05)',
+  raiseHi:     'rgb(var(--content-rgb) / 0.09)',
+  online:      'var(--online)',
+  mesh:        'var(--app-bg-image)',
+  shadow:      'var(--shadow-window)',
+  shadowSm:    'var(--shadow-card)',
+  inBub:       'var(--bubble-in)',
+  inBubBorder: 'rgb(var(--border-rgb) / 0.5)',
+};
+
+const gradText: CSSProperties = {
+  background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+};
+
+// ── Анимированный океанский фон с параллаксом при скролле ─────────────────────
+// Несколько мягких океанских «орбов» дрейфуют (CSS) и параллаксят по скроллу
+// (разная скорость на слой), плюс плавные волны снизу. Лежит fixed за контентом.
+function OceanBackdrop() {
+  const raw = useMotionValue(0);
+  const sy = useSpring(raw, { stiffness: 60, damping: 22, mass: 0.6 });
+
   useEffect(() => {
-    document.documentElement.classList.add('landing-scroll');
-    return () => document.documentElement.classList.remove('landing-scroll');
-  }, []);
-
-  return (
-    <div className="relative min-h-screen bg-dark-bg text-content overflow-x-hidden">
-      <AmbientGlows />
-      <CursorGlow />
-      <ScrollBeam />
-
-      <Header onSignIn={() => navigate('/auth')} />
-
-      <Hero />
-
-      <FeatureGrid />
-
-      <PrivacySection />
-
-      <DownloadSection onSignIn={() => navigate('/auth')} />
-
-      <Footer />
-
-      <ScrollDownButton />
-    </div>
-  );
-}
-
-// ─── Курсор-glow: брендовое пятно следует за мышью (десктоп) ──────────────────
-
-function CursorGlow() {
-  const x = useMotionValue(-1000);
-  const y = useMotionValue(-1000);
-  const sx = useSpring(x, { stiffness: 90, damping: 20 });
-  const sy = useSpring(y, { stiffness: 90, damping: 20 });
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, [x, y]);
-  const bg = useMotionTemplate`radial-gradient(460px circle at ${sx}px ${sy}px, rgba(124,77,255,0.14), rgba(255,77,141,0.06) 40%, transparent 70%)`;
-  return <motion.div aria-hidden className="fixed inset-0 z-0 pointer-events-none hidden md:block" style={{ background: bg }} />;
-}
-
-// ─── Скролл-луч: вьющаяся брендовая лента, прорисовывается по мере прокрутки ───
-// Длинный извивающийся путь вдоль левого края — «луч путешествует» вниз по странице.
-
-// Извивающийся путь в фикс-вьюпорте (viewBox 100×800 ≈ высота экрана, без растяжения).
-const BEAM_PATH = 'M55 -10 C 96 90, 8 180, 52 280 C 96 380, 6 460, 50 560 C 94 650, 12 730, 56 810';
-
-function ScrollBeam() {
-  const { scrollYProgress } = useScroll();
-  const smooth = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 });
-  const pathRef = useRef<SVGPathElement>(null);
-  const [len, setLen] = useState(900);
-  useEffect(() => { if (pathRef.current) setLen(pathRef.current.getTotalLength()); }, []);
-  // offset = len (скрыт) → 0 (полностью прорисован) по мере скролла
-  const dashoffset = useTransform(smooth, [0, 1], [len, 0]);
-  return (
-    <svg
-      aria-hidden
-      className="fixed left-0 top-0 h-screen w-[100px] z-0 pointer-events-none hidden lg:block"
-      viewBox="0 0 100 800" fill="none"
-    >
-      <defs>
-        <linearGradient id="dakkaBeam" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#7c4dff" />
-          <stop offset="50%" stopColor="#ff4d8d" />
-          <stop offset="100%" stopColor="#ff8a3d" />
-        </linearGradient>
-      </defs>
-      {/* тусклый «рельс» */}
-      <path d={BEAM_PATH} stroke="rgb(var(--content-rgb) / 0.07)" strokeWidth="2" />
-      {/* светящийся луч — прорисовывается по мере прокрутки */}
-      <motion.path
-        ref={pathRef}
-        d={BEAM_PATH}
-        stroke="url(#dakkaBeam)" strokeWidth="2.5" strokeLinecap="round"
-        strokeDasharray={len}
-        style={{ strokeDashoffset: dashoffset, filter: 'drop-shadow(0 0 5px rgba(255,77,141,0.5))' }}
-      />
-    </svg>
-  );
-}
-
-// ─── Ambient floating gradient blurs (в светлой теме приглушены) ──────────────
-
-function AmbientGlows() {
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      {/* Aurora: мягкие угловые блумы коралл/индиго/бирюза на графитовом базисе. */}
-      <motion.div
-        animate={{ x: [0, 30, 0], y: [0, 20, 0], scale: [1, 1.08, 1] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-[#FF6B72]/[0.07] dark:bg-[#FF6B72]/[0.12] blur-3xl"
-      />
-      <motion.div
-        animate={{ x: [0, -25, 0], y: [0, -15, 0], scale: [1, 1.05, 1] }}
-        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute top-1/4 -right-40 w-[640px] h-[640px] rounded-full bg-[#8A91FF]/[0.06] dark:bg-[#8A91FF]/[0.11] blur-3xl"
-      />
-      <motion.div
-        animate={{ x: [0, 18, 0], y: [0, -10, 0] }}
-        transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute bottom-0 left-1/3 w-[440px] h-[440px] rounded-full bg-[#2FD0C4]/[0.05] dark:bg-[#2FD0C4]/[0.08] blur-3xl"
-      />
-    </div>
-  );
-}
-
-// ─── Header ───────────────────────────────────────────────────────────────────
-
-function Header({ onSignIn }: { onSignIn: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <header className="relative z-20 px-6 lg:px-12 py-6 flex items-center justify-between max-w-[1480px] mx-auto">
-      <div className="flex items-center gap-2.5">
-        <DakkaIcon size={40} className="drop-shadow-[0_6px_18px_rgba(154,77,255,0.45)]" />
-        <span className="text-xl font-extrabold tracking-[-0.04em]">dakka</span>
-      </div>
-
-      <nav className="hidden md:flex items-center gap-9 text-sm text-content/60">
-        <a href="#features" className="hover:text-content transition">{t('landing.nav_features')}</a>
-        <a href="#privacy"  className="hover:text-content transition">{t('landing.nav_privacy')}</a>
-        <a href="#download" className="hover:text-content transition">{t('landing.nav_download')}</a>
-      </nav>
-
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onSignIn}
-          className="hidden sm:inline-flex text-sm text-content/70 hover:text-content px-3 py-2 rounded-lg transition"
-        >
-          {t('landing.signIn')}
-        </button>
-        <button
-          onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
-          className="text-sm text-content bg-content/[0.06] hover:bg-content/[0.10] border border-content/[0.10] px-4 py-2 rounded-xl transition"
-        >
-          {t('landing.download')}
-        </button>
-      </div>
-    </header>
-  );
-}
-
-// ─── Hero ─────────────────────────────────────────────────────────────────────
-
-function Hero() {
-  const { t } = useTranslation();
-  return (
-    <section className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-6 lg:pt-10 pb-16 lg:pb-20">
-      <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-10 items-center">
-        {/* ─── Left: typography hero ─── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
-          className="space-y-8 text-center lg:text-left"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
-            className="inline-flex items-center gap-2 text-xs text-content/65 bg-content/[0.05] border border-content/[0.09] rounded-full px-3 py-1.5"
-          >
-            <Sparkles size={12} className="text-accent-pink" />
-            {t('landing.heroBadge')}
-          </motion.div>
-
-          {/* HUGE typography — выровнено по базовой линии, читается в обеих темах */}
-          <h1 className="font-extrabold leading-[0.9] tracking-[-0.04em] text-[15vw] sm:text-[12vw] lg:text-[7.4vw] xl:text-[112px]">
-            <span className="block text-content">
-              {t('landing.heroWrite')}<span className="text-content/35">.</span>
-            </span>
-            <span
-              className="block bg-clip-text text-transparent"
-              style={{ backgroundImage: 'linear-gradient(90deg, #ff4d8d 0%, #ff8a3d 100%)' }}
-            >
-              {t('landing.heroTalk')}<span className="text-accent-pink/80">.</span>
-            </span>
-            <span
-              className="block bg-clip-text text-transparent"
-              style={{ backgroundImage: 'linear-gradient(90deg, #7c4dff 0%, #34e0d0 100%)' }}
-            >
-              {t('landing.heroLive')}<span className="text-accent-violet/80">.</span>
-            </span>
-          </h1>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35 }}
-            className="text-content/60 text-lg max-w-md mx-auto lg:mx-0 leading-relaxed"
-          >
-            {t('landing.heroSub')}
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="flex justify-center lg:justify-start"
-          >
-            <button
-              onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
-              className="group inline-flex items-center justify-center gap-2 bg-brand-gradient hover:opacity-95 active:scale-[0.98] transition px-8 py-4 rounded-full text-base font-medium text-white shadow-glow-violet"
-            >
-              {t('landing.downloadFree')}
-              <ArrowRight size={18} className="-ml-0.5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-        </motion.div>
-
-        {/* ─── Right: объёмный живой телефон + влетающий луч ─── */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 30 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.85, ease: [0.32, 0.72, 0, 1] }}
-          className="relative mx-auto"
-          id="demo"
-        >
-          <LivePhone />
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Кнопка «вниз»: постоянная, по центру, ведёт к следующей секции ────────────
-// Видна на всех секциях, прячется только у самого низа страницы.
-
-function ScrollDownButton() {
-  const { t } = useTranslation();
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => {
-    const onScroll = () => {
-      // Прячем кнопку, когда СЛЕДУЮЩЕЙ секции уже нет (ты на последней) — тогда
-      // стрелка вниз бесполезна. Пока страница ещё не скроллируема (landing-scroll
-      // применяется отдельным эффектом) — НЕ прячем, иначе залипнет скрытой.
-      const scrollable = document.documentElement.scrollHeight - window.innerHeight > 200;
-      const hasNext = ['features', 'privacy', 'download']
-        .map((id) => document.getElementById(id))
-        .some((el) => el && el.getBoundingClientRect().top > 140);
-      setHidden(scrollable && !hasNext);
-    };
-    onScroll();
-    // повторный замер после раскладки/применения landing-scroll
-    const raf = requestAnimationFrame(onScroll);
+    const onScroll = () => raw.set(document.documentElement.scrollTop || window.scrollY || 0);
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    document.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
     return () => {
-      cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      document.removeEventListener('scroll', onScroll);
     };
-  }, []);
+  }, [raw]);
 
-  const goNext = () => {
-    const next = ['features', 'privacy', 'download']
-      .map((id) => document.getElementById(id))
-      .find((el) => el && el.getBoundingClientRect().top > 120);
-    if (next) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-  };
+  const y1 = useTransform(sy, (v) => v * 0.18);
+  const y2 = useTransform(sy, (v) => -v * 0.12);
+  const y3 = useTransform(sy, (v) => v * 0.10);
+  const y4 = useTransform(sy, (v) => -v * 0.06);
+  const waveY = useTransform(sy, (v) => v * 0.04);
 
-  // На последней секции кнопка не нужна — просто не рендерим (unmount = гарантированно
-  // исчезает, без зависимости от opacity/framer). Хуки выше выполняются всегда.
-  if (hidden) return null;
-
-  return (
-    <button
-      onClick={goNext}
-      className="hidden lg:flex fixed left-1/2 -translate-x-1/2 bottom-6 z-30 flex-col items-center gap-1.5 text-content/70 hover:text-content transition-colors"
-      aria-label={t('landing.scrollDown')}
-    >
-      <span className="text-[11px] tracking-wide uppercase">{t('landing.scrollDown')}</span>
-      <motion.span
-        animate={{ y: [0, 6, 0] }}
-        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-        className="w-11 h-11 rounded-full border border-content/25 bg-content/[0.08] backdrop-blur-md flex items-center justify-center shadow-e2"
-      >
-        <ChevronDown size={20} />
-      </motion.span>
-    </button>
+  // Параллакс — на внешнем motion.div (y), дрейф — на внутреннем (CSS), чтобы
+  // два transform не конфликтовали.
+  const Orb = ({ y, drift, color, size, pos }: {
+    y: MotionValue<number>; drift: string; color: string; size: number; pos: CSSProperties;
+  }) => (
+    <motion.div style={{ position: 'absolute', y, ...pos }}>
+      <div className={drift} style={{ width: size, height: size, borderRadius: '50%', filter: 'blur(70px)', background: `radial-gradient(circle, ${color}, transparent 70%)` }} />
+    </motion.div>
   );
-}
-
-// ─── Влетающий луч + взрыв за телефоном (один раз на загрузке) ────────────────
-
-function IntroBeam() {
-  const [phase, setPhase] = useState<'fly' | 'burst' | 'done'>('fly');
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase('burst'), 1150);
-    const t2 = setTimeout(() => setPhase('done'), 2100);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, []);
-
-  if (phase === 'done') return null;
 
   return (
-    <div className="absolute inset-0 -z-10 pointer-events-none overflow-visible">
-      {/* комета летит из верхнего-левого угла к центру телефона */}
-      {phase === 'fly' && (
-        <motion.div
-          initial={{ left: '-60%', top: '-45%', opacity: 0, scale: 0.5 }}
-          animate={{
-            left:    ['-60%', '32%', '-6%', '50%'],
-            top:     ['-45%', '6%', '44%', '50%'],
-            opacity: [0, 1, 1, 1],
-            scale:   [0.5, 1, 1, 1],
-          }}
-          transition={{ duration: 1.15, ease: 'easeInOut', times: [0, 0.4, 0.72, 1] }}
-          className="absolute"
-        >
-          <div className="relative -translate-x-1/2 -translate-y-1/2">
-            {/* хвост кометы */}
-            <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-40 h-1.5 origin-right rotate-[28deg] rounded-full bg-gradient-to-l from-accent-pink/90 to-transparent blur-[2px]" />
-            {/* ядро */}
-            <div className="w-10 h-10 rounded-full bg-brand-gradient blur-md opacity-95" />
-            <div className="absolute inset-0 w-10 h-10 rounded-full bg-white/80 blur-[6px] scale-50" />
-          </div>
-        </motion.div>
-      )}
-
-      {/* взрыв в центре (за телефоном — свет выбивается по краям силуэта) */}
-      {phase === 'burst' && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <motion.div
-            initial={{ scale: 0, opacity: 0.85 }}
-            animate={{ scale: 7, opacity: 0 }}
-            transition={{ duration: 0.9, ease: 'easeOut' }}
-            className="w-28 h-28 rounded-full bg-brand-gradient blur-2xl"
-          />
-          <motion.div
-            initial={{ scale: 0.2, opacity: 0.9 }}
-            animate={{ scale: 4, opacity: 0 }}
-            transition={{ duration: 0.75, ease: 'easeOut' }}
-            className="absolute inset-0 w-28 h-28 rounded-full border-2 border-accent-pink/70"
-          />
-          {/* искры */}
-          {Array.from({ length: 12 }).map((_, i) => {
-            const ang = (i / 12) * Math.PI * 2;
-            const dist = 150 + (i % 3) * 30;
-            return (
-              <motion.span
-                key={i}
-                initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                animate={{ x: Math.cos(ang) * dist, y: Math.sin(ang) * dist, opacity: 0, scale: 0.4 }}
-                transition={{ duration: 0.8, ease: 'easeOut' }}
-                className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full bg-accent-pink shadow-[0_0_8px_rgba(255,77,141,0.8)]"
-              />
-            );
-          })}
-        </div>
-      )}
+    <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }} aria-hidden>
+      <Orb y={y1} drift="animate-drift-a" color="rgba(66,230,206,0.30)" size={540} pos={{ top: -140, left: -100 }} />
+      <Orb y={y2} drift="animate-drift-b" color="rgba(22,182,224,0.26)" size={620} pos={{ top: 20, right: -160 }} />
+      <Orb y={y3} drift="animate-drift-c" color="rgba(45,107,240,0.24)" size={700} pos={{ top: '44%', left: '6%' }} />
+      <Orb y={y4} drift="animate-drift-a" color="rgba(122,69,230,0.18)" size={480} pos={{ bottom: '6%', right: '4%' }} />
+      {/* плавные волны снизу */}
+      <motion.svg viewBox="0 0 1440 320" preserveAspectRatio="none" style={{ position: 'absolute', bottom: -20, left: '-10%', width: '120%', height: 280, opacity: 0.5, y: waveY }}>
+        <path className="animate-wave-slow" fill="rgba(45,107,240,0.12)" d="M0,160 C240,220 480,90 720,140 C960,190 1200,110 1440,160 L1440,320 L0,320 Z" />
+        <path className="animate-wave-fast" fill="rgba(52,220,200,0.10)" d="M0,200 C240,150 480,250 720,200 C960,150 1200,240 1440,190 L1440,320 L0,320 Z" />
+      </motion.svg>
     </div>
   );
 }
 
-// ─── Объёмный живой телефон: переписка по кругу + 3D-наклон + блик ────────────
-
-type ScriptMsg =
-  | { id: number; kind: 'in' | 'out'; textKey: string }
-  | { id: number; kind: 'voice' };
-
-const SCRIPT: ScriptMsg[] = [
-  { id: 0, kind: 'in',  textKey: 'landing.demoMsg0' },
-  { id: 1, kind: 'out', textKey: 'landing.demoMsg1' },
-  { id: 2, kind: 'voice' },
-  { id: 3, kind: 'in',  textKey: 'landing.demoMsg3' },
-];
-
-const TIMELINE: Array<{ at: number; type: 'typing' | 'msg' | 'react' | 'reset'; i?: number }> = [
-  { at: 500,  type: 'typing' },
-  { at: 1500, type: 'msg',   i: 0 },
-  { at: 2600, type: 'msg',   i: 1 },
-  { at: 3500, type: 'react', i: 0 },
-  { at: 4300, type: 'typing' },
-  { at: 5300, type: 'msg',   i: 2 },
-  { at: 6500, type: 'msg',   i: 3 },
-  // переписка проигрывается ОДИН раз и остаётся на экране (без зацикливания).
-];
-
-function LivePhone() {
-  const { t } = useTranslation();
-  const [shown,   setShown]   = useState<number[]>([]);
-  const [typing,  setTyping]  = useState(false);
-  const [reacted, setReacted] = useState(false);
-
-  useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const run = () => {
-      setShown([]); setTyping(false); setReacted(false);
-      for (const ev of TIMELINE) {
-        timers.push(setTimeout(() => {
-          if (ev.type === 'typing') setTyping(true);
-          else if (ev.type === 'msg') { setTyping(false); setShown((s) => [...s, ev.i!]); }
-          else if (ev.type === 'react') setReacted(true);
-          else if (ev.type === 'reset') run();
-        }, ev.at));
-      }
-    };
-    run();
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  return (
-    <div className="relative w-[290px] sm:w-[330px] mx-auto" style={{ perspective: 1100 }}>
-      {/* свечение под телефоном */}
-      <div className="absolute inset-0 -inset-x-12 bg-accent-pink/20 blur-3xl rounded-full" />
-      <IntroBeam />
-
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        className="relative rounded-[46px] p-[3px] bg-gradient-to-br from-white/20 via-white/5 to-transparent shadow-[0_40px_90px_-20px_rgba(0,0,0,0.75)]"
-      >
-        {/* боковые кнопки iPhone — mute + громкость слева, питание справа */}
-        <span aria-hidden className="absolute -left-[2px] top-[17%] w-[3px] h-6 rounded-l bg-black/55" />
-        <span aria-hidden className="absolute -left-[2px] top-[26%] w-[3px] h-9 rounded-l bg-black/50" />
-        <span aria-hidden className="absolute -left-[2px] top-[37%] w-[3px] h-9 rounded-l bg-black/50" />
-        <span aria-hidden className="absolute -right-[2px] top-[24%] w-[3px] h-16 rounded-r bg-black/50" />
-
-        {/* корпус */}
-        <div className="relative rounded-[44px] bg-[#0a0814] border border-white/[0.06] overflow-hidden">
-          <div className="aspect-[0.49] flex flex-col">
-            {/* Dynamic Island — строго по центру, плоский (без перекоса) */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full z-30" />
-
-            {/* status bar */}
-            <div className="absolute top-0 left-0 right-0 px-6 pt-4 flex justify-between items-center text-[11px] text-white/85 z-20">
-              <span className="font-medium">9:41</span>
-              <span className="w-3 h-2 rounded-sm border border-white/60" />
-            </div>
-
-            {/* peer header */}
-            <div className="flex items-center gap-3 px-4 pt-14 pb-3 border-b border-white/[0.06]">
-              <button className="text-white/50 text-lg leading-none">‹</button>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center text-xs font-semibold text-white">
-                МК
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white">{t('landing.demoPeer')}</div>
-                <div className="text-[10px] text-accent-pink/85">{typing ? t('chat.typing') : t('chat.online')}</div>
-              </div>
-              <VideoIcon size={16} className="text-white/55" />
-            </div>
-
-            {/* messages */}
-            <div className="flex-1 flex flex-col justify-end gap-2 px-4 py-3 overflow-hidden">
-              <AnimatePresence>
-                {shown.map((i) => {
-                  const m = SCRIPT[i];
-                  if (m.kind === 'voice') {
-                    return (
-                      <motion.div
-                        key={m.id}
-                        layout
-                        initial={{ opacity: 0, y: 14, scale: 0.9 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-                        className="self-start flex items-center gap-2 bg-white/[0.06] border border-white/[0.06] rounded-2xl rounded-bl-md px-3 py-2 max-w-[72%]"
-                      >
-                        <span className="w-6 h-6 rounded-full bg-brand-gradient flex items-center justify-center flex-shrink-0">
-                          <Play size={11} fill="white" className="text-white" />
-                        </span>
-                        <LiveWaveform />
-                        <span className="text-[10px] text-white/70 tabular-nums">0:12</span>
-                      </motion.div>
-                    );
-                  }
-                  return (
-                    <motion.div
-                      key={m.id}
-                      layout
-                      initial={{ opacity: 0, y: 14, scale: 0.9 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-                      className={
-                        m.kind === 'out'
-                          ? 'relative self-end bg-brand-gradient text-white rounded-2xl rounded-br-md px-3 py-2 text-[12px] max-w-[74%] shadow-glow-pink'
-                          : 'relative self-start bg-white/[0.06] text-white/95 rounded-2xl rounded-bl-md px-3 py-2 text-[12px] max-w-[74%] border border-white/[0.05]'
-                      }
-                    >
-                      {t(m.textKey)}
-                      {m.id === 0 && (
-                        <AnimatePresence>
-                          {reacted && (
-                            <motion.span
-                              initial={{ scale: 0, y: 4 }}
-                              animate={{ scale: 1, y: 0 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 16 }}
-                              className="absolute -bottom-2.5 -right-1 flex items-center gap-0.5 bg-[#1a1726] border border-white/10 rounded-full pl-1 pr-1.5 py-0.5 shadow-lg"
-                            >
-                              <Heart size={9} fill="#ff4d8d" className="text-accent-pink" />
-                              <span className="text-[9px] text-white/80">1</span>
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      )}
-                    </motion.div>
-                  );
-                })}
-
-                {typing && (
-                  <motion.div
-                    key="typing"
-                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.85 }}
-                    className="self-start flex items-center gap-1 bg-white/[0.06] border border-white/[0.05] rounded-2xl rounded-bl-md px-3 py-2.5"
-                  >
-                    {[0, 1, 2].map((d) => (
-                      <motion.span
-                        key={d}
-                        animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
-                        transition={{ duration: 1, repeat: Infinity, delay: d * 0.18 }}
-                        className="w-1.5 h-1.5 rounded-full bg-white/70"
-                      />
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* composer */}
-            <div className="px-4 pb-5 pt-1 flex items-center gap-2">
-              <button className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/55 flex-shrink-0">+</button>
-              <div className="flex-1 h-9 rounded-full bg-white/[0.04] border border-white/[0.06] px-4 flex items-center text-[12px] text-white/35">
-                {t('landing.demoComposer')}
-              </div>
-              <button className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-pink to-accent-orange flex items-center justify-center flex-shrink-0">
-                <Mic size={14} fill="white" className="text-white" />
-              </button>
-            </div>
-          </div>
-
-          {/* статичный стеклянный блик — без перерисовки на каждый кадр, не лагает */}
-          <div aria-hidden className="absolute inset-0 pointer-events-none rounded-[44px] bg-gradient-to-br from-white/[0.07] via-transparent to-transparent" />
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-// Анимированная волна голосового — бегущие столбики
-function LiveWaveform() {
-  const bars = [3, 8, 5, 11, 7, 13, 6, 10, 4, 9, 6, 11];
-  return (
-    <div className="flex items-center gap-[2px] flex-1">
-      {bars.map((h, i) => (
-        <motion.div
-          key={i}
-          animate={{ scaleY: [1, 0.45, 1] }}
-          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.07, ease: 'easeInOut' }}
-          className="w-[2px] bg-white/85 rounded-full origin-center"
-          style={{ height: h }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── Feature grid (magnetic-наклон карточек к курсору) ────────────────────────
-
-function FeatureGrid() {
-  const { t } = useTranslation();
-  const items = [
-    { icon: Lock,      title: t('landing.feat_security_t'), desc: t('landing.feat_security_d') },
-    { icon: Mic,       title: t('landing.feat_voice_t'),    desc: t('landing.feat_voice_d') },
-    { icon: VideoIcon, title: t('landing.feat_calls_t'),    desc: t('landing.feat_calls_d') },
-    { icon: Smile,     title: t('landing.feat_react_t'),    desc: t('landing.feat_react_d') },
-    { icon: Phone,     title: t('landing.feat_phone_t'),    desc: t('landing.feat_phone_d') },
-    { icon: Globe,     title: t('landing.feat_cross_t'),    desc: t('landing.feat_cross_d') },
-  ];
-  return (
-    <section id="features" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
-      <SectionHeader
-        chip={t('landing.featuresChip')}
-        title={t('landing.featuresTitle')}
-        sub={t('landing.featuresSub')}
-      />
-
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
-        {items.map((it, i) => (
-          <TiltCard key={it.title} index={i}>
-            <div className="w-11 h-11 rounded-xl bg-brand-gradient-soft border border-content/[0.08] flex items-center justify-center mb-4 transition group-hover:scale-110">
-              <it.icon size={18} className="text-accent-pink" />
-            </div>
-            <div className="text-base font-medium mb-1.5">{it.title}</div>
-            <div className="text-sm text-content/55 leading-relaxed">{it.desc}</div>
-          </TiltCard>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// Карточка с magnetic-наклоном к курсору (интерактив этого «уровня»)
-function TiltCard({ children, index }: { children: React.ReactNode; index: number }) {
-  const mx = useMotionValue(0);
-  const my = useMotionValue(0);
-  const rx = useSpring(useTransform(my, [-0.5, 0.5], [6, -6]),  { stiffness: 200, damping: 20 });
-  const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-6, 6]),  { stiffness: 200, damping: 20 });
-  const onMove = (e: React.MouseEvent) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    mx.set((e.clientX - r.left) / r.width - 0.5);
-    my.set((e.clientY - r.top) / r.height - 0.5);
-  };
+// ── Появление секции при вскролле ────────────────────────────────────────────
+function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
   return (
     <motion.div
-      onMouseMove={onMove}
-      onMouseLeave={() => { mx.set(0); my.set(0); }}
-      initial={{ opacity: 0, y: 20 }}
+      className={className}
+      initial={{ opacity: 0, y: 28 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-40px' }}
-      transition={{ duration: 0.55, delay: index * 0.05, ease: [0.32, 0.72, 0, 1] }}
-      style={{ rotateX: rx, rotateY: ry, transformStyle: 'preserve-3d', perspective: 700 }}
-      className="group p-6 rounded-2xl bg-content/[0.025] border border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12] transition-colors"
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 0.6, delay, ease: [0.22, 0.61, 0.36, 1] }}
     >
       {children}
     </motion.div>
   );
 }
 
-// ─── Privacy section ──────────────────────────────────────────────────────────
-
-function PrivacySection() {
-  const { t } = useTranslation();
+// ── Бренд-глифы Apple / Windows (точные path из дизайн-системы) ───────────────
+function AppleGlyph({ size = 20, color = '#fff' }: { size?: number; color?: string }) {
   return (
-    <section id="privacy" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
-      <div className="grid lg:grid-cols-2 gap-14 items-center">
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-        >
-          <div className="inline-flex items-center gap-2 text-xs text-accent-violet bg-accent-violet/[0.12] border border-accent-violet/[0.22] rounded-full px-3 py-1.5 mb-6">
-            <ShieldCheck size={12} /> {t('landing.privacyChip')}
-          </div>
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[0.95] mb-6">
-            {t('landing.privacyTitle1')}<br />
-            {t('landing.privacyTitle2')} <span className="bg-clip-text text-transparent bg-brand-gradient">{t('landing.privacyTitleHi')}</span>.
-          </h2>
-          <p className="text-content/60 text-lg leading-relaxed max-w-md">
-            {t('landing.privacySub')}
-          </p>
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M16 13.5c0 3 2 4 2 4s-1.4 3-3.2 3c-1 0-1.6-.6-2.8-.6s-1.9.6-2.8.6C7 21 5 17.5 5 14c0-3.4 2.2-5 4-5 1.1 0 2 .7 2.8.7S13.4 9 14.6 9c1.6 0 2.6 1 3.1 1.8-1.5.8-1.7 2.4-1.7 2.7zM13 6.5c.7-.9 1-2 .9-2.5-1 .1-1.8.6-2.3 1.2-.5.6-.9 1.5-.8 2.4 1 .1 1.6-.4 2.2-1.1z" fill={color} />
+    </svg>
+  );
+}
+function WindowsGlyph({ size = 20, color = '#fff' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 5l8-1v7H3zM13 3.7L21 3v9h-8zM3 12h8v7l-8-1zM13 12h8v9l-8-1z" fill={color} />
+    </svg>
+  );
+}
 
-          <div className="mt-8 space-y-3 text-sm text-content/70">
-            {[
-              t('landing.privacyP1'),
-              t('landing.privacyP2'),
-              t('landing.privacyP3'),
-              t('landing.privacyP4'),
-            ].map((line) => (
-              <div key={line} className="flex items-center gap-3">
-                <span className="w-5 h-5 rounded-full bg-accent-pink/15 flex items-center justify-center flex-shrink-0">
-                  <Check size={11} className="text-accent-pink" />
-                </span>
-                {line}
-              </div>
+// ── Кнопка ───────────────────────────────────────────────────────────────────
+function Btn({ children, primary, large, icon, onClick }: {
+  children: ReactNode; primary?: boolean; large?: boolean; icon?: ReactNode; onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="active:scale-[0.98]"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 9, cursor: 'pointer',
+        padding: large ? '15px 28px' : '11px 20px', borderRadius: 30,
+        fontWeight: 700, fontSize: large ? 16 : 14.5, transition: 'transform .15s, filter .15s',
+        background: primary ? GRAD : C.panel, color: primary ? '#fff' : C.ink,
+        border: primary ? 'none' : `1px solid ${C.rim}`,
+        boxShadow: primary ? '0 12px 30px -8px rgba(45,107,240,0.55)' : C.shadowSm,
+      }}
+    >
+      {icon}{children}
+    </button>
+  );
+}
+
+// ── Мини-аватар для моков ───────────────────────────────────────────────────
+const ACCENTS: Record<string, [string, string, string]> = {
+  aqua:   ['#5DEBD6', '#13B6BE', '#34DCC8'],
+  cyan:   ['#5BD2FF', '#1689E0', '#3BB4F0'],
+  ocean:  ['#6AA2FF', '#2D5BF0', '#5B82FF'],
+  amber:  ['#FFD58A', '#FF9A3D', '#FFB257'],
+  violet: ['#C79CFF', '#7A45E6', '#A878F0'],
+};
+function MiniAvatar({ accent = 'cyan', initials = 'A', size = 40, ring = false }: {
+  accent?: string; initials?: string; size?: number; ring?: boolean;
+}) {
+  const [from, to, glow] = ACCENTS[accent] || ACCENTS.cyan;
+  const r = size / 2;
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      {ring && (
+        <div style={{
+          position: 'absolute', inset: -4, borderRadius: r + 4,
+          boxShadow: `0 0 0 2px ${glow}`, animation: 'presencePulse 2.4s ease-in-out infinite',
+        }} />
+      )}
+      <div style={{
+        width: size, height: size, borderRadius: r,
+        background: `linear-gradient(150deg, ${from}, ${to})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.45), inset 0 -8px 16px rgba(0,0,0,0.16)',
+        color: '#fff', fontWeight: 600, fontSize: size * 0.4, letterSpacing: '-0.02em',
+        textShadow: '0 1px 2px rgba(0,0,0,0.18)',
+      }}>{initials}</div>
+    </div>
+  );
+}
+
+// ── Мини-вейвформа ───────────────────────────────────────────────────────────
+function MiniWave({ count = 16, progress = 0.5, height = 18 }: { count?: number; progress?: number; height?: number }) {
+  const bars = Array.from({ length: count }, (_, i) => {
+    const env = 0.45 + 0.55 * Math.abs(Math.sin((i / count) * Math.PI * 3.2 + 5));
+    return Math.max(0.25, env);
+  });
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, height }}>
+      {bars.map((h, i) => (
+        <div key={i} style={{
+          width: 2, height: Math.round(h * height), borderRadius: 2, flexShrink: 0,
+          background: (i / count) < progress ? '#3BB4F0' : 'rgba(59,180,240,0.3)',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Десктоп-мок окна ────────────────────────────────────────────────────────
+function WindowMock() {
+  const rows = [
+    { initials: 'МК', accent: 'cyan',   name: 'Майя Кравцова', msg: 'печатает…',          time: '12:48', unread: 3, active: false, online: true },
+    { initials: 'ДР', accent: 'aqua',   name: 'Денис Рощин',   msg: 'Скинул макет, глянь', time: '11:50', active: true, online: true },
+    { initials: 'СВ', accent: 'amber',  name: 'Соня Власова',  msg: '📷 Фотография',       time: '10:12', unread: 1 },
+    { initials: 'АП', accent: 'violet', name: 'Артём',         msg: 'Ха, ну ты даёшь 😄',  time: 'Вчера' },
+  ];
+  const railIcons = [<MessageCircle key="c" size={19} />, <Phone key="p" size={19} />, <Users key="u" size={19} />, <Settings key="g" size={19} />];
+  const headIcons = [<Phone key="p" size={18} />, <Video key="v" size={18} />, <MoreHorizontal key="m" size={18} />];
+  return (
+    <div style={{ width: 880, height: 540, borderRadius: 18, overflow: 'hidden', background: C.bg, border: `1px solid ${C.rim}`, boxShadow: C.shadow, display: 'flex' }}>
+      {/* рельс */}
+      <div style={{ width: 60, background: C.rail, borderRight: `1px solid ${C.hair}`, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 16, gap: 14 }}>
+        <div style={{ display: 'flex', gap: 6, alignSelf: 'flex-start', marginLeft: 14, marginBottom: 6 }}>
+          {['#ff5f57', '#febc2e', '#28c840'].map((c) => <span key={c} style={{ width: 9, height: 9, borderRadius: 5, background: c }} />)}
+        </div>
+        <OceanLogo size={36} />
+        {railIcons.map((ic, i) => (
+          <div key={i} style={{ width: 38, height: 38, borderRadius: 12, background: i === 0 ? C.raiseHi : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? C.ink : C.ink3 }}>{ic}</div>
+        ))}
+      </div>
+      {/* список */}
+      <div style={{ width: 270, background: C.panel, borderRight: `1px solid ${C.hair}`, padding: '16px 12px' }}>
+        <div style={{ fontSize: 19, fontWeight: 800, color: C.ink, letterSpacing: '-0.02em', margin: '4px 6px 12px' }}>Чаты</div>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 13, background: r.active ? C.raiseHi : 'transparent', marginBottom: 2 }}>
+            <MiniAvatar accent={r.accent} initials={r.initials} size={40} ring={!!r.online} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: r.unread ? 700 : 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+              <div style={{ fontSize: 12, color: r.msg === 'печатает…' ? '#3BB4F0' : C.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.msg}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+              <span style={{ fontSize: 10.5, color: r.unread ? '#3BB4F0' : C.ink3 }}>{r.time}</span>
+              {r.unread
+                ? <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: GRAD, color: '#fff', fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{r.unread}</span>
+                : <div style={{ height: 18 }} />}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* переписка */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', background: C.bg }}>
+        <div style={{ position: 'absolute', inset: 0, background: C.mesh, pointerEvents: 'none' }} />
+        <div style={{ height: 58, borderBottom: `1px solid ${C.hair}`, display: 'flex', alignItems: 'center', gap: 11, padding: '0 18px', position: 'relative', background: C.panel }}>
+          <MiniAvatar accent="aqua" initials="ДР" size={36} ring />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: C.ink }}>Денис Рощин</div>
+            <div style={{ fontSize: 11.5, color: C.online, fontWeight: 600 }}>в сети</div>
+          </div>
+          {headIcons.map((ic, i) => <span key={i} style={{ margin: '0 5px', color: C.ink2, display: 'flex' }}>{ic}</span>)}
+        </div>
+        <div style={{ flex: 1, padding: '18px 22px', position: 'relative', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ alignSelf: 'flex-start', maxWidth: 280, background: C.inBub, border: `1px solid ${C.inBubBorder}`, color: C.ink, fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderBottomLeftRadius: 6 }}>Сделал в океанской палитре 🌊</div>
+          <div style={{ alignSelf: 'flex-end', maxWidth: 280, background: GRAD, color: '#fff', fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderBottomRightRadius: 6, boxShadow: '0 8px 18px -8px rgba(45,107,240,0.6)' }}>Огонь 🔥 Очень плавно ложится</div>
+          <div style={{ alignSelf: 'flex-end', maxWidth: 280, background: GRAD, color: '#fff', fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderTopRightRadius: 6, boxShadow: '0 8px 18px -8px rgba(45,107,240,0.6)' }}>Светлая тоже шикарная вышла</div>
+        </div>
+        <div style={{ padding: '12px 18px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.panel, border: `1px solid ${C.rim}`, borderRadius: 22, padding: '7px 8px 7px 14px' }}>
+            <span style={{ color: C.ink2, display: 'flex' }}><Plus size={19} /></span>
+            <span style={{ flex: 1, fontSize: 13, color: C.ink3 }}>Напишите сообщение…</span>
+            <div style={{ width: 36, height: 36, borderRadius: 18, background: GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mic size={17} color="#fff" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Мок телефона ─────────────────────────────────────────────────────────────
+function PhoneMock({ isLight }: { isLight: boolean }) {
+  const frame = isLight ? '#0B2138' : '#000';
+  return (
+    <div style={{ width: 248, height: 510, borderRadius: 44, padding: 10, background: frame, boxShadow: C.shadow, border: `1px solid ${C.rim}` }}>
+      <div style={{ width: '100%', height: '100%', borderRadius: 36, overflow: 'hidden', background: C.bg, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', inset: 0, background: C.mesh, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 9, left: '50%', transform: 'translateX(-50%)', width: 96, height: 26, borderRadius: 13, background: frame, zIndex: 5 }} />
+        <div style={{ height: 92, position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 16px 12px' }}>
+          <MiniAvatar accent="cyan" initials="МК" size={40} ring />
+          <div><div style={{ fontSize: 14.5, fontWeight: 700, color: C.ink }}>Майя</div><div style={{ fontSize: 11.5, color: C.online, fontWeight: 600 }}>в сети</div></div>
+        </div>
+        <div style={{ flex: 1, padding: '6px 16px', position: 'relative', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ alignSelf: 'flex-start', maxWidth: 180, background: C.inBub, border: `1px solid ${C.inBubBorder}`, color: C.ink, fontSize: 13, padding: '8px 12px', borderRadius: 16, borderBottomLeftRadius: 5 }}>Уже в пути! 🌊</div>
+          <div style={{ alignSelf: 'flex-end', maxWidth: 180, background: GRAD, color: '#fff', fontSize: 13, padding: '8px 12px', borderRadius: 16, borderBottomRightRadius: 5 }}>Жду у причала ⚓️</div>
+          <div style={{ alignSelf: 'flex-start', width: 150, background: C.inBub, border: `1px solid ${C.inBubBorder}`, padding: '8px 12px', borderRadius: 16, borderBottomLeftRadius: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 14, background: 'rgba(59,180,240,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Play size={13} color="#3BB4F0" /></div>
+            <MiniWave count={16} progress={0.5} height={18} />
+          </div>
+        </div>
+        <div style={{ padding: '8px 14px 16px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.panel, border: `1px solid ${C.rim}`, borderRadius: 20, padding: '6px 6px 6px 14px' }}>
+            <span style={{ flex: 1, fontSize: 12.5, color: C.ink3 }}>Сообщение</span>
+            <div style={{ width: 32, height: 32, borderRadius: 16, background: GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mic size={15} color="#fff" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Карточка фичи ────────────────────────────────────────────────────────────
+function FeatureCard({ icon, accent, title, body, wide }: {
+  icon: ReactNode; accent: string; title: string; body: string; wide?: boolean;
+}) {
+  return (
+    <div className={wide ? 'sm:col-span-2' : ''} style={{ background: C.panel, border: `1px solid ${C.hair}`, borderRadius: 22, padding: 28, boxShadow: C.shadowSm, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: -30, right: -20, width: 160, height: 110, background: `radial-gradient(circle, ${accent}28, transparent 70%)` }} />
+      <div style={{ width: 50, height: 50, borderRadius: 15, background: `linear-gradient(140deg, ${accent}, ${accent}bb)`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: `0 10px 24px -8px ${accent}99`, color: '#fff' }}>{icon}</div>
+      <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: C.ink, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 15, lineHeight: 1.55, color: C.ink2 }}>{body}</div>
+    </div>
+  );
+}
+
+// ── Лендинг ──────────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const navigate = useNavigate();
+  const [isLight, setIsLight] = useState(() => {
+    const m = getStoredMode();
+    return m === 'light' || (m === 'auto' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: light)').matches);
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.add('landing-scroll');
+    return () => document.documentElement.classList.remove('landing-scroll');
+  }, []);
+
+  const toggleTheme = () => {
+    const next = isLight ? 'dark' : 'light';
+    applyThemeMode(next);
+    setIsLight(!isLight);
+  };
+
+  const onDownload = () => {
+    const dl = desktopDownload();
+    if (dl.url) window.location.href = dl.url;
+    else navigate('/auth');
+  };
+  const goAuth = () => navigate('/auth');
+
+  const heroRadial = isLight
+    ? 'radial-gradient(60% 50% at 20% -10%, rgba(66,230,206,0.22), transparent 60%), radial-gradient(55% 50% at 95% 10%, rgba(45,107,240,0.18), transparent 62%)'
+    : 'radial-gradient(60% 50% at 18% -10%, rgba(45,107,240,0.22), transparent 60%), radial-gradient(50% 45% at 92% 8%, rgba(52,220,200,0.14), transparent 62%)';
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, color: C.ink, transition: 'background .3s', position: 'relative' }}>
+      <OceanBackdrop />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+      {/* NAV */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: C.panel, borderBottom: `1px solid ${C.hair}`, backdropFilter: 'blur(22px) saturate(160%)', WebkitBackdropFilter: 'blur(22px) saturate(160%)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', height: 70, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <OceanLogo size={34} />
+            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: C.ink }}>ocean</span>
+          </div>
+          <div style={{ flex: 1 }} />
+          <div className="hidden md:flex" style={{ gap: 4, marginRight: 10 }}>
+            {['Возможности', 'Безопасность', 'Звонки', 'Скачать'].map((l) => (
+              <button key={l} onClick={onDownload} style={{ fontSize: 14.5, fontWeight: 600, color: C.ink2, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 10 }}>{l}</button>
             ))}
           </div>
-        </motion.div>
+          <button onClick={toggleTheme} aria-label="Сменить тему" style={{ width: 40, height: 40, borderRadius: 12, background: C.raise, border: `1px solid ${C.hair}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: C.ink2 }}>
+            {isLight ? <Moon size={19} /> : <Sun size={19} />}
+          </button>
+          <Btn primary icon={<Download size={18} color="#fff" />} onClick={onDownload}>Скачать</Btn>
+        </div>
+      </div>
 
-        <motion.div
-          initial={{ opacity: 0, x: 30 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="relative"
-        >
-          <div className="relative p-8 rounded-3xl bg-content/[0.03] border border-content/[0.08] overflow-hidden">
-            <div className="absolute -inset-1 bg-brand-gradient-soft blur-2xl pointer-events-none" />
-            <div className="relative flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-brand-gradient flex items-center justify-center shadow-glow-violet">
-                <Lock size={28} className="text-white" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{t('landing.privacyCardT')}</div>
-                <div className="text-sm text-content/55">{t('landing.privacyCardS')}</div>
-              </div>
+      {/* HERO */}
+      <div style={{ position: 'relative', overflow: 'hidden', padding: '90px 24px 60px' }}>
+        <div style={{ position: 'absolute', inset: 0, background: heroRadial, pointerEvents: 'none' }} />
+        <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative' }}>
+          <div style={{ textAlign: 'center', maxWidth: 820, margin: '0 auto 48px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', borderRadius: 24, background: C.raise, border: `1px solid ${C.rim}`, fontSize: 13.5, fontWeight: 600, color: C.ink2, marginBottom: 26 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 4, background: C.online, boxShadow: `0 0 8px ${C.online}` }} />Новая версия 3.0 · Aurora
             </div>
-
-            <div className="relative mt-7 p-4 rounded-xl bg-black/40 border border-white/[0.06] font-mono text-[11px] text-white/70 leading-relaxed">
-              <span className="text-accent-pink">{'> '}</span>tls: <span className="text-accent-orange">'1.3'</span><br/>
-              <span className="text-accent-pink">{'> '}</span>hsts: <span className="text-accent-orange">enabled</span><br/>
-              <span className="text-accent-pink">{'> '}</span>media: <span className="text-white/40">private</span><br/>
-              <span className="text-accent-pink">{'> '}</span>2fa: <span className="text-white/40">'TOTP'</span>
+            <h1 className="text-[44px] sm:text-[60px] lg:text-[76px]" style={{ margin: 0, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.04em', color: C.ink }}>
+              Сообщения, что<br />текут <span style={gradText}>плавно</span>
+            </h1>
+            <p style={{ fontSize: 20, lineHeight: 1.5, color: C.ink2, maxWidth: 600, margin: '24px auto 0' }}>
+              Мессенджер, в котором всё ощущается как вода: переписка, звонки и голосовые — со сквозным шифрованием и идеальной синхронизацией на всех устройствах.
+            </p>
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 34, flexWrap: 'wrap' }}>
+              <Btn primary large icon={<AppleGlyph size={20} />} onClick={onDownload}>Скачать для Mac</Btn>
+              <Btn large icon={<WindowsGlyph size={20} color="rgb(var(--content-rgb))" />} onClick={onDownload}>Для Windows</Btn>
             </div>
           </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Download section ─────────────────────────────────────────────────────────
-
-function DownloadSection({ onSignIn }: { onSignIn: () => void }) {
-  const { t } = useTranslation();
-  const dl = desktopDownload();
-  return (
-    <section id="download" className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto py-16 lg:py-20 lg:min-h-screen lg:flex lg:flex-col lg:justify-center">
-      <SectionHeader
-        chip={t('landing.downloadChip')}
-        title={t('landing.downloadTitle')}
-        sub={t('landing.downloadSub')}
-      />
-
-      {/* Главная кнопка — сразу под текущую ОС (macOS/Windows). Иначе — открыть в браузере. */}
-      <div className="mt-10 flex justify-center">
-        {dl.url ? (
-          <motion.a
-            href={dl.url} download
-            whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-            className="inline-flex items-center gap-2.5 h-14 px-8 rounded-2xl bg-brand-gradient text-white font-semibold text-base shadow-glow-violet hover:opacity-95"
-          >
-            <Download size={20} /> {dl.label}
-          </motion.a>
-        ) : (
-          <motion.button
-            onClick={onSignIn}
-            whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-            className="inline-flex items-center gap-2.5 h-14 px-8 rounded-2xl bg-brand-gradient text-white font-semibold text-base shadow-glow-violet hover:opacity-95"
-          >
-            <Globe size={20} /> {t('landing.openInBrowser')}
-          </motion.button>
-        )}
-      </div>
-
-      <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-12">
-        <DownloadCard icon={Apple}      title="macOS"               sub={t('landing.dl_mac')}     href={DESKTOP_DOWNLOADS.mac}     highlight={dl.os === 'mac'} />
-        <DownloadCard icon={Monitor}    title="Windows"             sub={t('landing.dl_win')}     href={DESKTOP_DOWNLOADS.windows} highlight={dl.os === 'windows'} />
-        <DownloadCard icon={Apple}      title="iPhone & iPad"       sub={t('landing.dl_ios')}     onClick={onSignIn} />
-        <DownloadCard icon={Smartphone} title="Android"             sub={t('landing.dl_android')} onClick={onSignIn} />
-        <DownloadCard icon={Globe}      title={t('landing.webTitle')} sub={t('landing.dl_web')}   onClick={onSignIn} />
-      </div>
-    </section>
-  );
-}
-
-function DownloadCard({
-  icon: Icon, title, sub, onClick, href, highlight,
-}: {
-  icon: typeof Apple; title: string; sub: string; onClick?: () => void; href?: string; highlight?: boolean;
-}) {
-  const { t } = useTranslation();
-  const className = `group relative block text-left p-6 rounded-2xl border transition-colors overflow-hidden
-    ${highlight
-      ? 'bg-brand-gradient-soft border-accent-violet/40 ring-1 ring-accent-violet/30'
-      : 'bg-content/[0.025] border-content/[0.07] hover:bg-content/[0.045] hover:border-content/[0.12]'
-    }`;
-  const inner = (
-    <>
-      <Icon size={32} className="mb-4 text-content/85 group-hover:scale-110 transition" />
-      <div className="text-base font-medium mb-1 flex items-center gap-2">
-        {title}
-        {highlight && <span className="text-[10px] font-semibold text-accent-violet bg-accent-violet/15 px-1.5 py-0.5 rounded-full">{t('landing.yourOs')}</span>}
-      </div>
-      <div className="text-sm text-content/55">{sub}</div>
-      <div className="flex items-center gap-1 mt-3 text-xs text-accent-pink opacity-0 group-hover:opacity-100 transition">
-        {href ? t('landing.dlDownload') : t('landing.dlOpen')} <ArrowRight size={12} />
-      </div>
-    </>
-  );
-  const motionProps = { whileHover: { y: -4 }, transition: { type: 'spring' as const, stiffness: 300, damping: 22 } };
-  return href
-    ? <motion.a href={href} download {...motionProps} className={className}>{inner}</motion.a>
-    : <motion.button onClick={onClick} {...motionProps} className={className}>{inner}</motion.button>;
-}
-
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function Footer() {
-  const { t } = useTranslation();
-  return (
-    <footer className="relative z-10 px-6 lg:px-12 max-w-[1480px] mx-auto pt-12 pb-16 border-t border-content/[0.07] space-y-8">
-      {/* Юридический дисклеймер — снимаем ответственность с сервиса/разработчиков. */}
-      <div className="text-[12px] leading-relaxed text-content/40 space-y-3 max-w-3xl">
-        <p>{t('landing.footerAs')}</p>
-        <p>{t('landing.footerRisk')}</p>
-        <p>
-          {t('landing.footerEmergency')}{' '}
-          <a href="#" className="text-content/60 underline hover:text-content/90">{t('landing.footerAgreement')}</a> {t('landing.footerAnd')}{' '}
-          <a href="#" className="text-content/60 underline hover:text-content/90">{t('landing.footerPrivacy')}</a>.
-        </p>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-content/45 pt-6 border-t border-content/[0.05]">
-        <div className="flex items-center gap-2">
-          <DakkaIcon size={24} />
-          <span className="text-content/70 font-extrabold tracking-[-0.04em]">dakka</span>
-          <span>{t('landing.footerRights')}</span>
-        </div>
-        <div className="flex items-center gap-5 flex-wrap justify-center">
-          <a href="#" className="hover:text-content/80 transition">{t('landing.footerLinkAgreement')}</a>
-          <a href="#" className="hover:text-content/80 transition">{t('landing.footerLinkPrivacy')}</a>
-          <a href="#" className="hover:text-content/80 transition">{t('landing.footerLinkOffer')}</a>
-          <a href="mailto:hello@akkdmsg.online" className="hover:text-content/80 transition">{t('landing.footerLinkContact')}</a>
+          {/* кластер устройств — десктоп */}
+          <div className="hidden lg:flex" style={{ position: 'relative', justifyContent: 'center', alignItems: 'flex-end', marginTop: 20 }}>
+            <div style={{ transform: 'translateX(56px)' }}><WindowMock /></div>
+            <div style={{ marginLeft: -150, marginBottom: -30, position: 'relative', zIndex: 4, animation: 'float 6s ease-in-out infinite' }}><PhoneMock isLight={isLight} /></div>
+          </div>
+          {/* мобайл — только телефон */}
+          <div className="flex lg:hidden" style={{ justifyContent: 'center', marginTop: 8 }}>
+            <div style={{ animation: 'float 6s ease-in-out infinite' }}><PhoneMock isLight={isLight} /></div>
+          </div>
         </div>
       </div>
-    </footer>
-  );
-}
 
-// ─── Reusable section header ──────────────────────────────────────────────────
-
-function SectionHeader({ chip, title, sub }: { chip: string; title: string; sub: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6 }}
-      className="text-center max-w-2xl mx-auto"
-    >
-      <div className="inline-flex items-center gap-2 text-xs text-content/60 bg-content/[0.05] border border-content/[0.09] rounded-full px-3 py-1.5 mb-5">
-        {chip}
+      {/* STATS */}
+      <Reveal>
+      <div style={{ borderTop: `1px solid ${C.hair}`, borderBottom: `1px solid ${C.hair}`, background: C.panel }}>
+        <div className="grid grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px', gap: 24 }}>
+          {[['12M+', 'активных пользователей'], ['190', 'стран на борту'], ['99.99%', 'аптайм звонков'], ['0', 'данных на продажу']].map(([n, l], i) => (
+            <div key={i} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', ...gradText }}>{n}</div>
+              <div style={{ fontSize: 14, color: C.ink2, marginTop: 4 }}>{l}</div>
+            </div>
+          ))}
+        </div>
       </div>
-      <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[0.95] mb-5">
-        {title}
-      </h2>
-      <p className="text-content/60 text-lg leading-relaxed">{sub}</p>
-    </motion.div>
+      </Reveal>
+
+      {/* FEATURES */}
+      <Reveal>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <h2 className="text-[34px] sm:text-[48px]" style={{ fontWeight: 800, letterSpacing: '-0.03em', color: C.ink, margin: 0 }}>Всё под одной волной</h2>
+          <p style={{ fontSize: 18, color: C.ink2, marginTop: 12 }}>Спроектировано вокруг ощущения плавности и спокойствия.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 18 }}>
+          <FeatureCard icon={<Lock size={25} />} accent="#16B6E0" title="Сквозное шифрование" body="Каждое сообщение, звонок и файл защищены по умолчанию. Ключи — только у вас и собеседника." />
+          <FeatureCard icon={<Video size={25} />} accent="#2D6BF0" title="Кристальные звонки" body="HD-видео и аудио, которые держатся даже на слабой сети. До 50 участников в комнате." />
+          <FeatureCard icon={<Mic size={25} />} accent="#13A99B" title="Голосовые волны" body="Голосовые с живой формой волны и распознаванием в текст одним касанием." />
+          <FeatureCard icon={<Waves size={25} />} accent="#7A45E6" title="Плавная синхронизация" body="Начните на телефоне, продолжите на ПК. История течёт между устройствами без задержек, мгновенно и без потерь." wide />
+          <FeatureCard icon={<Users size={25} />} accent="#FF9A3D" title="Группы и каналы" body="Сообщества до 200 000 участников с тихими упоминаниями и темами." />
+        </div>
+      </div>
+      </Reveal>
+
+      {/* SHOWCASE */}
+      <Reveal>
+      <div style={{ background: C.panel, borderTop: `1px solid ${C.hair}`, borderBottom: `1px solid ${C.hair}` }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto', padding: '40px 24px' }}>
+          {[
+            { tag: 'Две темы', title: 'Светлая днём, глубокая ночью', body: 'Тёплая морская пена или абиссальная синь — ocean подстраивается под время суток и ваше настроение одним переключателем.', icon: <Moon size={16} />, accent: '#2D6BF0', to: '#34DCC8', flip: false },
+            { tag: 'Приватность', title: 'Ваши данные остаются вашими', body: 'Никакой рекламы, никакой продажи данных. Сквозное шифрование, исчезающие сообщения и блокировка скриншотов встроены в ядро.', icon: <Shield size={16} />, accent: '#13A99B', to: '#1E40C8', flip: true },
+          ].map((r, i) => (
+            <div key={i} className={`flex flex-col ${r.flip ? 'lg:flex-row-reverse' : 'lg:flex-row'}`} style={{ alignItems: 'center', gap: 64, padding: '48px 0' }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, color: r.accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{r.icon}{r.tag}</span>
+                <h3 className="text-[30px] sm:text-[38px]" style={{ fontWeight: 800, letterSpacing: '-0.03em', color: C.ink, margin: '14px 0 0', lineHeight: 1.1 }}>{r.title}</h3>
+                <p style={{ fontSize: 17, lineHeight: 1.6, color: C.ink2, marginTop: 16, maxWidth: 440 }}>{r.body}</p>
+              </div>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: 360, maxWidth: '100%', height: 280, borderRadius: 24, background: `linear-gradient(150deg, ${r.accent}, ${r.to})`, position: 'relative', overflow: 'hidden', boxShadow: C.shadow }}>
+                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(70% 60% at 75% 15%, rgba(255,255,255,0.28), transparent 55%)' }} />
+                  <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(120deg, rgba(255,255,255,0.05) 0 18px, rgba(0,0,0,0.04) 18px 36px)' }} />
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><OceanLogo size={84} variant="flat" shadow={false} /></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      </Reveal>
+
+      {/* CTA */}
+      <Reveal>
+      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '90px 24px' }}>
+        <div style={{ borderRadius: 32, background: GRAD, padding: '64px 32px', position: 'relative', overflow: 'hidden', textAlign: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(60% 70% at 80% 0%, rgba(255,255,255,0.28), transparent 55%)' }} />
+          <div style={{ position: 'absolute', bottom: -80, left: -40, width: 320, height: 320, borderRadius: '50%', border: '44px solid rgba(255,255,255,0.1)' }} />
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}><OceanLogo size={72} variant="flat" shadow={false} /></div>
+            <h2 className="text-[36px] sm:text-[52px]" style={{ fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', margin: '20px 0 0', lineHeight: 1.05 }}>Нырните в ocean</h2>
+            <p style={{ fontSize: 19, color: 'rgba(255,255,255,0.9)', marginTop: 14, maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>Бесплатно навсегда. Доступно на Mac, Windows, iOS и Android.</p>
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 30, flexWrap: 'wrap' }}>
+              <button onClick={onDownload} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '15px 28px', borderRadius: 30, background: '#fff', color: '#0B2138', fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer', boxShadow: '0 14px 30px -8px rgba(0,0,0,0.35)' }}><AppleGlyph size={20} color="#0B2138" />App Store</button>
+              <button onClick={onDownload} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '15px 28px', borderRadius: 30, background: 'rgba(255,255,255,0.16)', color: '#fff', fontWeight: 700, fontSize: 16, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', backdropFilter: 'blur(8px)' }}><Download size={20} color="#fff" />Google Play</button>
+            </div>
+            <button onClick={goAuth} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 22, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.92)', fontWeight: 600, fontSize: 15 }}>Открыть в браузере <ArrowRight size={17} /></button>
+          </div>
+        </div>
+      </div>
+      </Reveal>
+
+      {/* FOOTER */}
+      <div style={{ borderTop: `1px solid ${C.hair}`, background: C.panel }}>
+        <div className="grid grid-cols-2 md:grid-cols-5" style={{ maxWidth: 1200, margin: '0 auto', padding: '56px 24px 40px', gap: 32 }}>
+          <div className="col-span-2 md:col-span-1">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}><OceanLogo size={32} /><span style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: C.ink }}>ocean</span></div>
+            <p style={{ fontSize: 13.5, color: C.ink2, lineHeight: 1.5, maxWidth: 220 }}>Мессенджер, что течёт плавно. Сделано с заботой о приватности.</p>
+          </div>
+          {[
+            ['Продукт', ['Возможности', 'Безопасность', 'Звонки', 'Загрузить', 'Что нового']],
+            ['Компания', ['О нас', 'Блог', 'Карьера', 'Пресс-кит']],
+            ['Поддержка', ['Помощь', 'Статус', 'Связаться', 'API']],
+            ['Право', ['Конфиденциальность', 'Условия', 'Шифрование']],
+          ].map(([h, items], i) => (
+            <div key={i}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 12 }}>{h as string}</div>
+              {(items as string[]).map((l) => <a key={l} href="#" onClick={(e) => e.preventDefault()} style={{ display: 'block', fontSize: 13.5, color: C.ink2, textDecoration: 'none', padding: '5px 0' }}>{l}</a>)}
+            </div>
+          ))}
+        </div>
+        <div style={{ borderTop: `1px solid ${C.hair}` }}>
+          <div className="flex flex-col sm:flex-row" style={{ gap: 8, maxWidth: 1200, margin: '0 auto', padding: '20px 24px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, color: C.ink3 }}>© 2026 ocean. Все права защищены.</span>
+            <span style={{ fontSize: 13, color: C.ink3 }}>Сделано там, где встречаются волны 🌊</span>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
   );
 }

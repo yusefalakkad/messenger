@@ -112,7 +112,7 @@ export default function VoiceMessage({
             className={clsx(
               'flex-1 rounded-full pointer-events-none transition-colors duration-75',
               i < filledCount
-                ? (isOwn ? 'bg-white' : 'bg-[#7A82FF]')
+                ? (isOwn ? 'bg-white' : 'bg-[#3BB4F0]')
                 : (isOwn ? 'bg-white/35' : 'bg-content/25'),
             )}
             style={{ height: `${Math.max(3, h * 28)}px` }}

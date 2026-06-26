@@ -18,17 +18,24 @@ const sizes = {
   xl:  { box: 'w-16 h-16',  text: 'text-xl',  dot: 'w-3.5 h-3.5' },
 };
 
-// Deterministic color from name
-function nameToColor(name: string): string {
-  const colors = [
-    'bg-rose-500', 'bg-pink-500', 'bg-fuchsia-500', 'bg-violet-500',
-    'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500', 'bg-teal-500',
-    'bg-emerald-500', 'bg-green-500', 'bg-yellow-500', 'bg-orange-500',
-  ];
+// Океанские акцент-градиенты (cool-доминантный набор + два тёплых «всплеска»),
+// детерминированно по имени. Точные стопы из дизайн-хендоффа.
+const ACCENT_GRADS = [
+  'linear-gradient(150deg,#5DEBD6,#13B6BE)', // aqua
+  'linear-gradient(150deg,#5BD2FF,#1689E0)', // cyan
+  'linear-gradient(150deg,#6AA2FF,#2D5BF0)', // ocean
+  'linear-gradient(150deg,#7E8CFF,#3B3FD0)', // deep
+  'linear-gradient(150deg,#7FE6B0,#1F9E7C)', // kelp
+  'linear-gradient(150deg,#C79CFF,#7A45E6)', // violet
+  'linear-gradient(150deg,#FF9C8A,#FF5E78)', // coral (warm pop)
+  'linear-gradient(150deg,#FFD58A,#FF9A3D)', // amber (warm pop)
+];
+function nameToAccent(name: string): string {
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  return colors[Math.abs(hash) % colors.length];
+  return ACCENT_GRADS[Math.abs(hash) % ACCENT_GRADS.length];
 }
+const AVATAR_GLOSS = 'inset 0 1px 1px rgba(255,255,255,0.45), inset 0 -8px 16px rgba(0,0,0,0.16)';
 
 export default function Avatar({ src, name, size = 'md', online, ring, className }: AvatarProps) {
   const s = sizes[size];
@@ -66,20 +73,22 @@ export default function Avatar({ src, name, size = 'md', online, ring, className
             )}
           />
         ) : (
-          <div className={clsx('w-full h-full flex items-center justify-center font-semibold text-white rounded-full', s.text, nameToColor(name))}>
+          <div
+            className={clsx('w-full h-full flex items-center justify-center font-semibold text-white rounded-full', s.text)}
+            style={{ background: nameToAccent(name), boxShadow: AVATAR_GLOSS, textShadow: '0 1px 2px rgba(0,0,0,0.18)', letterSpacing: '-0.02em' }}
+          >
             {initials}
           </div>
         )}
       </div>
       {online !== undefined && (
-        <span className={clsx(
-          'absolute bottom-0 right-0 rounded-full border-2 border-dark-surface transition-colors duration-300',
-          s.dot,
-          online ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.65)]' : 'bg-content/25',
-        )}>
-          {/* Мягкий пульс-ореол только для онлайна. */}
+        <span
+          className={clsx('absolute bottom-0 right-0 rounded-full border-2 border-dark-surface transition-colors duration-300', s.dot, !online && 'bg-content/25')}
+          style={online ? { background: 'var(--online)', boxShadow: '0 0 8px rgba(52,220,200,0.7)' } : undefined}
+        >
+          {/* Мягкий пульс-ореол только для онлайна — океанский. */}
           {online && (
-            <span className="absolute inset-0 rounded-full bg-emerald-400/60 animate-ping" />
+            <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'rgba(52,220,200,0.55)' }} />
           )}
         </span>
       )}

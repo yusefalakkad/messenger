@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { ShieldCheck } from 'lucide-react';
-import DakkaIcon from '@/components/ui/DakkaIcon';
+import OceanLogo from '@/components/ui/OceanLogo';
 import { EASE } from '@/lib/motion';
 
 // Лёгкий каскад появления hero-блока.
@@ -29,8 +29,8 @@ export default function EmptyChat() {
         {/* Логотип — сама форма пузыря-бабла, без квадратной подложки. */}
         <motion.div variants={child} className="relative mb-8 animate-float">
           <div className="absolute inset-0 bg-brand-gradient blur-2xl opacity-40" style={{ borderRadius: '40%' }} />
-          <div className="relative drop-shadow-[0_10px_30px_rgba(154,77,255,0.4)]">
-            <DakkaIcon size={100} />
+          <div className="relative drop-shadow-[0_10px_30px_rgba(45,107,240,0.4)]">
+            <OceanLogo size={100} />
           </div>
         </motion.div>
 

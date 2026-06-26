@@ -387,7 +387,7 @@ export default function PhoneAuthForm() {
             <BackButton onClick={() => { setStep('phone'); setTgDeepLink(null); setError(null); }} />
 
             <h2 className="text-content text-xl font-semibold leading-tight">
-              Откройте Dakka-бот в Telegram
+              Откройте нашего бота в Telegram
             </h2>
             <p className="text-content/50 text-sm">
               Это разовое действие. Откройте бота, нажмите <span className="text-content/80">Start</span>,

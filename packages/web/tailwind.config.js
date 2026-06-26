@@ -8,29 +8,31 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand: фиолетово-розово-оранжевый градиент. primary = violet-фиолетовый.
+        // Brand: океанский градиент (аква → циан → океанский синий → глубокая синь).
+        // primary = ocean blue #2D6BF0.
         primary: {
-          50:  '#f4efff',
-          100: '#e8dcff',
-          200: '#d3b8ff',
-          300: '#b794ff',
-          400: '#9a6dff',
-          500: '#7c4dff',
-          600: '#6a3df0',
-          700: '#5a2fd6',
-          800: '#4823a8',
-          900: '#311975',
-          950: '#1c0d4a',
+          50:  '#eaf1ff',
+          100: '#d6e4ff',
+          200: '#aecaff',
+          300: '#7da6ff',
+          400: '#4d80f6',
+          500: '#2d6bf0',  // ocean blue
+          600: '#2257de',
+          700: '#1e40c8',  // deep sea
+          800: '#1a36a8',
+          900: '#16307f',
+          950: '#0e1d4d',
         },
-        // Акцентные тона для градиентов
+        // Акцентные тона ocean (ключи сохранены — значения переведены на океан,
+        // чтобы существующие usage-и автоматически стали океанскими).
         accent: {
-          pink:   '#ff4e86',  // Aurora pink (середина бренд-градиента)
-          fuchsia:'#d946ef',
-          orange: '#ff8a3d',
-          violet: '#8a91ff',  // Aurora indigo (бывший violet — единый акцент)
-          coral:  '#ff6b72',  // Aurora coral
-          indigo: '#8a91ff',  // Aurora indigo
-          teal:   '#2fd0c4',  // Aurora teal («в сети»)
+          pink:   '#16b6e0',  // cyan (середина бренд-градиента)
+          fuchsia:'#2d6bf0',  // ocean blue
+          orange: '#ff9a3d',  // тёплый «всплеск» (amber)
+          violet: '#2d6bf0',  // единый океанский акцент
+          coral:  '#34dcc8',  // aqua
+          indigo: '#2d6bf0',
+          teal:   '#34dcc8',  // aqua («в сети»)
         },
         // Поверхности — через CSS-переменные (см. index.css :root / [data-theme=light]).
         // Один и тот же класс bg-dark-bg меняет цвет по теме автоматически.
@@ -48,7 +50,7 @@ export default {
         content: 'rgb(var(--content-rgb) / <alpha-value>)',
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        sans: ['"Inter Variable"', 'Inter', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Roboto', 'sans-serif'],
       },
       // ─── Дизайн-система ────────────────────────────────────────────────────
       // 4/8px-сетка отступов. Радиусы 6/10/14/18/24/9999. Hit-target ≥ 44px.
@@ -106,9 +108,10 @@ export default {
         'h1':       ['32px', { lineHeight: '38px', letterSpacing: '-0.025em', fontWeight: '700' }],
       },
       backgroundImage: {
-        'brand-gradient': 'linear-gradient(135deg, #7c4dff 0%, #d946ef 50%, #ff8a3d 100%)',
-        'brand-gradient-soft': 'linear-gradient(135deg, rgba(124,77,255,0.18) 0%, rgba(217,70,239,0.14) 50%, rgba(255,138,61,0.14) 100%)',
-        'brand-radial': 'radial-gradient(circle at 30% 20%, rgba(124,77,255,0.25), transparent 50%), radial-gradient(circle at 70% 80%, rgba(255,77,141,0.18), transparent 55%)',
+        // Океанский градиент: аква → циан → океанский синий → глубокая синь.
+        'brand-gradient': 'linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%)',
+        'brand-gradient-soft': 'linear-gradient(135deg, rgba(52,220,200,0.18) 0%, rgba(22,182,224,0.15) 45%, rgba(45,107,240,0.16) 100%)',
+        'brand-radial': 'radial-gradient(circle at 30% 20%, rgba(22,182,224,0.25), transparent 50%), radial-gradient(circle at 70% 80%, rgba(45,107,240,0.18), transparent 55%)',
       },
       boxShadow: {
         // Дизайн-система: 4 ступени высоты + 2 brand-glow.
@@ -117,8 +120,9 @@ export default {
         'e2': '0 4px 12px -2px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.2)',
         'e3': '0 12px 32px -8px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.25)',
         'e4': '0 24px 64px -12px rgba(0,0,0,0.7), 0 8px 16px rgba(0,0,0,0.3)',
-        'glow-violet': '0 8px 28px -10px rgba(138,82,255,0.55)',
-        'glow-pink':   '0 8px 28px -10px rgba(255,90,143,0.45)',
+        /* glow-* — океанские свечения (имена сохранены, цвет переведён на океан) */
+        'glow-violet': '0 8px 28px -10px rgba(45,107,240,0.55)',   /* ocean blue glow */
+        'glow-pink':   '0 8px 28px -10px rgba(22,182,224,0.45)',   /* cyan glow */
         'glow-soft':   '0 8px 32px -12px rgba(0,0,0,0.6)',
       },
       animation: {
@@ -136,6 +140,9 @@ export default {
         'spin-slow':       'spin 12s linear infinite',
         'shimmer':         'shimmer 2.5s linear infinite',
         'pop':             'pop 0.35s cubic-bezier(.34,1.56,.64,1)',
+        // ocean: кольцо присутствия у аватара/в звонке + точки «печатает».
+        'presence-pulse':  'presencePulse 2.4s ease-in-out infinite',
+        'typing-dot':      'typingDot 1.2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
@@ -157,8 +164,18 @@ export default {
           '50%':      { transform: 'scale(1.06)', opacity: '0.85' },
         },
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(124,77,255,0.4)' },
-          '50%':      { boxShadow: '0 0 0 14px rgba(124,77,255,0)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(45,107,240,0.4)' },
+          '50%':      { boxShadow: '0 0 0 14px rgba(45,107,240,0)' },
+        },
+        // ocean — кольцо присутствия (как у аватара в макете).
+        presencePulse: {
+          '0%, 100%': { opacity: '0.85', transform: 'scale(1)' },
+          '50%':      { opacity: '0.2',  transform: 'scale(1.1)' },
+        },
+        // ocean — точки индикатора «печатает» (фазовый сдвиг задаётся inline).
+        typingDot: {
+          '0%, 60%, 100%': { opacity: '0.3', transform: 'translateY(0)' },
+          '30%':           { opacity: '1',   transform: 'translateY(-2px)' },
         },
         shimmer: {
           '0%':   { backgroundPosition: '-200% 0' },

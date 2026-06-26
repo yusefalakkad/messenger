@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { MessageCircle, Phone, Bookmark, Users, Settings, Archive } from 'lucide-react';
 import { clsx } from 'clsx';
 import Avatar from '@/components/ui/Avatar';
+import OceanLogo from '@/components/ui/OceanLogo';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useChatStore } from '@/stores/chat.store';
@@ -18,26 +19,6 @@ import type { Chat } from '@messenger/shared';
  * на мобиле навигация живёт в нижнем таб-баре.
  */
 type RailKey = 'chats' | 'calls' | 'saved' | 'archive' | 'contacts';
-
-/** Белый знак-лого (чат-бабл с вырезанной волной) на градиентной плитке. */
-function RailMark() {
-  const bubble =
-    'M50 14C28.4 14 11 28.7 11 46.8c0 9.9 5.2 18.8 13.4 24.8 0 4.6-1.6 10.3-5.1 15.2 7.6-.7 15.2-3.4 21-7.7 3.1.7 6.3 1 9.7 1 21.6 0 39-14.7 39-32.8S71.6 14 50 14z';
-  const bars: [number, number][] = [[33, 16], [41, 30], [49, 22], [57, 34], [65, 14]];
-  return (
-    <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden>
-      <defs>
-        <mask id="rail-mark-m">
-          <path d={bubble} fill="#fff" />
-          {bars.map(([x, h], i) => (
-            <rect key={i} x={x} y={46 - h / 2} width="5" height={h} rx="2.5" fill="#000" />
-          ))}
-        </mask>
-      </defs>
-      <path d={bubble} fill="#fff" mask="url(#rail-mark-m)" />
-    </svg>
-  );
-}
 
 export default function NavRail() {
   const navigate = useNavigate();
@@ -80,15 +61,16 @@ export default function NavRail() {
       <div className="h-[52px] w-full" style={{ WebkitAppRegion: 'drag' } as Record<string, string>} />
 
       {/* Логотип-плитка */}
-      <button
+      <motion.button
         onClick={() => { closeAll(); navigate('/'); }}
-        className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center mb-6 shadow-[0_6px_18px_rgba(255,78,134,0.4)] active:scale-95 transition-transform"
-        style={{ background: 'linear-gradient(135deg,#FF7A78 0%,#FF4E86 46%,#7A82FF 100%)' }}
-        title="Dakka"
-        aria-label="Dakka"
+        whileTap={tap}
+        transition={SPRING.snappy}
+        className="mb-6 active:scale-95 transition-transform"
+        title="ocean"
+        aria-label="ocean"
       >
-        <RailMark />
-      </button>
+        <OceanLogo size={42} />
+      </motion.button>
 
       {/* Навигация */}
       <div className="flex flex-col gap-2.5">
