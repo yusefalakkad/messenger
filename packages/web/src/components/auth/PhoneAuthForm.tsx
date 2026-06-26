@@ -357,7 +357,7 @@ export default function PhoneAuthForm() {
                               transition-colors focus-within:border-primary-400/50 focus-within:bg-content/[0.05]
                               focus-within:ring-2 focus-within:ring-primary-500/15">
                 <CountryPicker value={country} onChange={setCountry} />
-                <span className="w-px h-7 self-center bg-content/20 rounded-full flex-shrink-0" aria-hidden />
+                <span className="w-px h-6 self-center bg-content/15 rounded-full flex-shrink-0" aria-hidden />
                 <input
                   autoFocus
                   inputMode="tel"
@@ -369,7 +369,7 @@ export default function PhoneAuthForm() {
                     if (c.code !== country.code) setCountry(c);
                     setPhone(local);
                   }}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-content text-[15px] placeholder:text-content/30 tabular-nums"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-content text-[17px] tracking-wide caret-primary-500 placeholder:text-content/30 placeholder:tracking-normal tabular-nums"
                 />
               </div>
             </label>

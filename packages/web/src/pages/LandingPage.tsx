@@ -311,6 +311,26 @@ function FeatureCard({ icon, accent, title, body, wide }: {
   );
 }
 
+// ── Showcase-карточка «Две темы»: половина светлая, половина тёмная ──────────
+function ThemeSplitCard() {
+  const half = (dark: boolean) => (
+    <div style={{ flex: 1, padding: '16px 14px', background: dark ? '#070C16' : '#EAF1F7', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ width: 22, height: 22, borderRadius: 11, background: 'linear-gradient(150deg,#5DEBD6,#13B6BE)' }} />
+        <div style={{ fontSize: 11, fontWeight: 700, color: dark ? '#EAF1FA' : '#0B2138' }}>Майя</div>
+      </div>
+      <div style={{ alignSelf: 'flex-start', maxWidth: '82%', fontSize: 10.5, padding: '6px 9px', borderRadius: 11, borderBottomLeftRadius: 3, background: dark ? '#141F31' : '#fff', color: dark ? '#EAF1FA' : '#0B2138', border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(16,58,110,0.08)' }}>Привет 🌊</div>
+      <div style={{ alignSelf: 'flex-end', maxWidth: '82%', fontSize: 10.5, padding: '6px 9px', borderRadius: 11, borderBottomRightRadius: 3, background: GRAD, color: '#fff' }}>И там и там 🔥</div>
+      <div style={{ marginTop: 'auto', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: dark ? 'rgba(234,241,250,0.45)' : 'rgba(11,33,56,0.45)' }}>{dark ? 'Тёмная' : 'Светлая'}</div>
+    </div>
+  );
+  return (
+    <div style={{ width: 360, maxWidth: '100%', height: 280, borderRadius: 24, overflow: 'hidden', display: 'flex', boxShadow: C.shadow, border: `1px solid ${C.rim}` }}>
+      {half(false)}{half(true)}
+    </div>
+  );
+}
+
 // ── Лендинг ──────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -336,6 +356,25 @@ export default function LandingPage() {
     else navigate('/auth');
   };
   const goAuth = () => navigate('/auth');
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  // Навигация: ссылки ведут к секциям, «Скачать» — реальная загрузка.
+  const navLinks: { label: string; go: () => void }[] = [
+    { label: 'Возможности', go: () => scrollToId('features') },
+    { label: 'Безопасность', go: () => scrollToId('privacy') },
+    { label: 'Звонки', go: () => scrollToId('features') },
+    { label: 'Скачать', go: onDownload },
+  ];
+  const footerGo: Record<string, () => void> = {
+    'Возможности': () => scrollToId('features'),
+    'Безопасность': () => scrollToId('privacy'),
+    'Звонки': () => scrollToId('features'),
+    'Загрузить': onDownload,
+    'Что нового': () => scrollToId('features'),
+  };
 
   const heroRadial = isLight
     ? 'radial-gradient(60% 50% at 20% -10%, rgba(66,230,206,0.22), transparent 60%), radial-gradient(55% 50% at 95% 10%, rgba(45,107,240,0.18), transparent 62%)'
@@ -354,8 +393,8 @@ export default function LandingPage() {
           </div>
           <div style={{ flex: 1 }} />
           <div className="hidden md:flex" style={{ gap: 4, marginRight: 10 }}>
-            {['Возможности', 'Безопасность', 'Звонки', 'Скачать'].map((l) => (
-              <button key={l} onClick={onDownload} style={{ fontSize: 14.5, fontWeight: 600, color: C.ink2, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 10 }}>{l}</button>
+            {navLinks.map((n) => (
+              <button key={n.label} onClick={n.go} style={{ fontSize: 14.5, fontWeight: 600, color: C.ink2, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 10 }}>{n.label}</button>
             ))}
           </div>
           <button onClick={toggleTheme} aria-label="Сменить тему" style={{ width: 40, height: 40, borderRadius: 12, background: C.raise, border: `1px solid ${C.hair}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: C.ink2 }}>
@@ -402,7 +441,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px', gap: 24 }}>
           {[['12M+', 'активных пользователей'], ['190', 'стран на борту'], ['99.99%', 'аптайм звонков'], ['0', 'данных на продажу']].map(([n, l], i) => (
             <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', ...gradText }}>{n}</div>
+              <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.25, paddingBottom: 4, display: 'inline-block', ...gradText }}>{n}</div>
               <div style={{ fontSize: 14, color: C.ink2, marginTop: 4 }}>{l}</div>
             </div>
           ))}
@@ -412,7 +451,7 @@ export default function LandingPage() {
 
       {/* FEATURES */}
       <Reveal>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 24px' }}>
+      <div id="features" style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 24px', scrollMarginTop: 80 }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 className="text-[34px] sm:text-[48px]" style={{ fontWeight: 800, letterSpacing: '-0.03em', color: C.ink, margin: 0 }}>Всё под одной волной</h2>
           <p style={{ fontSize: 18, color: C.ink2, marginTop: 12 }}>Спроектировано вокруг ощущения плавности и спокойствия.</p>
@@ -429,7 +468,7 @@ export default function LandingPage() {
 
       {/* SHOWCASE */}
       <Reveal>
-      <div style={{ background: C.panel, borderTop: `1px solid ${C.hair}`, borderBottom: `1px solid ${C.hair}` }}>
+      <div id="privacy" style={{ background: C.panel, borderTop: `1px solid ${C.hair}`, borderBottom: `1px solid ${C.hair}`, scrollMarginTop: 70 }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '40px 24px' }}>
           {[
             { tag: 'Две темы', title: 'Светлая днём, глубокая ночью', body: 'Тёплая морская пена или абиссальная синь — ocean подстраивается под время суток и ваше настроение одним переключателем.', icon: <Moon size={16} />, accent: '#2D6BF0', to: '#34DCC8', flip: false },
@@ -442,11 +481,18 @@ export default function LandingPage() {
                 <p style={{ fontSize: 17, lineHeight: 1.6, color: C.ink2, marginTop: 16, maxWidth: 440 }}>{r.body}</p>
               </div>
               <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                <div style={{ width: 360, maxWidth: '100%', height: 280, borderRadius: 24, background: `linear-gradient(150deg, ${r.accent}, ${r.to})`, position: 'relative', overflow: 'hidden', boxShadow: C.shadow }}>
-                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(70% 60% at 75% 15%, rgba(255,255,255,0.28), transparent 55%)' }} />
-                  <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(120deg, rgba(255,255,255,0.05) 0 18px, rgba(0,0,0,0.04) 18px 36px)' }} />
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><OceanLogo size={84} variant="flat" shadow={false} /></div>
-                </div>
+                {i === 0 ? (
+                  <ThemeSplitCard />
+                ) : (
+                  <div style={{ width: 360, maxWidth: '100%', height: 280, borderRadius: 24, background: `linear-gradient(150deg, ${r.accent}, ${r.to})`, position: 'relative', overflow: 'hidden', boxShadow: C.shadow }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(70% 60% at 75% 15%, rgba(255,255,255,0.28), transparent 55%)' }} />
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(120deg, rgba(255,255,255,0.05) 0 18px, rgba(0,0,0,0.04) 18px 36px)' }} />
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexDirection: 'column' }}>
+                      <Lock size={56} color="#fff" strokeWidth={1.6} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '0.04em' }}>END-TO-END</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -456,7 +502,7 @@ export default function LandingPage() {
 
       {/* CTA */}
       <Reveal>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '90px 24px' }}>
+      <div id="download" style={{ maxWidth: 1120, margin: '0 auto', padding: '90px 24px', scrollMarginTop: 70 }}>
         <div style={{ borderRadius: 32, background: GRAD, padding: '64px 32px', position: 'relative', overflow: 'hidden', textAlign: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(60% 70% at 80% 0%, rgba(255,255,255,0.28), transparent 55%)' }} />
           <div style={{ position: 'absolute', bottom: -80, left: -40, width: 320, height: 320, borderRadius: '50%', border: '44px solid rgba(255,255,255,0.1)' }} />
@@ -489,14 +535,20 @@ export default function LandingPage() {
           ].map(([h, items], i) => (
             <div key={i}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 12 }}>{h as string}</div>
-              {(items as string[]).map((l) => <a key={l} href="#" onClick={(e) => e.preventDefault()} style={{ display: 'block', fontSize: 13.5, color: C.ink2, textDecoration: 'none', padding: '5px 0' }}>{l}</a>)}
+              {(items as string[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={footerGo[l] || (() => window.scrollTo({ top: 0, behavior: 'smooth' }))}
+                  style={{ display: 'block', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, color: C.ink2, padding: '5px 0', width: '100%' }}
+                >{l}</button>
+              ))}
             </div>
           ))}
         </div>
         <div style={{ borderTop: `1px solid ${C.hair}` }}>
           <div className="flex flex-col sm:flex-row" style={{ gap: 8, maxWidth: 1200, margin: '0 auto', padding: '20px 24px', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, color: C.ink3 }}>© 2026 ocean. Все права защищены.</span>
-            <span style={{ fontSize: 13, color: C.ink3 }}>Сделано там, где встречаются волны 🌊</span>
+            <button onClick={goAuth} style={{ fontSize: 13, color: C.ink2, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Открыть в браузере →</button>
           </div>
         </div>
       </div>
