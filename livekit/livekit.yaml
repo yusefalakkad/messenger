@@ -14,8 +14,11 @@ rtc:
   # TCP fallback — для клиентов за рестриктивным NAT/firewall, где UDP заблочен.
   tcp_port: 7881
   # UDP-диапазон для медиа. Должен совпадать с диапазоном в docker-compose.yml.
-  udp_port_range_start: 50000
-  udp_port_range_end:   50099
+  # ВАЖНО: поля переименованы в новых версиях livekit-server (старые имена
+  # udp_port_range_start/end больше не парсятся → "field not found", контейнер
+  # падает на старте). Актуальные имена — port_range_start/end.
+  port_range_start: 50000
+  port_range_end:   50099
   # use_external_ip — авто-резолв публичного IP через STUN. Нужно когда LiveKit
   # запущен за NAT (docker bridge, VPS с эластичным IP, и т.д.).
   use_external_ip: true
