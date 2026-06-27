@@ -309,7 +309,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
           {/* Превью цитаты */}
           {message.replyTo && (
             <div className={clsx(
-              'flex items-start gap-2 px-3 py-2 rounded-xl mb-1 border-l-2',
+              'flex items-start gap-2 px-3 py-2 rounded-xl mb-1 border-s-2',
               // Нейтральный фон + полупрозрачный border — читаемо на любом градиенте
               isOwn ? 'bg-white/15 border-white/60 backdrop-blur-sm' : 'bg-dark-hover border-primary-500',
             )}>

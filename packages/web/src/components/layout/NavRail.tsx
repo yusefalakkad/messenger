@@ -55,7 +55,7 @@ export default function NavRail() {
   ];
 
   return (
-    <div className="hidden lg:flex w-[76px] flex-shrink-0 flex-col items-center bg-dark-bg border-r border-dark-border pb-4">
+    <div className="hidden lg:flex w-[76px] flex-shrink-0 flex-col items-center bg-dark-bg border-e border-dark-border pb-4">
       {/* Зона под traffic lights / перетаскивание окна (Electron) */}
       <div className="h-[52px] w-full" style={{ WebkitAppRegion: 'drag' } as Record<string, string>} />
 

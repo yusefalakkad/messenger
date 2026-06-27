@@ -199,7 +199,7 @@ export default function ProfilePanel({ chat, otherMember, onClose }: Props) {
         initial="hidden"
         animate="visible"
         exit="exit"
-        className="absolute inset-y-0 right-0 w-full sm:w-80 bg-dark-surface border-l border-dark-border flex flex-col z-panel shadow-e4"
+        className="absolute inset-y-0 end-0 w-full sm:w-80 bg-dark-surface border-s border-dark-border flex flex-col z-panel shadow-e4"
       >
         {/* Шапка — h-16 единая с ChatHeader/GroupCallView */}
         <div className="flex items-center gap-3 px-4 h-16 border-b border-dark-border bg-dark-surface/80 backdrop-blur-xl flex-shrink-0 z-header">
