@@ -52,7 +52,6 @@ export default function NavRail() {
     { key: 'calls',    Icon: Phone,         label: t('nav.calls'),    on: active === 'calls',    onClick: () => { setSettingsOpen(false); setContactsOpen(false); setCallsOpen(true); } },
     { key: 'saved',    Icon: Bookmark,      label: t('chat.saved'),   on: false,                 onClick: openSaved },
     { key: 'archive',  Icon: Archive,       label: t('chat.archive'), on: archiveOpen,           onClick: () => setArchiveOpen(true) },
-    { key: 'contacts', Icon: Users,         label: t('nav.contacts'), on: active === 'contacts', onClick: () => { setSettingsOpen(false); setCallsOpen(false); setContactsOpen(true); } },
   ];
 
   return (
@@ -89,7 +88,7 @@ export default function NavRail() {
                 on ? 'bg-dark-hover border border-dark-border' : 'border border-transparent hover:bg-dark-hover/60',
               )}
             >
-              {on && <span className="absolute -left-[15px] top-[13px] w-[3px] h-5 rounded-full" style={{ background: '#FF6B72' }} />}
+              {on && <span className="absolute -left-[15px] top-[13px] w-[3px] h-5 rounded-full" style={{ background: 'linear-gradient(180deg,#16E0E6,#7A2BFF)', boxShadow: '0 0 10px rgba(22,224,230,0.6)' }} />}
               <Icon size={22} strokeWidth={on ? 2 : 1.7}
                     className={on ? 'text-content' : 'text-content/40'} />
             </motion.button>

@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { ShieldCheck } from 'lucide-react';
 import OceanLogo from '@/components/ui/OceanLogo';
 import { EASE } from '@/lib/motion';
 
@@ -29,15 +28,9 @@ export default function EmptyChat() {
         {/* Логотип — сама форма пузыря-бабла, без квадратной подложки. */}
         <motion.div variants={child} className="relative mb-8 animate-float">
           <div className="absolute inset-0 bg-brand-gradient blur-2xl opacity-40" style={{ borderRadius: '40%' }} />
-          <div className="relative drop-shadow-[0_10px_30px_rgba(45,107,240,0.4)]">
+          <div className="relative drop-shadow-[0_10px_30px_rgba(22,224,230,0.45)]">
             <OceanLogo size={100} />
           </div>
-        </motion.div>
-
-        {/* Чип-плашка */}
-        <motion.div variants={child} className="chip-brand mb-6">
-          <ShieldCheck size={13} className="text-primary-600 dark:text-primary-300" />
-          Приватность по умолчанию · защищённое соединение
         </motion.div>
 
         {/* Заголовок с градиентным акцентом */}

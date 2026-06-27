@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'framer-motion';
 import {
   Download, Sun, Moon, Lock, Video, Mic, Waves, Users, Shield,
-  Phone, MoreHorizontal, Settings, Plus, Play, MessageCircle, ArrowRight,
+  Phone, MoreHorizontal, Settings, Plus, Play, MessageCircle, ArrowRight, ChevronDown,
 } from 'lucide-react';
 import OceanLogo from '@/components/ui/OceanLogo';
 import Spores from '@/components/ui/Spores';
@@ -370,7 +370,6 @@ export default function LandingPage() {
     { label: 'Возможности', go: () => scrollToId('features') },
     { label: 'Безопасность', go: () => scrollToId('privacy') },
     { label: 'Звонки', go: () => scrollToId('features') },
-    { label: 'Скачать', go: onDownload },
   ];
   const footerGo: Record<string, () => void> = {
     'Возможности': () => scrollToId('features'),
@@ -413,10 +412,7 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', inset: 0, background: heroRadial, pointerEvents: 'none' }} />
         <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative' }}>
           <div style={{ textAlign: 'center', maxWidth: 820, margin: '0 auto 48px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', borderRadius: 24, background: C.raise, border: `1px solid ${C.rim}`, fontSize: 13.5, fontWeight: 600, color: C.ink2, marginBottom: 26 }}>
-              <span style={{ width: 7, height: 7, borderRadius: 4, background: C.online, boxShadow: `0 0 8px ${C.online}` }} />Новая версия 3.0 · Aurora
-            </div>
-            <h1 className="text-[44px] sm:text-[60px] lg:text-[76px]" style={{ margin: 0, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.04em', color: C.ink }}>
+            <h1 className="text-[44px] sm:text-[60px] lg:text-[76px]" style={{ margin: 0, marginTop: 8, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.04em', color: C.ink }}>
               Сообщения, что<br />текут <span style={{ ...gradText, background: GRAD_HERO, WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'drop-shadow(0 0 28px rgba(91,247,218,0.55))' }}>плавно</span>
             </h1>
             <p style={{ fontSize: 20, lineHeight: 1.5, color: C.ink2, maxWidth: 600, margin: '24px auto 0' }}>
@@ -426,6 +422,10 @@ export default function LandingPage() {
               <Btn primary large icon={<AppleGlyph size={20} />} onClick={onDownload}>Скачать для Mac</Btn>
               <Btn large icon={<WindowsGlyph size={20} color="rgb(var(--content-rgb))" />} onClick={onDownload}>Для Windows</Btn>
             </div>
+            {/* стрелка-вниз — скролл к секциям */}
+            <button onClick={() => scrollToId('features')} aria-label="Листать вниз" className="animate-bounce" style={{ marginTop: 30, background: 'none', border: 'none', cursor: 'pointer', color: C.ink3, display: 'inline-flex' }}>
+              <ChevronDown size={28} />
+            </button>
           </div>
           {/* кластер устройств — десктоп */}
           <div className="hidden lg:flex" style={{ position: 'relative', justifyContent: 'center', alignItems: 'flex-end', marginTop: 20 }}>
