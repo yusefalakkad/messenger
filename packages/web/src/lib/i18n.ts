@@ -23,10 +23,9 @@ export function getStoredLang(): Lang {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v === 'ru' || v === 'en' || v === 'ar') return v;
   } catch { /* инкогнито */ }
-  // По умолчанию — язык устройства (navigator.language).
-  const sys = (typeof navigator !== 'undefined' ? navigator.language : 'ru').toLowerCase();
-  if (sys.startsWith('ar')) return 'ar';
-  if (sys.startsWith('en')) return 'en';
+  // По умолчанию — русский (лендинг и приложение RU-first). Язык меняется в
+  // настройках; раньше брали navigator.language → у англоязычных браузеров форма
+  // входа была на английском, а лендинг на русском (рассинхрон).
   return 'ru';
 }
 

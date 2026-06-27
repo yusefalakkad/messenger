@@ -46,7 +46,7 @@ export default function AuthPage() {
             key="welcome"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.35, ease: EASE.out }}
-            className="relative flex flex-col min-h-screen px-5 pb-[calc(var(--sab)+1.25rem)] w-full lg:max-w-[420px] lg:mx-auto"
+            className="relative flex flex-col min-h-screen px-5 pb-[calc(var(--sab)+1.25rem)] w-full max-w-[440px] mx-auto"
           >
             {/* ── Парящие аватарки: точные позиции, размеры, float-анимация ── */}
             {FLOATERS.map((f) => (
@@ -124,7 +124,7 @@ export default function AuthPage() {
             key="form"
             initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.35, ease: EASE.out }}
-            className="relative flex-1 flex flex-col px-6 pt-[calc(var(--sat)+1rem)] pb-[calc(var(--sab)+1.5rem)] w-full lg:max-w-[420px] lg:mx-auto"
+            className="relative flex-1 flex flex-col px-6 pt-[calc(var(--sat)+1rem)] pb-[calc(var(--sab)+1.5rem)] w-full max-w-[440px] mx-auto"
           >
             <button
               onClick={() => setStarted(false)}
@@ -141,7 +141,7 @@ export default function AuthPage() {
 
             {/* На десктопе центрируем форму по вертикали (не «прижата» к верху
                 с пустотой снизу), на мобиле — обычный поток. */}
-            <div className="flex-1 lg:flex lg:flex-col lg:justify-center lg:pb-24">
+            <div className="flex-1 flex flex-col justify-center pb-24">
               <PhoneAuthForm />
             </div>
           </motion.div>
