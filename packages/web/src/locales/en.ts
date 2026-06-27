@@ -88,7 +88,7 @@ export const en: Dict = {
     messagePlaceholder: 'Message…',
     searchChats: 'Search chats…',
     online: 'online', offline: 'offline', typing: 'typing…',
-    archive: 'Archive', saved: 'Saved Messages',
+    archive: 'Archive', saved: 'Saved Messages', savedSub: 'Saved messages',
     archivedChats: 'Archived chats',
     downloadApp: 'Download app',
     newChat: 'New chat', newGroup: 'New group', newChannel: 'New channel',

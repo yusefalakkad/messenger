@@ -82,6 +82,8 @@ function OceanBackdrop() {
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }} aria-hidden>
+      {/* каустика — подвижный подводный блик */}
+      <div className="animate-caustic spores-layer" style={{ position: 'absolute', inset: '-10%', background: 'radial-gradient(40% 32% at 30% 24%, rgba(22,224,230,0.12), transparent 60%), radial-gradient(38% 30% at 72% 70%, rgba(122,43,255,0.12), transparent 62%)' }} />
       <Orb y={y1} drift="animate-drift-a" color="rgba(91,247,218,0.30)" size={540} pos={{ top: -140, left: -100 }} />
       <Orb y={y2} drift="animate-drift-b" color="rgba(22,224,230,0.26)" size={620} pos={{ top: 20, right: -160 }} />
       <Orb y={y3} drift="animate-drift-c" color="rgba(46,123,255,0.24)" size={700} pos={{ top: '44%', left: '6%' }} />

@@ -10,6 +10,7 @@ import { Search, Moon, Sun, Monitor, MessageSquare, Bookmark, Megaphone, Users, 
 import { useChatStore } from '@/stores/chat.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { setMode } from '@/lib/theme';
+import i18nInstance from '@/lib/i18n';
 import { backdrop, popIn } from '@/lib/motion';
 import Avatar from '@/components/ui/Avatar';
 
@@ -45,7 +46,7 @@ export default function CommandPalette() {
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 30); }, [open]);
 
   const chatName = useCallback((c: typeof chats[number]): { name: string; sub?: string } => {
-    if (c.type === 'saved') return { name: 'Избранное' };
+    if (c.type === 'saved') return { name: i18nInstance.t('chat.saved') };
     if (c.type === 'group') return { name: c.name ?? 'Группа', sub: `${c.members.length} участников` };
     if (c.type === 'channel') return { name: c.name ?? 'Канал', sub: 'канал' };
     const other = c.members.find((m) => m.userId !== myId);

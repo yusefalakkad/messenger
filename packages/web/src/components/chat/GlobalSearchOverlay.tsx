@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import i18nInstance from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { Loader2, Megaphone, SearchX, Users, MessageSquarePlus } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -56,7 +57,7 @@ function subscribersLabel(n: number): string {
 
 // Имя чата: группа/saved — своё, direct — собеседник
 function chatTitle(chat: Chat, myUserId?: string): string {
-  if (chat.type === 'saved') return 'Избранное';
+  if (chat.type === 'saved') return i18nInstance.t('chat.saved');
   if (chat.type === 'group') return chat.name ?? 'Группа';
   return chat.members?.find((m) => m.userId !== myUserId)?.user.displayName ?? 'Чат';
 }
@@ -360,7 +361,7 @@ export default function GlobalSearchOverlay({ query, onOpenChat }: Props) {
           </h4>
           {results.messages.map((msg) => {
             const chatName = msg.chat.type === 'saved'
-              ? 'Избранное'
+              ? i18nInstance.t('chat.saved')
               : msg.chat.name ?? msg.sender?.displayName ?? 'Чат';
             const snippet = makeSnippet(msg.content ?? '', query);
             return (

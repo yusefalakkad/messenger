@@ -383,7 +383,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
                     )}
                   />
                   {message.content && (
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words px-3 pt-1 pb-1">
+                    <p dir="auto" className="text-sm leading-relaxed whitespace-pre-wrap break-words px-3 pt-1 pb-1">
                       {message.content}
                     </p>
                   )}
@@ -412,7 +412,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
                 message.encrypted
                   ? <EncryptedText message={message} chatId={chatId} />
                   : <>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      <p dir="auto" className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                         {renderRichText(message.content ?? '')}
                         {message.editedAt && (
                           message.editHistory?.length
@@ -996,7 +996,7 @@ function EncryptedText({ message, chatId }: { message: Message; chatId: string }
   }
 
   return (
-    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+    <p dir="auto" className="text-sm leading-relaxed whitespace-pre-wrap break-words">
       {renderRichText(plaintext)}
     </p>
   );

@@ -89,7 +89,7 @@ export const ru = {
     messagePlaceholder: 'Сообщение…',
     searchChats: 'Поиск чатов…',
     online: 'в сети', offline: 'не в сети', typing: 'печатает…',
-    archive: 'Архив', saved: 'Избранное',
+    archive: 'Архив', saved: 'Избранное', savedSub: 'Сохранённые сообщения',
     archivedChats: 'Архивные чаты',
     downloadApp: 'Скачать приложение',
     newChat: 'Новый чат', newGroup: 'Новая группа', newChannel: 'Новый канал',

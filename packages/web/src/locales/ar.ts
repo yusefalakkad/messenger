@@ -88,7 +88,7 @@ export const ar: Dict = {
     messagePlaceholder: 'رسالة…',
     searchChats: 'بحث في المحادثات…',
     online: 'متصل', offline: 'غير متصل', typing: 'يكتب…',
-    archive: 'الأرشيف', saved: 'الرسائل المحفوظة',
+    archive: 'الأرشيف', saved: 'الرسائل المحفوظة', savedSub: 'رسائلك المحفوظة',
     archivedChats: 'المحادثات المؤرشفة',
     downloadApp: 'تنزيل التطبيق',
     newChat: 'محادثة جديدة', newGroup: 'مجموعة جديدة', newChannel: 'قناة جديدة',

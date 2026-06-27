@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import i18nInstance from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { useFoldersStore } from '@/stores/folders.store';
@@ -16,7 +17,7 @@ interface Props {
 
 /** Имя чата для списка: saved → «Избранное», direct → имя собеседника. */
 function chatDisplay(chat: Chat, myUserId?: string): { name: string; avatar?: string | null } {
-  if (chat.type === 'saved') return { name: 'Избранное' };
+  if (chat.type === 'saved') return { name: i18nInstance.t('chat.saved') };
   if (chat.type === 'group') return { name: chat.name ?? 'Группа', avatar: chat.avatar };
   const other = chat.members.find((m) => m.userId !== myUserId);
   return { name: other?.user.displayName ?? 'Unknown', avatar: other?.user.avatar };

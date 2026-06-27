@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Phone, Video, Search, MoreVertical, ShieldCheck, Trash2, ChevronLeft, Users, Timer, Hourglass, Palette, Bookmark } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -62,6 +63,7 @@ export default function ChatHeader({ chat, otherMember }: Props) {
   const clearMessages = useChatStore((s) => s.clearMessages);
   const [startingGroupCall, setStartingGroupCall] = useState(false);
 
+  const { t } = useTranslation();
   const isChannel = chat.type === 'channel';
   const isSaved   = chat.type === 'saved';
   // Моя роль в чате — медленный режим настраивают только owner/admin групп и каналов
@@ -69,13 +71,13 @@ export default function ChatHeader({ chat, otherMember }: Props) {
   const canSetSlowMode =
     (chat.type === 'group' || chat.type === 'channel') &&
     (myRole === 'owner' || myRole === 'admin');
-  const name     = isSaved ? 'Избранное' : chat.type === 'direct' ? otherMember?.user.displayName : chat.name;
+  const name     = isSaved ? t('chat.saved') : chat.type === 'direct' ? otherMember?.user.displayName : chat.name;
   const avatar   = chat.type === 'direct' ? otherMember?.user.avatar : chat.avatar;
   const isOnline = otherMember?.user.status === 'online';
   // «Избранное» — личное хранилище, не показываем индикатор шифрования.
   const e2e      = !isSaved && isChatE2E(chat);
   const subtitle = isSaved
-    ? 'Сохранённые сообщения'
+    ? t('chat.savedSub')
     : chat.type === 'group'
       ? `${chat.members.length} участников`
       : isChannel
