@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
 import OceanLogo from '@/components/ui/OceanLogo';
+import Spores from '@/components/ui/Spores';
 import { EASE, SPRING, tap } from '@/lib/motion';
 
 const INTER = "'Inter Variable', -apple-system, system-ui, sans-serif";
@@ -33,8 +34,11 @@ export default function AuthPage() {
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(120% 55% at 18% -8%, rgba(45,107,240,0.20), transparent 60%), radial-gradient(110% 50% at 92% 4%, rgba(52,220,200,0.14), transparent 62%)' }}
+        style={{ background: 'radial-gradient(120% 55% at 18% -8%, rgba(22,224,230,0.18), transparent 60%), radial-gradient(110% 50% at 92% 4%, rgba(122,43,255,0.16), transparent 62%)' }}
       />
+      {/* биолюминесцентные споры — только тёмная тема */}
+      <Spores count={40} seed={11} />
+      <span className="sr-only">ocean</span>
 
       <AnimatePresence mode="wait">
         {!started ? (

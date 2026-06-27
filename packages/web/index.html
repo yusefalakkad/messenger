@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#070C16" />
+    <meta name="theme-color" content="#040A14" />
     <meta name="color-scheme" content="dark" />
 
     <!-- PWA / iOS Add-to-Homescreen -->
@@ -23,7 +23,7 @@
             ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
             : (m === 'light' ? 'light' : 'dark');
           document.documentElement.setAttribute('data-theme', actual);
-          var bg = actual === 'light' ? '#EAF1F7' : '#070C16';
+          var bg = actual === 'light' ? '#EAF1F7' : '#040A14';
           document.documentElement.style.backgroundColor = bg;
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', bg);

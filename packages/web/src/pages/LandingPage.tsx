@@ -6,6 +6,7 @@ import {
   Phone, MoreHorizontal, Settings, Plus, Play, MessageCircle, ArrowRight,
 } from 'lucide-react';
 import OceanLogo from '@/components/ui/OceanLogo';
+import Spores from '@/components/ui/Spores';
 import { desktopDownload } from '@/lib/desktopDownload';
 import { getStoredMode, setMode as applyThemeMode } from '@/lib/theme';
 
@@ -17,7 +18,8 @@ import { getStoredMode, setMode as applyThemeMode } from '@/lib/theme';
  * бренд — океанский градиент. Кнопки завязаны на реальные действия (вход/скачать).
  */
 
-const GRAD = 'linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%)';
+const GRAD = 'linear-gradient(135deg, #38F5C8 0%, #16E0E6 34%, #2E7BFF 68%, #7A2BFF 100%)';
+const GRAD_HERO = 'linear-gradient(120deg, #5BF7DA, #16E0E6 40%, #6AB4FF 70%, #B07BFF)';
 
 // Токены темы как ссылки на CSS-переменные → меняются вместе с data-theme без re-render.
 const C = {
@@ -80,15 +82,17 @@ function OceanBackdrop() {
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }} aria-hidden>
-      <Orb y={y1} drift="animate-drift-a" color="rgba(66,230,206,0.30)" size={540} pos={{ top: -140, left: -100 }} />
-      <Orb y={y2} drift="animate-drift-b" color="rgba(22,182,224,0.26)" size={620} pos={{ top: 20, right: -160 }} />
-      <Orb y={y3} drift="animate-drift-c" color="rgba(45,107,240,0.24)" size={700} pos={{ top: '44%', left: '6%' }} />
-      <Orb y={y4} drift="animate-drift-a" color="rgba(122,69,230,0.18)" size={480} pos={{ bottom: '6%', right: '4%' }} />
+      <Orb y={y1} drift="animate-drift-a" color="rgba(91,247,218,0.30)" size={540} pos={{ top: -140, left: -100 }} />
+      <Orb y={y2} drift="animate-drift-b" color="rgba(22,224,230,0.26)" size={620} pos={{ top: 20, right: -160 }} />
+      <Orb y={y3} drift="animate-drift-c" color="rgba(46,123,255,0.24)" size={700} pos={{ top: '44%', left: '6%' }} />
+      <Orb y={y4} drift="animate-drift-a" color="rgba(154,75,255,0.22)" size={480} pos={{ bottom: '6%', right: '4%' }} />
       {/* плавные волны снизу */}
       <motion.svg viewBox="0 0 1440 320" preserveAspectRatio="none" style={{ position: 'absolute', bottom: -20, left: '-10%', width: '120%', height: 280, opacity: 0.5, y: waveY }}>
-        <path className="animate-wave-slow" fill="rgba(45,107,240,0.12)" d="M0,160 C240,220 480,90 720,140 C960,190 1200,110 1440,160 L1440,320 L0,320 Z" />
-        <path className="animate-wave-fast" fill="rgba(52,220,200,0.10)" d="M0,200 C240,150 480,250 720,200 C960,150 1200,240 1440,190 L1440,320 L0,320 Z" />
+        <path className="animate-wave-slow" fill="rgba(46,123,255,0.12)" d="M0,160 C240,220 480,90 720,140 C960,190 1200,110 1440,160 L1440,320 L0,320 Z" />
+        <path className="animate-wave-fast" fill="rgba(91,247,218,0.12)" d="M0,200 C240,150 480,250 720,200 C960,150 1200,240 1440,190 L1440,320 L0,320 Z" />
       </motion.svg>
+      {/* биолюминесцентные споры — только тёмная тема (CSS прячет .spores-layer в светлой) */}
+      <Spores count={54} seed={7} />
     </div>
   );
 }
@@ -138,7 +142,7 @@ function Btn({ children, primary, large, icon, onClick }: {
         fontWeight: 700, fontSize: large ? 16 : 14.5, transition: 'transform .15s, filter .15s',
         background: primary ? GRAD : C.panel, color: primary ? '#fff' : C.ink,
         border: primary ? 'none' : `1px solid ${C.rim}`,
-        boxShadow: primary ? '0 12px 30px -8px rgba(45,107,240,0.55)' : C.shadowSm,
+        boxShadow: primary ? '0 12px 30px -8px rgba(22,224,230,0.55)' : C.shadowSm,
       }}
     >
       {icon}{children}
@@ -251,8 +255,8 @@ function WindowMock() {
         </div>
         <div style={{ flex: 1, padding: '18px 22px', position: 'relative', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ alignSelf: 'flex-start', maxWidth: 280, background: C.inBub, border: `1px solid ${C.inBubBorder}`, color: C.ink, fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderBottomLeftRadius: 6 }}>Сделал в океанской палитре 🌊</div>
-          <div style={{ alignSelf: 'flex-end', maxWidth: 280, background: GRAD, color: '#fff', fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderBottomRightRadius: 6, boxShadow: '0 8px 18px -8px rgba(45,107,240,0.6)' }}>Огонь 🔥 Очень плавно ложится</div>
-          <div style={{ alignSelf: 'flex-end', maxWidth: 280, background: GRAD, color: '#fff', fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderTopRightRadius: 6, boxShadow: '0 8px 18px -8px rgba(45,107,240,0.6)' }}>Светлая тоже шикарная вышла</div>
+          <div style={{ alignSelf: 'flex-end', maxWidth: 280, background: GRAD, color: '#fff', fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderBottomRightRadius: 6, boxShadow: '0 8px 18px -8px rgba(22,224,230,0.6)' }}>Огонь 🔥 Очень плавно ложится</div>
+          <div style={{ alignSelf: 'flex-end', maxWidth: 280, background: GRAD, color: '#fff', fontSize: 13.5, padding: '8px 13px', borderRadius: 16, borderTopRightRadius: 6, boxShadow: '0 8px 18px -8px rgba(22,224,230,0.6)' }}>Светлая тоже шикарная вышла</div>
         </div>
         <div style={{ padding: '12px 18px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.panel, border: `1px solid ${C.rim}`, borderRadius: 22, padding: '7px 8px 7px 14px' }}>
@@ -378,7 +382,7 @@ export default function LandingPage() {
 
   const heroRadial = isLight
     ? 'radial-gradient(60% 50% at 20% -10%, rgba(66,230,206,0.22), transparent 60%), radial-gradient(55% 50% at 95% 10%, rgba(45,107,240,0.18), transparent 62%)'
-    : 'radial-gradient(60% 50% at 18% -10%, rgba(45,107,240,0.22), transparent 60%), radial-gradient(50% 45% at 92% 8%, rgba(52,220,200,0.14), transparent 62%)';
+    : 'radial-gradient(58% 48% at 16% -10%, rgba(22,224,230,0.20), transparent 60%), radial-gradient(50% 45% at 92% 6%, rgba(122,43,255,0.18), transparent 62%), radial-gradient(64% 50% at 50% 112%, rgba(46,123,255,0.14), transparent 70%)';
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.ink, transition: 'background .3s', position: 'relative' }}>
@@ -413,7 +417,7 @@ export default function LandingPage() {
               <span style={{ width: 7, height: 7, borderRadius: 4, background: C.online, boxShadow: `0 0 8px ${C.online}` }} />Новая версия 3.0 · Aurora
             </div>
             <h1 className="text-[44px] sm:text-[60px] lg:text-[76px]" style={{ margin: 0, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.04em', color: C.ink }}>
-              Сообщения, что<br />текут <span style={gradText}>плавно</span>
+              Сообщения, что<br />текут <span style={{ ...gradText, background: GRAD_HERO, WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'drop-shadow(0 0 28px rgba(91,247,218,0.55))' }}>плавно</span>
             </h1>
             <p style={{ fontSize: 20, lineHeight: 1.5, color: C.ink2, maxWidth: 600, margin: '24px auto 0' }}>
               Мессенджер, в котором всё ощущается как вода: переписка, звонки и голосовые — со сквозным шифрованием и идеальной синхронизацией на всех устройствах.

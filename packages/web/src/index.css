@@ -10,17 +10,16 @@
   --sar: env(safe-area-inset-right, 0px);
   --keyboard-height: 0px;
 
-  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) — язык «ocean / бездна» ──────────────────
-     Океанская бездна: bg #070C16, панели #0C1421, приподнятые #111A2A. Глубина —
-     через волосяные rim-границы и океанские радиальные блики (mesh).
-     Поверхности заданы как RGB-каналы → работает opacity-модификатор. */
-  --bg-rgb:      7 12 22;            /* #070C16  abyss bg */
-  --surface-rgb: 12 20 33;           /* #0C1421  panel (список, шапки, детали) */
-  --card-rgb:    17 26 42;           /* #111A2A  panel2 (входящие, медиа) */
-  --border-rgb:  31 43 61;           /* ≈ rim rgba(255,255,255,0.13) над panel */
-  --hover-rgb:   24 34 51;           /* raise/raiseHi (ховер/активные подложки) */
-  --input-rgb:   17 26 42;           /* #111A2A */
-  --rail-rgb:    10 17 31;           /* #0A111F нав-рельс */
+  /* ─── ТЁМНАЯ ТЕМА (по умолчанию) — «океан Пандоры / биолюминесценция» ──────
+     Глубокая абиссальная вода (#040A14) со светящимися спорами и teal/violet
+     всполохами. Поверхности RGB-каналами → работает opacity-модификатор. */
+  --bg-rgb:      4 10 20;             /* #040A14  Pandora abyss */
+  --surface-rgb: 8 19 31;             /* #08131F  panel */
+  --card-rgb:    12 27 43;            /* #0C1B2B  panel2 */
+  --border-rgb:  23 60 65;            /* ≈ rim rgba(91,247,218,0.18) над panel — био-бирюзовый хайрлайн */
+  --hover-rgb:   17 44 52;            /* ≈ raiseHi rgba(91,247,218,0.11) */
+  --input-rgb:   12 27 43;            /* #0C1B2B */
+  --rail-rgb:    6 16 30;             /* #06101E нав-рельс */
   /* Удобные «плоские» алиасы для прямых var(--bg) ссылок (body, html-бутстрап). */
   --bg:       rgb(var(--bg-rgb));
   --surface:  rgb(var(--surface-rgb));
@@ -28,16 +27,17 @@
   --border:   rgb(var(--border-rgb));
   --hover:    rgb(var(--hover-rgb));
   --input:    rgb(var(--input-rgb));
-  --content-rgb: 234 241 250;        /* #EAF1FA ink */
-  --online: #34DCC8;                 /* индикатор «в сети» */
-  --shadow-window: 0 40px 120px rgba(0,0,0,0.66);   /* тень окна/устройств */
-  --shadow-card:   0 8px 22px -8px rgba(0,0,0,0.6); /* тень карточек */
-  --bubble-in: #141F31;              /* входящий пузырь — inBub */
-  --bubble-in-text: #EAF1FA;
+  --content-rgb: 234 251 250;        /* #EAFBFA ink (cyan-white) */
+  --online: #5BF7DA;                 /* спора-планктон «в сети» */
+  --shadow-window: 0 40px 120px rgba(0,0,0,0.7);
+  --shadow-card:   0 8px 22px -8px rgba(0,0,0,0.62);
+  --bubble-in: #0E2030;              /* входящий пузырь — inBub */
+  --bubble-in-text: #EAFBFA;
   --app-bg-image:
-    radial-gradient(46% 36% at 16% 0%, rgba(45,107,240,0.13), transparent 66%),
-    radial-gradient(44% 34% at 92% 8%, rgba(52,220,200,0.10), transparent 66%);
-  --selection-bg: rgba(45,107,240,0.32);
+    radial-gradient(48% 38% at 14% 0%, rgba(22,224,230,0.14), transparent 64%),
+    radial-gradient(46% 36% at 92% 8%, rgba(122,43,255,0.13), transparent 64%),
+    radial-gradient(60% 50% at 50% 108%, rgba(46,123,255,0.12), transparent 70%);
+  --selection-bg: rgba(22,224,230,0.32);
   color-scheme: dark;
 }
 
@@ -137,13 +137,21 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   .animate-drift-a, .animate-drift-b, .animate-drift-c, .animate-wave-slow, .animate-wave-fast { animation: none; }
 }
 
+/* ─── Биолюминесцентные споры-планктон (ТОЛЬКО тёмная тема) ───────────────────
+   Светящиеся частицы дрейфуют (sporeFloat) и мерцают (sporeGlow). В светлой
+   «дневной» теме слой скрыт. */
+@keyframes sporeFloat { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(var(--drift, 12px), -22px); } }
+@keyframes sporeGlow  { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+[data-theme="light"] .spores-layer { display: none; }
+@media (prefers-reduced-motion: reduce) { .spore { animation: none !important; } }
+
 /* ─── Активный чат: яркая «плашка» + 3D-наклон за курсором (десктоп) ──────────
    Заливка-градиент brand + внутренняя рамка + мягкое свечение. transform
    (наклон) ставится инлайном из ChatListItem; здесь только плавность возврата. */
 @media (min-width: 1024px) {
   .chat-active-plaque {
-    background: linear-gradient(100deg, rgba(45,107,240,0.24), rgba(22,182,224,0.14));
-    box-shadow: inset 0 0 0 1px rgba(91,130,255,0.42), 0 12px 28px -12px rgba(45,107,240,0.55);
+    background: linear-gradient(100deg, rgba(22,224,230,0.24), rgba(122,43,255,0.14));
+    box-shadow: inset 0 0 0 1px rgba(91,247,218,0.42), 0 12px 28px -12px rgba(22,224,230,0.55);
     transition: transform 0.16s cubic-bezier(0.32,0.72,0,1), box-shadow 0.2s ease;
     will-change: transform;
   }
@@ -226,7 +234,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      Брендовый градиентный текст (анимированный)
   ───────────────────────────────────────────── */
   .text-gradient {
-    background: linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 100%);
+    background: linear-gradient(135deg, #38F5C8 0%, #16E0E6 40%, #2E7BFF 100%);
     background-size: 200% 200%;
     -webkit-background-clip: text;
     background-clip: text;
@@ -327,7 +335,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   .chip-brand {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-white/85;
     background: linear-gradient(rgba(8,14,24,0.6), rgba(8,14,24,0.6)) padding-box,
-                linear-gradient(135deg, #42E6CE, #16B6E0 50%, #2D6BF0) border-box;
+                linear-gradient(135deg, #38F5C8, #16E0E6 50%, #2E7BFF) border-box;
     border: 1px solid transparent;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -338,10 +346,10 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      in:  плотная тёмная поверхность с тонкой светящейся границей и глубиной. */
   .bubble-out {
     @apply text-white rounded-[26px] rounded-br-[9px];
-    background: linear-gradient(140deg, #42E6CE 0%, #16B6E0 38%, #2D6BF0 72%, #1E40C8 100%);
+    background: linear-gradient(140deg, #38F5C8 0%, #16E0E6 38%, #2E7BFF 72%, #7A2BFF 100%);
     box-shadow:
       0 1px 0 rgba(255,255,255,0.14) inset,
-      0 10px 28px -14px rgba(45,107,240,0.6),
+      0 10px 28px -14px rgba(22,224,230,0.6),
       0 2px 6px -2px rgba(0,0,0,0.25);
   }
   .bubble-in {
@@ -398,13 +406,13 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
   .btn-primary {
     @apply btn text-white shadow-glow-violet;
-    background: linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%);
+    background: linear-gradient(135deg, #38F5C8 0%, #16E0E6 40%, #2E7BFF 74%, #7A2BFF 100%);
     background-size: 200% 200%;
   }
   .btn-primary:hover:not(:disabled) {
     background-position: 100% 0%;
     filter: brightness(1.08);
-    box-shadow: 0 12px 36px -10px rgba(45,107,240,0.55);
+    box-shadow: 0 12px 36px -10px rgba(22,224,230,0.55);
   }
 
   .btn-secondary {
@@ -467,14 +475,14 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
   /* Кольцо-градиент вокруг аватара */
   .ring-gradient {
-    background: linear-gradient(135deg, #42E6CE, #16B6E0 55%, #2D6BF0);
+    background: linear-gradient(135deg, #38F5C8, #16E0E6 55%, #2E7BFF);
     padding: 2px;
     border-radius: 9999px;
     transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.3s;
   }
   .ring-gradient:hover {
     transform: scale(1.04);
-    box-shadow: 0 0 24px -2px rgba(45,107,240,0.55);
+    box-shadow: 0 0 24px -2px rgba(22,224,230,0.55);
   }
 
   /* Анимированная градиентная обводка вокруг карточки */
@@ -487,7 +495,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
     position: absolute; inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(66,230,206,0.5), rgba(22,182,224,0.4), rgba(45,107,240,0.4));
+    background: linear-gradient(135deg, rgba(56,245,200,0.5), rgba(22,224,230,0.4), rgba(122,43,255,0.4));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
             mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
@@ -541,8 +549,8 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
   }
 
   /* Световое пятно (как фон) */
-  .bg-spot-violet { background: radial-gradient(circle, rgba(45,107,240,0.30), transparent 60%); }
-  .bg-spot-pink   { background: radial-gradient(circle, rgba(22,182,224,0.25), transparent 60%); }
+  .bg-spot-violet { background: radial-gradient(circle, rgba(122,43,255,0.30), transparent 60%); }
+  .bg-spot-pink   { background: radial-gradient(circle, rgba(22,224,230,0.25), transparent 60%); }
   .bg-spot-orange { background: radial-gradient(circle, rgba(255,138,61,0.22), transparent 60%); }
 
   /* Hover-lift микро-интеракция */
@@ -556,7 +564,7 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
 
   /* Текст с градиентным подчёркиванием на hover */
   .link-grad {
-    background-image: linear-gradient(90deg, #42E6CE, #16B6E0, #2D6BF0);
+    background-image: linear-gradient(90deg, #38F5C8, #16E0E6, #2E7BFF);
     background-size: 100% 1px;
     background-position: 0 100%;
     background-repeat: no-repeat;

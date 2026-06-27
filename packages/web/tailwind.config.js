@@ -108,10 +108,10 @@ export default {
         'h1':       ['32px', { lineHeight: '38px', letterSpacing: '-0.025em', fontWeight: '700' }],
       },
       backgroundImage: {
-        // Океанский градиент: аква → циан → океанский синий → глубокая синь.
-        'brand-gradient': 'linear-gradient(135deg, #42E6CE 0%, #16B6E0 40%, #2D6BF0 74%, #1E40C8 100%)',
-        'brand-gradient-soft': 'linear-gradient(135deg, rgba(52,220,200,0.18) 0%, rgba(22,182,224,0.15) 45%, rgba(45,107,240,0.16) 100%)',
-        'brand-radial': 'radial-gradient(circle at 30% 20%, rgba(22,182,224,0.25), transparent 50%), radial-gradient(circle at 70% 80%, rgba(45,107,240,0.18), transparent 55%)',
+        // Биолюм-градиент «океан Пандоры»: спора-аква → reef-циан → current-синь → био-фиолет.
+        'brand-gradient': 'linear-gradient(135deg, #38F5C8 0%, #16E0E6 34%, #2E7BFF 68%, #7A2BFF 100%)',
+        'brand-gradient-soft': 'linear-gradient(135deg, rgba(56,245,200,0.18) 0%, rgba(22,224,230,0.15) 40%, rgba(122,43,255,0.16) 100%)',
+        'brand-radial': 'radial-gradient(circle at 30% 20%, rgba(22,224,230,0.25), transparent 50%), radial-gradient(circle at 70% 80%, rgba(122,43,255,0.20), transparent 55%)',
       },
       boxShadow: {
         // Дизайн-система: 4 ступени высоты + 2 brand-glow.
@@ -120,9 +120,9 @@ export default {
         'e2': '0 4px 12px -2px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.2)',
         'e3': '0 12px 32px -8px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.25)',
         'e4': '0 24px 64px -12px rgba(0,0,0,0.7), 0 8px 16px rgba(0,0,0,0.3)',
-        /* glow-* — океанские свечения (имена сохранены, цвет переведён на океан) */
-        'glow-violet': '0 8px 28px -10px rgba(45,107,240,0.55)',   /* ocean blue glow */
-        'glow-pink':   '0 8px 28px -10px rgba(22,182,224,0.45)',   /* cyan glow */
+        /* glow-* — биолюм-свечения (reef-циан + bio-violet, имена сохранены) */
+        'glow-violet': '0 10px 30px -6px rgba(22,224,230,0.55), 0 0 40px -8px rgba(122,43,255,0.5)',
+        'glow-pink':   '0 8px 28px -10px rgba(91,247,218,0.5), 0 0 32px -10px rgba(255,77,216,0.4)',
         'glow-soft':   '0 8px 32px -12px rgba(0,0,0,0.6)',
       },
       animation: {
