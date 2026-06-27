@@ -234,32 +234,33 @@ export default function Sidebar() {
       {/* ── Folder tabs — «Все» + папки + «+» ── */}
       <FolderTabs onEditFolder={(id) => setEditFolder({ open: true, id })} />
 
-      {/* ── Архив + Избранное — ТОЛЬКО МОБИЛА, тонкие строки как в Telegram.
-             На десктопе они живут в нав-рейле слева, поэтому здесь lg:hidden. ── */}
+      {/* ── Архив (как в Telegram) — инлайн-строка вверху списка на ДЕСКТОПЕ И
+             мобайле, появляется когда есть архивные чаты. Избранное — только
+             мобайл (на десктопе живёт в нав-рейле). ── */}
       {!activeFolderId && (
-      <div className="lg:hidden px-2 mb-1 flex-shrink-0 space-y-0.5">
+      <div className="px-2 mb-1 flex-shrink-0 space-y-0.5">
+        {archivedCount > 0 && (
         <motion.button
           onClick={() => setArchiveOpen(true)}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left active:bg-content/[0.05] transition-colors"
+          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left hover:bg-content/[0.04] active:bg-content/[0.06] transition-colors"
           title={t('chat.archivedChats')}
         >
-          <span className="w-9 h-9 flex-shrink-0 rounded-full bg-content/[0.07] flex items-center justify-center text-content/70">
+          <span className="w-9 h-9 flex-shrink-0 rounded-full flex items-center justify-center text-white" style={{ background: 'linear-gradient(150deg,#16E0E6,#2E7BFF)' }}>
             <Archive size={17} />
           </span>
           <span className="flex-1 min-w-0 truncate text-content/90 font-medium text-[15px]">{t('chat.archive')}</span>
-          {archivedCount > 0 && (
-            <span className="text-[13px] font-medium text-content/45 tabular-nums">{archivedCount}</span>
-          )}
+          <span className="text-[13px] font-medium text-content/45 tabular-nums">{archivedCount}</span>
           <ChevronRight size={16} className="text-content/25 flex-shrink-0" />
         </motion.button>
+        )}
 
         <motion.button
           onClick={openSaved}
           whileTap={tap}
           transition={SPRING.snappy}
-          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left active:bg-content/[0.05] transition-colors"
+          className="lg:hidden w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left active:bg-content/[0.05] transition-colors"
           title={t('chat.saved')}
         >
           <span className="w-9 h-9 flex-shrink-0 rounded-full bg-brand-gradient flex items-center justify-center text-white">
