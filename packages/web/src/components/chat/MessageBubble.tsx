@@ -55,6 +55,21 @@ interface Props {
   chatId: string;
 }
 
+// Сообщение из одних эмодзи (1–6) → рисуем крупно без пузыря, как в Telegram.
+function isOnlyEmoji(s?: string | null): boolean {
+  if (!s) return false;
+  const t = s.replace(/\s/g, '');
+  if (!t) return false;
+  try {
+    const rest = t.replace(/(\p{Extended_Pictographic}|\p{Emoji_Component}|️|‍)/gu, '');
+    if (rest.length > 0) return false;
+    const n = [...t.matchAll(/\p{Extended_Pictographic}/gu)].length;
+    return n >= 1 && n <= 6;
+  } catch {
+    return false;
+  }
+}
+
 export default function MessageBubble({ message, isOwn, showAvatar, showName = false, isCont = false, chatId }: Props) {
   const { t } = useTranslation();
   const [viewerSrc,  setViewerSrc]  = useState<string | null>(null);
@@ -210,6 +225,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
   const isPureImage = message.type === 'image' && !message.content && showMediaInline;
   // Видео без подписи — аналогично
   const isPureVideo = message.type === 'video' && !message.content && showMediaInline;
+  const isEmojiOnly = message.type === 'text' && !message.encrypted && !message.forwardedFromId && !message.replyTo && isOnlyEmoji(message.content);
   // Первая ссылка в незашифрованном тексте — рендерим OG-превью под текстом
   const firstUrl = (message.type === 'text' && !message.encrypted && message.content)
     ? message.content.match(URL_RE)?.[0] ?? null
@@ -341,10 +357,10 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
           {!isCircle && (
             <div className={clsx(
               // Опрос — всегда нейтральный пузырь (bubble-in), даже у отправителя.
-              isPoll ? 'bubble-in' : (isOwn ? 'bubble-out' : 'bubble-in'),
+              isPoll ? 'bubble-in' : isEmojiOnly ? 'bg-transparent shadow-none border-0' : (isOwn ? 'bubble-out' : 'bubble-in'),
               isCont && 'is-cont',
-              (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : 'px-3.5 py-2 relative',
-              'min-w-[88px]',
+              (isPureImage || isPureVideo) ? 'p-0 overflow-hidden relative' : isEmojiOnly ? 'px-1 py-0 relative' : 'px-3.5 py-2 relative',
+              !isEmojiOnly && 'min-w-[88px]',
               isSelected    && 'ring-2 ring-primary-500/70',
               isHighlighted && 'ring-2 ring-primary-400/60 bg-primary-500/10 transition-all duration-500',
             )}>
@@ -412,7 +428,7 @@ export default function MessageBubble({ message, isOwn, showAvatar, showName = f
                 message.encrypted
                   ? <EncryptedText message={message} chatId={chatId} />
                   : <>
-                      <p dir="auto" className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      <p dir="auto" className={clsx('whitespace-pre-wrap break-words', isEmojiOnly ? 'text-[46px] leading-tight' : 'text-sm leading-relaxed')}>
                         {renderRichText(message.content ?? '')}
                         {message.editedAt && (
                           message.editHistory?.length

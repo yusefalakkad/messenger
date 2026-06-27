@@ -354,12 +354,15 @@ html.is-desktop [role="button"] { -webkit-app-region: no-drag; }
      in:  плотная тёмная поверхность с тонкой светящейся границей и глубиной. */
   .bubble-out {
     @apply text-white rounded-[26px] rounded-br-[9px];
-    background: linear-gradient(140deg, #38F5C8 0%, #16E0E6 38%, #2E7BFF 72%, #7A2BFF 100%);
+    /* Чуть приглушаем самый яркий teal слева, чтобы белый текст читался. */
+    background: linear-gradient(140deg, #18C9C0 0%, #16C2E0 36%, #2E7BFF 72%, #7A2BFF 100%);
+    text-shadow: 0 1px 3px rgba(4,16,26,0.38);
     box-shadow:
       0 1px 0 rgba(255,255,255,0.14) inset,
       0 10px 28px -14px rgba(22,224,230,0.6),
       0 2px 6px -2px rgba(0,0,0,0.25);
   }
+  .bubble-out * { text-shadow: inherit; }
   .bubble-in {
     @apply rounded-[26px] rounded-bl-[9px];
     color: var(--bubble-in-text);
