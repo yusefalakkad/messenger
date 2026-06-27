@@ -139,7 +139,9 @@ export default function AuthPage() {
               <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1.5px' }}>ocean</span>
             </div>
 
-            <div className="flex-1">
+            {/* На десктопе центрируем форму по вертикали (не «прижата» к верху
+                с пустотой снизу), на мобиле — обычный поток. */}
+            <div className="flex-1 lg:flex lg:flex-col lg:justify-center lg:pb-24">
               <PhoneAuthForm />
             </div>
           </motion.div>

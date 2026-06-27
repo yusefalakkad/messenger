@@ -441,20 +441,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* STATS */}
-      <Reveal>
-      <div style={{ borderTop: `1px solid ${C.hair}`, borderBottom: `1px solid ${C.hair}`, background: C.panel }}>
-        <div className="grid grid-cols-2 md:grid-cols-4" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px', gap: 24 }}>
-          {[['12M+', 'активных пользователей'], ['190', 'стран на борту'], ['99.99%', 'аптайм звонков'], ['0', 'данных на продажу']].map(([n, l], i) => (
-            <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.25, paddingBottom: 4, display: 'inline-block', ...gradText }}>{n}</div>
-              <div style={{ fontSize: 14, color: C.ink2, marginTop: 4 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      </Reveal>
-
       {/* FEATURES */}
       <Reveal>
       <div id="features" style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 24px', scrollMarginTop: 80 }}>
